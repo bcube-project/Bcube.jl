@@ -364,8 +364,8 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::CellInfo, dom
     icell = cellindex(elementInfo)
     nU = Val(get_ndofs(U, shape(celltype(elementInfo))))
     nV = Val(get_ndofs(V, shape(celltype(elementInfo))))
-    jdofs = get_dofs(U, icell, nU)
-    idofs = get_dofs(V, icell, nV)
+    jdofs = get_dofs(U, icell, nU) # columns correspond to the TrialFunction
+    idofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
     _idofs, _jdofs = _cartesian_product(idofs, jdofs)
     unwrapValues = _unwrap_cell_integrate(V, values)
     append!(I, _idofs)
@@ -580,6 +580,26 @@ function _cellpair_blockmap_shape_functions(
     LazyMapOver((λij,))
 end
 
+"""
+# Dev notes:
+Return `blockU` and `blockV` to be able to compute
+the local matrix corresponding to the bilinear form :
+```math
+    A[i,j] = a(λᵤ[j], λᵥ[i])
+```
+where `λᵤ` and `λᵥ` are the shape functions associated with
+the trial `U` and the test `V` function spaces respectively.
+In a "map-over" version, it can be written :
+```math
+    A = a(blockU, blockV)
+```
+where `blockU` and `blockV` correspond formally to
+the lazy-map-over matrices :
+```math
+    ∀k, blockU[k,j] = λᵤ[j],
+        blockV[i,k] = λᵥ[i]
+```
+"""
 function blockmap_bilinear_shape_functions(
     U::AbstractFESpace,
     V::AbstractFESpace,
@@ -588,7 +608,8 @@ function blockmap_bilinear_shape_functions(
     cshape = shape(celltype(cellinfo))
     λU = get_shape_functions(U, cshape)
     λV = get_shape_functions(V, cshape)
-    _blockmap_bilinear(λU, λV)
+    blockV, blockU = _blockmap_bilinear(λV, λU)
+    blockU, blockV
 end
 
 """

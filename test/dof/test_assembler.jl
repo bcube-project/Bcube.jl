@@ -192,6 +192,24 @@
         @test A[12, 3] ≈ 1.0 / 3.0
     end
 
+    @testset "Bilinear rectangular system" begin
+        mesh = one_cell_mesh(:line)
+
+        U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+        V = TestFESpace(FunctionSpace(:Lagrange, 2), mesh)
+
+        dΩ = Measure(CellDomain(mesh), 2)
+        a(u, v) = ∫(∇(u) ⋅ v)dΩ
+        l(v) = ∫(v)dΩ
+
+        A = assemble_bilinear(a, U, V)
+        b = assemble_linear(l, V)
+
+        @test all((A[1, 1], A[1, 2]) .≈ (-1.0 / 6.0, 1.0 / 6.0))
+        @test all((A[2, 1], A[2, 2]) .≈ (-2.0 / 3.0, 2.0 / 3.0))
+        @test all((A[3, 1], A[3, 2]) .≈ (-1.0 / 6.0, 1.0 / 6.0))
+    end
+
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials
