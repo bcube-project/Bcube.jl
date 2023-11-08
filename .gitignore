@@ -1,0 +1,16 @@
+/docs/build/
+/docs/site/
+/docs/Manifest.toml
+/docs/src/example/
+/docs/src/tutorial/
+Manifest.toml
+*.code-workspace
+.vscode/
+/myout/
+/myout/*
+benchmark/*.json
+benchmark/Manifest.toml
+params.json
+.ipynb_checkpoints/
+/example/private/
+

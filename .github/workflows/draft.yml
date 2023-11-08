@@ -1,0 +1,20 @@
+# based on:
+# https://www.jessesquires.com/blog/2021/08/24/useful-label-based-github-actions-workflows/
+
+name: Do Not Merge Draft PR
+on:
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
+
+# Return "failure" if label "draft" is assigned to the PR.
+jobs:
+  do-not-merge-draft:
+    name: Prevent Merging
+    if: contains(github.event.pull_request.labels.*.name, 'draft')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for label
+        run: |
+          echo "Pull request is labeled as 'draft'"
+          echo "This workflow fails so that the pull request cannot be merged"
+          exit 1

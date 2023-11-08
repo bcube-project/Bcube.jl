@@ -1,0 +1,28 @@
+# adapted from https://github.com/tkf/BenchmarkCI.jl
+name: Run benchmarks
+on:
+  pull_request:
+    types: [unlabeled, opened, synchronize, reopened]
+
+# Only trigger the benchmark job when `draft` label is not assigned to the PR
+jobs:
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    env:
+      JULIA_DEBUG: BenchmarkCI
+    if: contains(github.event.pull_request.labels.*.name, 'draft') == false
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.8'
+      - uses: julia-actions/julia-buildpkg@latest
+      - name: Install dependencies
+        run: julia -e 'using Pkg; pkg"add PkgBenchmark BenchmarkCI@0.1"'
+      - name: Run benchmarks
+        run: julia -e "using BenchmarkCI; BenchmarkCI.judge()"
+      - name: Post results
+        run: julia -e "using BenchmarkCI; BenchmarkCI.postjudge()"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
