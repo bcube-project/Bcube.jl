@@ -1,0 +1,7 @@
+[deps]
+Bcube = "cf06320b-b7f3-4748-8003-81a6b6979792"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"

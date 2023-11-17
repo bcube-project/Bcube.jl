@@ -36,7 +36,7 @@ function write_vtk(
         [MeshCell(vtk_entity(cells(mesh)[icell]), c2n[icell]) for icell in 1:ncells(mesh)]
 
     # Define mesh for vtk
-    new_name = @sprintf("%s_%08i", basename, it)
+    new_name = _build_fname_with_iterations(basename, it)
     vtkfile = vtk_grid(new_name, vtknodes, vtkcells)
 
     for (varname, (value, loc)) in vars
@@ -109,7 +109,7 @@ function write_vtk_discontinuous(
 
     # Define mesh for vtk
     #vtk_save(paraview_collection(basename))
-    new_name = @sprintf("%s_%08i", basename, it)
+    new_name = _build_fname_with_iterations(basename, it)
     vtkfile = vtk_grid(new_name, vtknodes, vtkcells)
 
     for (varname, (value, loc)) in vars
@@ -172,7 +172,7 @@ function write_vtk_bnd_discontinuous(
     end
 
     # Define mesh for vtk
-    new_name = @sprintf("%s_%08i", basename, it)
+    new_name = _build_fname_with_iterations(basename, it)
     vtkfile = vtk_grid(new_name, vtknodes, vtkcells)
 
     for (varname, (value, loc)) in vars
@@ -320,6 +320,17 @@ function _vtk_coords_from_lagrange(shape::Union{Square, Cube}, degree)
 end
 
 """
+    write_vtk_lagrange(
+        basename::String,
+        vars::Dict{String, F},
+        mesh::AbstractMesh,
+        U_export::AbstractFESpace,
+        it::Int = 0,
+        time::Real = 0.0;
+        append = false,
+        ascii = false,
+    ) where {F <: AbstractLazy}
+
 Write the provided FEFunction on the mesh with the precision of the Lagrange FESpace provided.
 
 `vars` is a dictionnary of variable name => FEFunction to write.
@@ -420,7 +431,7 @@ function write_vtk_lagrange(
 
     # Write VTK file
     pvd = paraview_collection(basename; append)
-    new_name = @sprintf("%s_%08i", basename, it)
+    new_name = _build_fname_with_iterations(basename, it)
     vtkfile = vtk_grid(new_name, coords_vtk, cells_vtk; ascii)
 
     for (varname, value) in zip(keys(vars), values_vtk)
@@ -430,3 +441,5 @@ function write_vtk_lagrange(
     pvd[float(time)] = vtkfile
     vtk_save(pvd)
 end
+
+_build_fname_with_iterations(basename, it) = @sprintf("%s_%08i", basename, it)

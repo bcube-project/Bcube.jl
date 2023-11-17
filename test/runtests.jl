@@ -1,9 +1,9 @@
 using Bcube
 using Test
 using StaticArrays
-using FEMQuad
 using LinearAlgebra
-using ForwardDiff
+using DelimitedFiles
+using SHA: sha1
 
 # from :
 # https://discourse.julialang.org/t/what-general-purpose-commands-do-you-usually-end-up-adding-to-your-projects/4889
@@ -64,4 +64,5 @@ end
     custom_include("./dof/test_assembler.jl")
     custom_include("./operator/test_algebra.jl")
     custom_include("./dof/test_meshdata.jl")
+    custom_include("./writers/test_vtk.jl")
 end
