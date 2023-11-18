@@ -242,10 +242,37 @@ function _compute_space_dim(verbose::Bool)
     end
 end
 
-"""
-    gen_line_mesh(output; nx = 2, lx = 1., xc = 0., order = 1)
+function _apply_gmsh_options(;
+    split_files = false,
+    create_ghosts = false,
+    msh_format = 0,
+    verbose = false,
+)
+    gmsh.option.setNumber("General.Terminal", Int(verbose))
+    gmsh.option.setNumber("Mesh.PartitionSplitMeshFiles", Int(split_files))
+    gmsh.option.setNumber("Mesh.PartitionCreateGhostCells", Int(create_ghosts))
+    (msh_format > 0) && gmsh.option.setNumber("Mesh.MshFileVersion", msh_format)
+end
 
-Generate a 1D mesh of a segment and write to "output"
+"""
+    gen_line_mesh(
+        output;
+        nx = 2,
+        lx = 1.0,
+        xc = 0.0,
+        order = 1,
+        bnd_names = ("LEFT", "RIGHT"),
+        n_partitions = 0,
+        kwargs...
+    )
+
+Generate a 1D mesh of a segment and write to "output".
+
+Available kwargs are
+* `verbose` : `true` or `false` to enable gmsh verbose
+* `msh_format` : floating number indicating the output msh format (for instance : `2.2`)
+* `split_files` : if `true`, create one file by partition
+* `create_ghosts` : if `true`, add a layer of ghost cells at every partition boundary
 """
 function gen_line_mesh(
     output;
@@ -254,17 +281,11 @@ function gen_line_mesh(
     xc = 0.0,
     order = 1,
     bnd_names = ("LEFT", "RIGHT"),
-    npartitions = 0,
-    split_files = false,
-    create_ghosts = false,
-    format22 = false,
-    verbose = false,
+    n_partitions = 0,
+    kwargs...,
 )
     gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", Int(verbose))
-    gmsh.option.setNumber("Mesh.PartitionSplitMeshFiles", Int(split_files))
-    gmsh.option.setNumber("Mesh.PartitionCreateGhostCells", Int(create_ghosts))
-    gmsh.model.add("line")
+    _apply_gmsh_options(kwargs...)
     lc = 1e-1
 
     # Points
@@ -289,10 +310,9 @@ function gen_line_mesh(
     # Gen mesh
     gmsh.model.geo.synchronize()
     gmsh.model.mesh.generate(1)
-    gmsh.model.mesh.partition(npartitions)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
-    format22 && gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
     gmsh.write(output)
 
     # End
@@ -300,10 +320,26 @@ function gen_line_mesh(
 end
 
 """
-    gen_rectangle_mesh(output, type; recombine = false, nx = 2, ny = 2, lx = 1., ly = 1., xc = -1., yc = -1., order = 1)
+    gen_rectangle_mesh(
+        output,
+        type;
+        transfinite = false,
+        nx = 2,
+        ny = 2,
+        lx = 1.0,
+        ly = 1.0,
+        xc = -1.0,
+        yc = -1.0,
+        order = 1,
+        bnd_names = ("North", "South", "East", "West"),
+        n_partitions = 0,
+        kwargs...
+    )
 
 Generate a 2D mesh of a rectangle domain and write the mesh to `output`. Use `type` to specify the element types:
 `:tri` or `:quad`.
+
+For kwargs, see [`gen_line_mesh`](@ref).
 """
 function gen_rectangle_mesh(
     output,
@@ -317,11 +353,8 @@ function gen_rectangle_mesh(
     yc = -1.0,
     order = 1,
     bnd_names = ("North", "South", "East", "West"),
-    npartitions = 0,
-    split_files = false,
-    create_ghosts = false,
-    format22 = false,
-    verbose = false,
+    n_partitions = 0,
+    kwargs...,
 )
     #         North
     #      D ------- C
@@ -331,10 +364,7 @@ function gen_rectangle_mesh(
     #      A ------- B
     #         South
     gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", Int(verbose))
-    gmsh.option.setNumber("Mesh.PartitionSplitMeshFiles", Int(split_files))
-    gmsh.option.setNumber("Mesh.PartitionCreateGhostCells", Int(create_ghosts))
-    gmsh.model.add("rectangle")
+    _apply_gmsh_options(kwargs...)
     lc = 1e-1
 
     # Points
@@ -383,10 +413,9 @@ function gen_rectangle_mesh(
     # Gen mesh
     gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
-    gmsh.model.mesh.partition(npartitions)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
-    format22 && gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
     gmsh.write(output)
 
     # End
@@ -394,7 +423,23 @@ function gen_rectangle_mesh(
 end
 
 """
-Mesh the domain around a disk
+    gen_mesh_around_disk(
+        output;
+        r_in = 1.0,
+        r_ext = 10.0,
+        nθ = 360,
+        nr = 100,
+        nr_prog = 1.05,
+        order = 1,
+        recombine = true,
+        bnd_names = ("Farfield", "Wall"),
+        n_partitions = 0,
+        kwargs...
+    )
+
+Mesh the 2D domain around a disk.
+
+For kwargs, see [`gen_line_mesh`](@ref).
 """
 function gen_mesh_around_disk(
     output;
@@ -406,17 +451,11 @@ function gen_mesh_around_disk(
     order = 1,
     recombine = true,
     bnd_names = ("Farfield", "Wall"),
-    npartitions = 0,
-    split_files = false,
-    create_ghosts = false,
-    format22 = false,
-    verbose = false,
+    n_partitions = 0,
+    kwargs...,
 )
     gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", Int(verbose))
-    gmsh.option.setNumber("Mesh.PartitionSplitMeshFiles", Int(split_files))
-    gmsh.option.setNumber("Mesh.PartitionCreateGhostCells", Int(create_ghosts))
-    gmsh.model.add("disk")
+    _apply_gmsh_options(kwargs...)
 
     # Points
     O = gmsh.model.geo.addPoint(0.0, 0.0, 0.0)
@@ -483,10 +522,9 @@ function gen_mesh_around_disk(
     # Gen mesh
     gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
-    gmsh.model.mesh.partition(npartitions)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
-    format22 && gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
     gmsh.write(output)
 
     # End
@@ -494,7 +532,18 @@ function gen_mesh_around_disk(
 end
 
 """
-    gen_rectangle_mesh_with_tri_and_quad(output; nx = 2, ny = 2, lx = 1., ly = 1., xc = -1., yc = -1., order = 1)
+    gen_rectangle_mesh_with_tri_and_quad(
+        output;
+        nx = 2,
+        ny = 2,
+        lx = 1.0,
+        ly = 1.0,
+        xc = -1.0,
+        yc = -1.0,
+        order = 1,
+        n_partitions = 0,
+        kwargs...
+    )
 
 Generate a 2D mesh of a rectangle domain and write the mesh to `output`. The domain is split vertically in two parts:
 the upper part is composed of 'quad' cells and the lower part with 'tri'.
@@ -505,6 +554,8 @@ the upper part is composed of 'quad' cells and the lower part with 'tri'.
          |   :tri  |
          A ------- B
            South
+
+For kwargs, see [`gen_line_mesh`](@ref).
 """
 function gen_rectangle_mesh_with_tri_and_quad(
     output;
@@ -515,14 +566,13 @@ function gen_rectangle_mesh_with_tri_and_quad(
     xc = -1.0,
     yc = -1.0,
     order = 1,
-    npartitions = 0,
-    verbose = false,
+    n_partitions = 0,
+    kwargs...,
 )
 
     #         South
     gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", Int(verbose))
-    gmsh.model.add("rectangle")
+    _apply_gmsh_options(kwargs...)
     lc = 1e-1
 
     # Points
@@ -581,10 +631,9 @@ function gen_rectangle_mesh_with_tri_and_quad(
     # Gen mesh
     gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
-    gmsh.model.mesh.partition(npartitions)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
-    #gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
     gmsh.write(output)
 
     # End
@@ -592,10 +641,21 @@ function gen_rectangle_mesh_with_tri_and_quad(
 end
 
 """
-    gen_hexa_mesh(output, type; recombine = false, n = [2, 2, 2],  l = [1., 1., 1.], center = [0., 0., 0.], order = 1)
+    gen_hexa_mesh(
+        output,
+        type;
+        recombine = false,
+        n = [2, 2, 2],
+        l = [1.0, 1.0, 1.0],
+        center = [0.0, 0.0, 0.0],
+        order = 1,
+        kwargs...
+    )
 
 Generate a 3D mesh of a hexahedral domain and write the mesh to `output`. Use `type` to specify the element types:
 `:tetra` or `:hexa`.
+
+For kwargs, see [`gen_line_mesh`](@ref).
 
 # Implementation
 Notations from https://cgns.github.io/CGNS_docs_current/sids/conv.html
@@ -609,11 +669,10 @@ function gen_hexa_mesh(
     l = [1.0, 1.0, 1.0],
     center = [0.0, 0.0, 0.0],
     order = 1,
-    verbose = false,
+    kwargs...,
 )
     gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", Int(verbose))
-    gmsh.model.add("hexa")
+    _apply_gmsh_options(kwargs...)
     lc = 1e-1
 
     # Unpack
@@ -726,7 +785,6 @@ function gen_hexa_mesh(
     gmsh.model.mesh.generate(3)
 
     # Write result
-    #gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
     gmsh.write(output)
 
     # End
@@ -734,24 +792,29 @@ function gen_hexa_mesh(
 end
 
 """
-    gen_disk_mesh(output; radius = 1., lc = 1e-1, order = 1, npartitions = 0, verbose = false)
+    gen_disk_mesh(
+        output;
+        radius = 1.0,
+        lc = 1e-1,
+        order = 1,
+        n_partitions = 0,
+        kwargs...
+    )
 
 Generate a 2D mesh of a disk domain and write the mesh to `output`.
+
+For kwargs, see [`gen_line_mesh`](@ref).
 """
 function gen_disk_mesh(
     output;
     radius = 1.0,
     lc = 1e-1,
     order = 1,
-    npartitions = 0,
-    split_files = false,
-    create_ghosts = false,
-    verbose = false,
+    n_partitions = 0,
+    kwargs...,
 )
     gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", Int(verbose))
-    gmsh.option.setNumber("Mesh.PartitionSplitMeshFiles", Int(split_files))
-    gmsh.option.setNumber("Mesh.PartitionCreateGhostCells", Int(create_ghosts))
+    _apply_gmsh_options(kwargs...)
 
     # Points
     O = gmsh.model.geo.addPoint(0, 0, 0, lc)
@@ -780,10 +843,9 @@ function gen_disk_mesh(
     # Gen mesh
     gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
-    gmsh.model.mesh.partition(npartitions)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
-    #gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
     gmsh.write(output)
 
     # End
@@ -791,10 +853,22 @@ function gen_disk_mesh(
 end
 
 """
-    gen_star_disk_mesh(output, ε, m; nθ = 360, radius = 1., lc = 1e-1, order = 1, npartitions = 0, format22 = false, verbose = false)
+    gen_star_disk_mesh(
+        output,
+        ε,
+        m;
+        nθ = 360,
+        radius = 1.0,
+        lc = 1e-1,
+        order = 1,
+        n_partitions = 0,
+        kwargs...,
+    )
 
 Generate a 2D mesh of a star domain and write the mesh to `output`. The "star" wall is defined by
 ``r_{wall} = R \\left( 1 + \\varepsilon \\cos(m \\theta) \\right)``.
+
+For kwargs, see [`gen_line_mesh`](@ref).
 """
 function gen_star_disk_mesh(
     output,
@@ -804,16 +878,11 @@ function gen_star_disk_mesh(
     radius = 1.0,
     lc = 1e-1,
     order = 1,
-    npartitions = 0,
-    split_files = false,
-    create_ghosts = false,
-    format22 = false,
-    verbose = false,
+    n_partitions = 0,
+    kwargs...,
 )
     gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", Int(verbose))
-    gmsh.option.setNumber("Mesh.PartitionSplitMeshFiles", Int(split_files))
-    gmsh.option.setNumber("Mesh.PartitionCreateGhostCells", Int(create_ghosts))
+    _apply_gmsh_options(kwargs...)
 
     # Alias
     R = radius
@@ -857,10 +926,9 @@ function gen_star_disk_mesh(
     # Gen mesh
     gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
-    gmsh.model.mesh.partition(npartitions)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
-    format22 && gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
     gmsh.write(output)
 
     # End
@@ -868,9 +936,20 @@ function gen_star_disk_mesh(
 end
 
 """
-    gen_cylinder_mesh(output, Lz; radius = 1., lc = 1e-1, order = 1, npartitions = 0, verbose = false)
+    gen_cylinder_mesh(
+        output,
+        Lz,
+        nz;
+        radius = 1.0,
+        lc = 1e-1,
+        order = 1,
+        n_partitions = 0,
+        kwargs...
+    )
 
 Generate a 3D mesh of a cylindrical domain and length `L` and write the mesh to `output`.
+
+For kwargs, see [`gen_line_mesh`](@ref).
 """
 function gen_cylinder_mesh(
     output,
@@ -879,15 +958,11 @@ function gen_cylinder_mesh(
     radius = 1.0,
     lc = 1e-1,
     order = 1,
-    npartitions = 0,
-    split_files = false,
-    create_ghosts = false,
-    verbose = false,
+    n_partitions = 0,
+    kwargs...,
 )
     gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", Int(verbose))
-    gmsh.option.setNumber("Mesh.PartitionSplitMeshFiles", Int(split_files))
-    gmsh.option.setNumber("Mesh.PartitionCreateGhostCells", Int(create_ghosts))
+    _apply_gmsh_options(kwargs...)
 
     # Points -> need for 4 arcs for extrusion otherwise crash
     O = gmsh.model.geo.addPoint(0, 0, 0, lc)
@@ -934,10 +1009,9 @@ function gen_cylinder_mesh(
     # Gen mesh
     gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(3)
-    gmsh.model.mesh.partition(npartitions)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
-    #gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
     gmsh.write(output)
 
     # End
