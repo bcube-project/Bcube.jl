@@ -325,10 +325,10 @@ end
         vars::Dict{String, F},
         mesh::AbstractMesh,
         U_export::AbstractFESpace,
-        it::Int = 0,
+        it::Integer = -1,
         time::Real = 0.0;
-        append = false,
-        ascii = false,
+        collection_append = false,
+        vtk_kwargs...,
     ) where {F <: AbstractLazy}
 
 Write the provided FEFunction on the mesh with the precision of the Lagrange FESpace provided.
@@ -355,7 +355,8 @@ end
 ```
 
 # Dev notes
-- `ascii` does not seem to work in WriteVTK
+- in order to write an ASCII file, you must pass both `ascii = true` and `append = false`
+- `collection_append` is not named `append` to enable passing correct `kwargs` to `vtk_grid`
 - remove (once fully validated) : `write_vtk_discontinuous`
 """
 function write_vtk_lagrange(
@@ -363,10 +364,10 @@ function write_vtk_lagrange(
     vars::Dict{String, F},
     mesh::AbstractMesh,
     U_export::AbstractFESpace,
-    it::Int = 0,
+    it::Integer = -1,
     time::Real = 0.0;
-    append = false,
-    ascii = false,
+    collection_append = false,
+    vtk_kwargs...,
 ) where {F <: AbstractLazy}
     _vars = collect(values(vars))
 
@@ -430,9 +431,9 @@ function write_vtk_lagrange(
     end
 
     # Write VTK file
-    pvd = paraview_collection(basename; append)
+    pvd = paraview_collection(basename; append = collection_append)
     new_name = _build_fname_with_iterations(basename, it)
-    vtkfile = vtk_grid(new_name, coords_vtk, cells_vtk; ascii)
+    vtkfile = vtk_grid(new_name, coords_vtk, cells_vtk; vtk_kwargs...)
 
     for (varname, value) in zip(keys(vars), values_vtk)
         vtkfile[varname, VTKPointData()] = value
@@ -442,4 +443,9 @@ function write_vtk_lagrange(
     vtk_save(pvd)
 end
 
-_build_fname_with_iterations(basename, it) = @sprintf("%s_%08i", basename, it)
+"""
+Append the number of iteration (if positive) to the basename
+"""
+function _build_fname_with_iterations(basename::String, it::Integer)
+    it >= 0 ? @sprintf("%s_%08i", basename, it) : basename
+end

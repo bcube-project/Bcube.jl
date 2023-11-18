@@ -41,6 +41,9 @@ function isapprox_arrays(a::AbstractArray, b::AbstractArray; rtol::Real = eps())
     return success
 end
 
+# This dir will be removed at the end of the tests
+tempdir = mktempdir()
+
 @testset "Bcube.jl" begin
     custom_include("./test_utils.jl")
     custom_include("./mesh/test_entity.jl")
