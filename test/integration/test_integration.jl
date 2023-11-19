@@ -523,9 +523,9 @@ end
         @test b[1] ≈ 0.75
 
         # Whole cylinder : build a cylinder of radius 1 and length 1, and compute its volume
-        gen_cylinder_mesh("mesh.msh", 1.0, 10)
-        mesh = read_msh("mesh.msh")
-        rm("mesh.msh")
+        path = joinpath(tempdir, "mesh.msh")
+        gen_cylinder_mesh(path, 1.0, 10)
+        mesh = read_msh(path)
 
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)

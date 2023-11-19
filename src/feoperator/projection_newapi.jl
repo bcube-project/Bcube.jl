@@ -1,19 +1,32 @@
 """
     projection_l2!(u::AbstractSingleFieldFEFunction, f, mesh::AbstractMesh, [degree::Int])
+    projection_l2!(
+        u::AbstractSingleFieldFEFunction,
+        f,
+        mesh::AbstractMesh,
+        degree::Int;
+        kwargs...,
+    )
+    projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass = nothing)
+    projection_l2!(u::MultiFieldFEFunction, f, args...; mass = nothing)
 
 Compute dof values of `u` from a projection L2 so that:
 ```math
     ∫(u ⋅ v)dΩ = ∫(f ⋅ v)dΩ
 ```
-where `dΩ` is the measure defined on the `CellDomain` of the `mesh`
-with a degree `D`
+where `dΩ` is the measure defined on the `CellDomain` of the `mesh` with a degree `D`
+
 If `degree` is not given, the default value is set to `2d+1` where `d`
 is the degree of the `function_space` of `u`.
+
+Keyword argument `mass` could be used to give a precomputed matrix for
+the left-hand term ``∫(u ⋅ v)dΩ``.
 """
 function projection_l2!(u::AbstractSingleFieldFEFunction, f, mesh::AbstractMesh; kwargs...)
     degree = 2 * get_degree(get_function_space(get_fespace(u))) + 1
     projection_l2!(u, f, mesh, degree; kwargs...)
 end
+
 function projection_l2!(
     u::AbstractSingleFieldFEFunction,
     f,
@@ -25,17 +38,9 @@ function projection_l2!(
     projection_l2!(u, f, dΩ; kwargs...)
 end
 
-"""
-    projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass = nothing)
-
-Compute dof values of `u` from a projection L2 so that:
-```math
-    ∫(u ⋅ v)dΩ = ∫(f ⋅ v)dΩ
-```
-Keyword argument `mass` could be used to give a precomputed matrix for
-the left-hand term ``∫(u ⋅ v)dΩ``.
-"""
 function projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass = nothing)
+    @assert f isa AbstractLazy "`f` must be <:AbstractLazy : a `PhysicalFunction` for instance"
+
     U = get_fespace(u)
     V = TestFESpace(U)
     if isa(mass, Nothing)
@@ -51,9 +56,6 @@ function projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass 
     return nothing
 end
 
-"""
-    projection_l2!(u::MultiFieldFEFunction, f, args...; mass = nothing)
-"""
 function projection_l2!(u::MultiFieldFEFunction, f, args...; mass = nothing)
     _mass = isa(mass, Nothing) ? ntuple(i -> nothing, length((u...,))) : mass
     foreach(u, f, _mass) do uᵢ, fᵢ, mᵢ
