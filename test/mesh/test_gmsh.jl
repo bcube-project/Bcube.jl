@@ -109,7 +109,9 @@ end
         mesh = read_msh(mesh_dir * "domainSquare_tri.msh", 3) # without autocompute
         @test spacedim(mesh) === 3
 
-        mesh = read_msh(mesh_dir * "sphere.msh")
+        path = joinpath(tempdir, "mesh.msh")
+        Bcube.gen_sphere_mesh(path)
+        mesh = read_msh(path)
         @test spacedim(mesh) === 3
     end
 end

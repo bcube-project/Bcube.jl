@@ -260,7 +260,9 @@ end
     end
 
     @testset "Sphere" begin
-        mesh = read_msh(string(@__DIR__, "/../../input/mesh/sphere.msh")) # Radius = 1 => area = 4\pi
+        path = joinpath(tempdir, "mesh.msh")
+        Bcube.gen_sphere_mesh(path; radius = 1.0)
+        mesh = read_msh(path) # Radius = 1 => area = 4\pi
         c2n = connectivities_indices(mesh, :c2n)
         S = 0.0
         for icell in 1:ncells(mesh)

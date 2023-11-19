@@ -1019,6 +1019,84 @@ function gen_cylinder_mesh(
 end
 
 """
+    gen_sphere_mesh(
+        output;
+        radius = 1.0,
+        lc = 1e-1,
+        order = 1,
+        n_partitions = 0,
+        kwargs...,
+    )
+
+Generate the mesh of a sphere (surface of topological dimension 2, spatial dimension 3).
+"""
+function gen_sphere_mesh(
+    output;
+    radius = 1.0,
+    lc = 1e-1,
+    order = 1,
+    n_partitions = 0,
+    kwargs...,
+)
+    gmsh.initialize()
+    _apply_gmsh_options(; kwargs...)
+
+    # Points
+    P1 = gmsh.model.geo.addPoint(0, 0, 0, lc)
+    P2 = gmsh.model.geo.addPoint(radius, 0, 0, lc)
+    P3 = gmsh.model.geo.addPoint(0, radius, 0, lc)
+    P4 = gmsh.model.geo.addPoint(0, 0, radius, lc)
+    P5 = gmsh.model.geo.addPoint(-radius, 0, 0, lc)
+    P6 = gmsh.model.geo.addPoint(0, -radius, 0, lc)
+    P7 = gmsh.model.geo.addPoint(0, 0, -radius, lc)
+
+    # Line
+    C1 = gmsh.model.geo.addCircleArc(P2, P1, P3)
+    C2 = gmsh.model.geo.addCircleArc(P3, P1, P5)
+    C3 = gmsh.model.geo.addCircleArc(P5, P1, P6)
+    C4 = gmsh.model.geo.addCircleArc(P6, P1, P2)
+    C5 = gmsh.model.geo.addCircleArc(P2, P1, P7)
+    C6 = gmsh.model.geo.addCircleArc(P7, P1, P5)
+    C7 = gmsh.model.geo.addCircleArc(P5, P1, P4)
+    C8 = gmsh.model.geo.addCircleArc(P4, P1, P2)
+    C9 = gmsh.model.geo.addCircleArc(P6, P1, P7)
+    C10 = gmsh.model.geo.addCircleArc(P7, P1, P3)
+    C11 = gmsh.model.geo.addCircleArc(P3, P1, P4)
+    C12 = gmsh.model.geo.addCircleArc(P4, P1, P6)
+
+    # Loops
+    LL1 = gmsh.model.geo.addCurveLoop([C1, C11, C8])
+    LL2 = gmsh.model.geo.addCurveLoop([C2, C7, -C11])
+    LL3 = gmsh.model.geo.addCurveLoop([C3, -C12, -C7])
+    LL4 = gmsh.model.geo.addCurveLoop([C4, -C8, C12])
+    LL5 = gmsh.model.geo.addCurveLoop([C5, C10, -C1])
+    LL6 = gmsh.model.geo.addCurveLoop([-C2, -C10, C6])
+    LL7 = gmsh.model.geo.addCurveLoop([-C3, -C6, -C9])
+    LL8 = gmsh.model.geo.addCurveLoop([-C4, C9, -C5])
+
+    # Surfaces
+    RS = map([LL1, LL2, LL3, LL4, LL5, LL6, LL7, LL8]) do LL
+        gmsh.model.geo.addSurfaceFilling([LL])
+    end
+
+    # Domains
+    sphere = gmsh.model.addPhysicalGroup(2, RS)
+    gmsh.model.setPhysicalName(2, sphere, "Sphere")
+
+    # Gen mesh
+    gmsh.model.geo.synchronize()
+    gmsh.model.mesh.setOrder(order)
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.partition(n_partitions)
+
+    # Write result
+    gmsh.write(output)
+
+    # End
+    gmsh.finalize()
+end
+
+"""
     nodes_gmsh2cgns(entity::AbstractEntityType, nodes::AbstractArray)
 
 Reorder `nodes` of a given `entity` from the Gmsh format to CGNS format
