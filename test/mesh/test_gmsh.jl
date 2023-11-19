@@ -113,3 +113,22 @@ end
         @test spacedim(mesh) === 3
     end
 end
+
+@testset "gmsh - generators" begin
+    basename = "gmsh_line_mesh"
+    path = joinpath(tempdir, basename * ".msh")
+
+    n_partitions = 3
+    gen_line_mesh(
+        path;
+        nx = 11,
+        n_partitions = n_partitions,
+        split_files = true,
+        create_ghosts = true,
+    )
+
+    for i in 1:n_partitions
+        fname = basename * "_$i.msh"
+        @test fname2sum[fname] == bytes2hex(open(sha1, joinpath(tempdir, fname)))
+    end
+end

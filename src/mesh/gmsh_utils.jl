@@ -285,7 +285,7 @@ function gen_line_mesh(
     kwargs...,
 )
     gmsh.initialize()
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
     lc = 1e-1
 
     # Points
@@ -364,7 +364,7 @@ function gen_rectangle_mesh(
     #      A ------- B
     #         South
     gmsh.initialize()
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
     lc = 1e-1
 
     # Points
@@ -455,7 +455,7 @@ function gen_mesh_around_disk(
     kwargs...,
 )
     gmsh.initialize()
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
 
     # Points
     O = gmsh.model.geo.addPoint(0.0, 0.0, 0.0)
@@ -572,7 +572,7 @@ function gen_rectangle_mesh_with_tri_and_quad(
 
     #         South
     gmsh.initialize()
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
     lc = 1e-1
 
     # Points
@@ -672,7 +672,7 @@ function gen_hexa_mesh(
     kwargs...,
 )
     gmsh.initialize()
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
     lc = 1e-1
 
     # Unpack
@@ -814,7 +814,7 @@ function gen_disk_mesh(
     kwargs...,
 )
     gmsh.initialize()
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
 
     # Points
     O = gmsh.model.geo.addPoint(0, 0, 0, lc)
@@ -882,7 +882,7 @@ function gen_star_disk_mesh(
     kwargs...,
 )
     gmsh.initialize()
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
 
     # Alias
     R = radius
@@ -962,7 +962,7 @@ function gen_cylinder_mesh(
     kwargs...,
 )
     gmsh.initialize()
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
 
     # Points -> need for 4 arcs for extrusion otherwise crash
     O = gmsh.model.geo.addPoint(0, 0, 0, lc)
