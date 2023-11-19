@@ -31,5 +31,5 @@ Numerous FEM-DG Julia packages are available, here is a non-exhaustive list;
 Any contribution(s) and/or remark(s) are welcome! Don't hesitate to open an issue to ask a question or signal a bug. PRs improving the code (new features, new elements, fixing bugs, ...) will be greatly appreciated.
 
 ## Gallery
-|![](https://bcube-project.github.io/Bcube.jl/stable/assets/helmholtz_x21_y21_vp6.png)|![](https://bcube-project.github.io/Bcube.jl/stable/assets/phase-field-supercooled-rectangle.gif)|![](https://bcube-project.github.io/Bcube.jl/stable/assets/linear_transport.gif)|
-|[Helmholtz equation](https://bcube-project.github.io/Bcube.jl/stable/tutorial/helmholtz.html)|[Phase field solidification](https://bcube-project.github.io/Bcube.jl/stable/tutorial/phase_field_supercooled.html)|[Linear transport equation](https://bcube-project.github.io/Bcube.jl/stable/tutorial/linear_transport.html)|
+|![](https://bcube-project.github.io/BcubeTutorials.jl/stable/assets/helmholtz_x21_y21_vp6.png)|![](https://bcube-project.github.io/BcubeTutorials.jl/stable/assets/phase-field-supercooled-rectangle.gif)|![](https://bcube-project.github.io/BcubeTutorials.jl/stable/assets/linear_transport.gif)|
+|[Helmholtz equation](https://bcube-project.github.io/BcubeTutorials.jl/stable/tutorial/helmholtz.html)|[Phase field solidification](https://bcube-project.github.io/BcubeTutorials.jl/stable/tutorial/phase_field_supercooled.html)|[Linear transport equation](https://bcube-project.github.io/BcubeTutorials.jl/stable/tutorial/linear_transport.html)|

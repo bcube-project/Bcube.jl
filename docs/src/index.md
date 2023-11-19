@@ -13,6 +13,9 @@ Bcube is a Julia library providing tools for the spatial discretization of parti
 
 This documentation is organised as follow. Checkout the tutorials to see what Bcube is capable of and/or quickly learn how to use it. Then, some more elaborated examples are provided to demonstrate the library capabilities. The "Manual" part explains how the core is organized. Finally, the "API" section is the low level code documentation.
 
+## Tutorials and examples
+Wanting to learn how to use `Bcube.jl` or just curious about what can be achieved with it? Commented tutorials as well as various examples can be found in the dedicated project [BcubeTutorials.jl](https://github.com/bcube-project/BcubeTutorials.jl).
+
 ## Writing documentation
 
 To write documentation for Bcube, Julia's guidelines should be followed : [https://docs.julialang.org/en/v1/manual/documentation/](https://docs.julialang.org/en/v1/manual/documentation/). Moreover, this project tries to apply the [SciML Style Guide](https://github.com/SciML/SciMLStyle).
