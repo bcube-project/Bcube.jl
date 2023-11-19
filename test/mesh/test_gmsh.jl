@@ -1,7 +1,9 @@
 const mesh_dir = string(@__DIR__, "/../../input/mesh/")
 
-@testset "gmsh - domainLine_o1" begin
-    mesh = read_msh(mesh_dir * "domainLine_o1.msh")
+@testset "gmsh - line order1" begin
+    path = joinpath(tempdir, "mesh.msh")
+    Bcube.gen_line_mesh(path; nx = 11, lx = 2.0)
+    mesh = read_msh(path)
 
     @test topodim(mesh) === 1
     @test spacedim(mesh) === 1
@@ -97,18 +99,23 @@ end
     # end
 
     @testset "gmsh - autocompute space dim" begin
-        mesh = read_msh(mesh_dir * "domainLine_o1.msh")
+        # Line order 1
+        path = joinpath(tempdir, "mesh.msh")
+        Bcube.gen_line_mesh(path; nx = 11, lx = 2.0)
+        mesh = read_msh(path)
         @test spacedim(mesh) === 1
 
-        mesh = read_msh(mesh_dir * "domainLine_o1.msh", 3) # without autocompute
+        mesh = read_msh(path, 3) # without autocompute
         @test spacedim(mesh) === 3
 
+        # Square tri
         mesh = read_msh(mesh_dir * "domainSquare_tri.msh")
         @test spacedim(mesh) === 2
 
         mesh = read_msh(mesh_dir * "domainSquare_tri.msh", 3) # without autocompute
         @test spacedim(mesh) === 3
 
+        # Sphere
         path = joinpath(tempdir, "mesh.msh")
         Bcube.gen_sphere_mesh(path)
         mesh = read_msh(path)
@@ -120,10 +127,10 @@ end
     basename = "gmsh_line_mesh"
     path = joinpath(tempdir, basename * ".msh")
 
-    n_partitions = 3
+    n_partitions = 2
     gen_line_mesh(
         path;
-        nx = 11,
+        nx = 12,
         n_partitions = n_partitions,
         split_files = true,
         create_ghosts = true,
