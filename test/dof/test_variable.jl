@@ -248,10 +248,9 @@ end
         # Note bmxam : to build this check, I sketched the rectangle
         # and built the dof numbering by hand.
 
-        tmp_path = "tmp.msh"
+        path = joinpath(tempdir, "mesh.msh")
         gen_rectangle_mesh(tmp_path, :quad; nx = 2, ny = 3)
-        mesh = read_msh(tmp_path, 2)
-        rm(tmp_path)
+        mesh = read_msh(path, 2)
 
         fs = FunctionSpace(:Lagrange, 1)
         fes = FESpace(fs, :continuous; size = 1)

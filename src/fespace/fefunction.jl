@@ -89,6 +89,7 @@ function FEFunction(feSpace::AbstractFESpace, constant::Number)
 end
 
 get_fespace(f::SingleFieldFEFunction) = f.feSpace
+get_ncomponents(f::SingleFieldFEFunction) = get_ncomponents(get_fespace(f))
 get_dof_values(f::SingleFieldFEFunction) = f.dofValues
 function get_dof_values(f::SingleFieldFEFunction, icell)
     feSpace = get_fespace(f)

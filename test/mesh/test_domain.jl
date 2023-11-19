@@ -2,19 +2,9 @@
     nx = 10
     ny = 10
     l = 1.0
-    tmp_path = "tmp.msh"
-    gen_rectangle_mesh(
-        tmp_path,
-        :quad;
-        nx = nx,
-        ny = ny,
-        lx = l,
-        ly = l,
-        xc = 0.0,
-        yc = 0.0,
-    )
-    mesh = read_msh(tmp_path)
-    rm(tmp_path)
+    path = joinpath(tempdir, "mesh.msh")
+    gen_rectangle_mesh(path, :quad; nx = nx, ny = ny, lx = l, ly = l, xc = 0.0, yc = 0.0)
+    mesh = read_msh(path)
 
     @test topodim(mesh) === 2
     periodicBCType_x = PeriodicBCType(Translation(SA[-l, 0.0]), ("East",), ("West",))
