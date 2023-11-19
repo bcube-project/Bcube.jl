@@ -1097,6 +1097,65 @@ function gen_sphere_mesh(
 end
 
 """
+    _gen_2cubes_mesh(output)
+
+Only for testing purpose.
+
+    D------E------F
+    |      |      |
+    |      |      |
+    A------B------C
+"""
+function _gen_2cubes_mesh(output)
+    lc = 1.0
+
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Terminal", 0)
+
+    # Points
+    A = gmsh.model.geo.addPoint(0, 0, 0, lc)
+    B = gmsh.model.geo.addPoint(1, 0, 0, lc)
+    C = gmsh.model.geo.addPoint(2, 0, 0, lc)
+    D = gmsh.model.geo.addPoint(0, 1, 0, lc)
+    E = gmsh.model.geo.addPoint(1, 1, 0, lc)
+    F = gmsh.model.geo.addPoint(2, 1, 0, lc)
+
+    # Line
+    AB = gmsh.model.geo.addLine(A, B)
+    BC = gmsh.model.geo.addLine(B, C)
+    DE = gmsh.model.geo.addLine(D, E)
+    EF = gmsh.model.geo.addLine(E, F)
+    AD = gmsh.model.geo.addLine(A, D)
+    BE = gmsh.model.geo.addLine(B, E)
+    CF = gmsh.model.geo.addLine(C, F)
+
+    # Surfaces
+    ABED = gmsh.model.geo.addPlaneSurface([gmsh.model.geo.addCurveLoop([AB, BE, -DE, -AD])])
+    BCFE = gmsh.model.geo.addPlaneSurface([gmsh.model.geo.addCurveLoop([BC, CF, -EF, -BE])])
+
+    # Extrusion
+    gmsh.model.geo.extrude([(2, ABED), (2, BCFE)], 0, 0, 1, [1], [], true)
+
+    for l in (AB, BC, DE, EF, AD, BE, CF)
+        gmsh.model.geo.mesh.setTransfiniteCurve(l, 2)
+    end
+
+    for s in (ABED, BCFE)
+        gmsh.model.geo.mesh.setTransfiniteSurface(s)
+        gmsh.model.geo.mesh.setRecombine(2, s)
+    end
+    # Gen mesh
+    gmsh.model.geo.synchronize()
+    gmsh.model.mesh.generate(3)
+
+    # Write result
+    gmsh.write(output)
+
+    # End
+    gmsh.finalize()
+end
+
+"""
     nodes_gmsh2cgns(entity::AbstractEntityType, nodes::AbstractArray)
 
 Reorder `nodes` of a given `entity` from the Gmsh format to CGNS format
