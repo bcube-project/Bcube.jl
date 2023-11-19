@@ -15,8 +15,19 @@ const mesh_dir = string(@__DIR__, "/../../input/mesh/")
     @test cells(mesh) == [Bar2_t() for i in 1:ncells(mesh)]
 end
 
-@testset "gmsh - domainSquare_tri" begin
-    mesh = read_msh(mesh_dir * "domainSquare_tri.msh")
+@testset "gmsh - square with triangles" begin
+    path = joinpath(tempdir, "mesh.msh")
+    Bcube.gen_rectangle_mesh(
+        path,
+        :tri;
+        nx = 4,
+        ny = 4,
+        lx = 1.0,
+        ly = 1.0,
+        xc = 0.5,
+        yc = 0.5,
+    )
+    mesh = read_msh(path)
 
     @test topodim(mesh) === 2
     @test spacedim(mesh) === 2
@@ -109,10 +120,21 @@ end
         @test spacedim(mesh) === 3
 
         # Square tri
-        mesh = read_msh(mesh_dir * "domainSquare_tri.msh")
+        path = joinpath(tempdir, "mesh.msh")
+        Bcube.gen_rectangle_mesh(
+            path,
+            :tri;
+            nx = 4,
+            ny = 4,
+            lx = 1.0,
+            ly = 1.0,
+            xc = 0.5,
+            yc = 0.5,
+        )
+        mesh = read_msh(path)
         @test spacedim(mesh) === 2
 
-        mesh = read_msh(mesh_dir * "domainSquare_tri.msh", 3) # without autocompute
+        mesh = read_msh(path, 3) # without autocompute
         @test spacedim(mesh) === 3
 
         # Sphere
@@ -127,7 +149,7 @@ end
     basename = "gmsh_line_mesh"
     path = joinpath(tempdir, basename * ".msh")
 
-    n_partitions = 2
+    n_partitions = 2 # with `3`, the result is not deterministic...
     gen_line_mesh(
         path;
         nx = 12,
