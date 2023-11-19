@@ -52,22 +52,16 @@ function var_on_vertices(f::AbstractFEFunction, mesh::Mesh)
 end
 
 function _get_returned_type(f::AbstractFEFunction, mesh::Mesh)
-    # Alias
-    c2n = connectivities_indices(mesh, :c2n)
-    celltypes = cells(mesh)
-
     # Get info about first cell of the mesh
     icell = 1
-    ctype = celltypes[icell]
-    _c2n = c2n[icell]
-    cnodes = get_nodes(mesh, _c2n)
-    cInfo = CellInfo(icell, ctype, cnodes)
+    ctype = cells(mesh)[icell]
+    cInfo = CellInfo(mesh, icell)
 
     # Materialize FE function on CellInfo
     _f = materialize(f, cInfo)
 
     # Evaluate function at the center
-    ξc = center(shape(celltypes[icell]))
+    ξc = center(shape(ctype))
     cPoint = CellPoint(ξc, cInfo, ReferenceDomain())
 
     # Return the type
