@@ -264,12 +264,10 @@ end
         Bcube.gen_sphere_mesh(path; radius = 1.0)
         mesh = read_msh(path) # Radius = 1 => area = 4\pi
         c2n = connectivities_indices(mesh, :c2n)
-        S = 0.0
-        for icell in 1:ncells(mesh)
+        S = sum(1:ncells(mesh)) do icell
             cnodes = get_nodes(mesh, c2n[icell])
             ctype = cells(mesh)[icell]
-
-            S += integrate_ref(ξ -> 1.0, cnodes, ctype, Quadrature(1))
+            integrate_ref(ξ -> 1.0, cnodes, ctype, Quadrature(1))
         end
         @test isapprox(S, 4π; atol = 1e-1)
     end
