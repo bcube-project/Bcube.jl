@@ -5,7 +5,7 @@ using BenchmarkTools
 
 ENV["BenchmarkMode"] = "true"
 
-include("../example/covo.jl")
+include("./covo.jl")
 include("./driver_bench_covo.jl")
 
 suite = run_covo()
@@ -20,7 +20,7 @@ using BenchmarkTools
 ENV["BenchmarkMode"] = "true"
 ENV["MeshConfig"] = "triquad"
 
-include("../example/covo.jl")
+include("./covo.jl")
 include("./driver_bench_covo.jl")
 
 suite = run_covo()
