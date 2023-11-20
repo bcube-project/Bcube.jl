@@ -2,7 +2,9 @@
 
 [![](https://img.shields.io/badge/docs-release-blue.svg)](https://bcube-project.github.io/Bcube.jl)
 
+[![codecov](https://codecov.io/gh/bcube-project/Bcube.jl/branch/main/graph/badge.svg)](https://app.codecov.io/gh/bcube-project/Bcube.jl)
 [![Build Status](https://github.com/bcube-project/Bcube.jl/workflows/CI/badge.svg)](https://github.com/bcube-project/Bcube.jl/actions)
+
 
 Bcube is a Julia library providing tools for the spatial discretization of partial differential equation(s) (PDE). It offers a high-level API to discretize linear or non-linear problems on unstructured mesh using continuous or discontinuous finite elements (FEM - DG).
 
