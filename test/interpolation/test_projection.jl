@@ -58,7 +58,8 @@
     end
 
     @testset "2D_Triangle" begin
-        mesh = read_msh(string(@__DIR__, "/../../input/mesh/domainSquare_tri.msh"))
+        path = joinpath(tempdir, "mesh.msh")
+        mesh = read_msh(path)
         fSpace = FunctionSpace(:Lagrange, 1)
         fes = FESpace(fSpace, :continuous)
         u = CellVariable(:u, mesh, fes)

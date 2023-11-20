@@ -254,7 +254,9 @@
             @test m_ρE[Bcube.get_dofs(U_ρE, 1)] == collect(33:40)
 
             #---- Mesh with 2 cubes side by side
-            mesh = read_msh("../input/mesh/2_cubes.msh")
+            path = joinpath(tempdir, "mesh.msh")
+            Bcube._gen_2cubes_mesh(path)
+            mesh = read_msh(path)
 
             dhl = Bcube.DofHandler(mesh, FunctionSpace(:Lagrange, 2), 1, false)
 
@@ -262,7 +264,9 @@
             @test Bcube.dof(dhl, 2) == collect(28:54)
 
             #---- Mesh with 4 cubes (pile)
-            mesh = read_msh("../input/mesh/cube_pile.msh")
+            path = joinpath(tempdir, "mesh.msh")
+            Bcube._gen_cube_pile(path)
+            mesh = read_msh(path)
 
             # One scalar FESpace
             dhl = Bcube.DofHandler(mesh, FunctionSpace(:Lagrange, 1), 1, false)
@@ -274,7 +278,9 @@
         end
 
         @testset "Continuous" begin
-            mesh = read_msh("../input/mesh/cube_pile.msh")
+            path = joinpath(tempdir, "mesh.msh")
+            Bcube._gen_cube_pile(path)
+            mesh = read_msh(path)
 
             # One scalar FESpace
             dhl = Bcube.DofHandler(mesh, FunctionSpace(:Lagrange, 1), 1, true)
@@ -288,7 +294,9 @@
             @test Bcube.dof(dhl, 4) == [6, 11, 8, 12, 17, 18, 19, 20]
 
             #---- Mesh with 2 cubes side by side
-            mesh = read_msh("../input/mesh/2_cubes.msh")
+            path = joinpath(tempdir, "mesh.msh")
+            Bcube._gen_2cubes_mesh(path)
+            mesh = read_msh(path)
 
             dhl = Bcube.DofHandler(mesh, FunctionSpace(:Lagrange, 2), 1, true)
             @test Bcube.dof(dhl, 1) == collect(1:27)
