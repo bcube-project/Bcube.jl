@@ -4,6 +4,10 @@
 Interpolate solution on mesh vertices.
 
 The result is a (nnodes, ncomps) matrix.
+
+WARNING : for now, the contribution to one vertice is the arithmetic mean of
+all the data obtained from the neighbor cells of this node. We could use
+the surface area (among other possible choices).
 """
 function var_on_vertices(f::AbstractFEFunction, mesh::Mesh)
     # Alias
@@ -13,7 +17,8 @@ function var_on_vertices(f::AbstractFEFunction, mesh::Mesh)
 
     # Allocate
     nc = get_size(feSpace)
-    values = zeros(nnodes(mesh), nc) # TODO : use number type of feSpace
+    T = _get_returned_type(f, mesh)
+    values = zeros(T, nnodes(mesh), nc)
 
     # Number of contributions per nodes
     ncontributions = zeros(Int, nnodes(mesh))
@@ -46,26 +51,43 @@ function var_on_vertices(f::AbstractFEFunction, mesh::Mesh)
     return values
 end
 
+function _get_returned_type(f::AbstractFEFunction, mesh::Mesh)
+    # Get info about first cell of the mesh
+    icell = 1
+    ctype = cells(mesh)[icell]
+    cInfo = CellInfo(mesh, icell)
+
+    # Materialize FE function on CellInfo
+    _f = materialize(f, cInfo)
+
+    # Evaluate function at the center
+    ξc = center(shape(ctype))
+    cPoint = CellPoint(ξc, cInfo, ReferenceDomain())
+
+    # Return the type
+    return eltype(_f(cPoint))
+end
+
 """
-    var_on_centers(f::SingleFEFunction, mesh::Mesh)
+    var_on_centers(f::AbstractSingleFEFunction, mesh::AbstractMesh)
 
 Interpolate solution on mesh vertices.
 
 The result is a (ncells, ncomps) matrix if ncomps > 1, or a (ncells) vector otherwise.
 """
-function var_on_centers(f::SingleFieldFEFunction{N}, mesh::Mesh) where {N}
+function var_on_centers(f::AbstractSingleFieldFEFunction{N}, mesh::AbstractMesh) where {N}
     values = zeros(ncells(mesh), N) # TODO : use number type of feSpace
     _var_on_centers!(values, f, mesh)
     return values
 end
 
-function var_on_centers(f::SingleFieldFEFunction{1}, mesh::Mesh)
+function var_on_centers(f::AbstractSingleFieldFEFunction{1}, mesh::AbstractMesh)
     values = zeros(ncells(mesh), 1) # TODO : use number type of feSpace
     _var_on_centers!(values, f, mesh)
     return vec(values)
 end
 
-function _var_on_centers!(values, f::SingleFieldFEFunction, mesh::Mesh)
+function _var_on_centers!(values, f::AbstractSingleFieldFEFunction, mesh::AbstractMesh)
     # Alias
     c2n = connectivities_indices(mesh, :c2n)
     celltypes = cells(mesh)
@@ -84,14 +106,18 @@ function _var_on_centers!(values, f::SingleFieldFEFunction, mesh::Mesh)
 end
 
 """
-    var_on_nodes_discontinuous(f::AbstractFEFunction, mesh::Mesh, degree::Integer=max(1, get_degree(get_function_space(get_fespace(f)))))
+    var_on_nodes_discontinuous(
+        f::AbstractFEFunction,
+        mesh::AbstractMesh,
+        degree::Integer = max(1, get_degree(get_function_space(get_fespace(f)))),
+    )
 
 Returns an array containing the values of `f` interpolated to new DoFs.
 The DoFs correspond to those of a discontinuous cell variable with a `:Lagrange` function space of selected `degree`.
 """
 function var_on_nodes_discontinuous(
     f::AbstractFEFunction,
-    mesh::Mesh,
+    mesh::AbstractMesh,
     degree::Integer = max(1, get_degree(get_function_space(get_fespace(f)))),
 )
     @assert degree ≥ 1 "degree must be ≥ 1"
@@ -103,7 +129,11 @@ end
 Apply the FEFunction on the nodes of the mesh using the `FunctionSpace` representation
 for the cells.
 """
-function _var_on_nodes_discontinuous(f::AbstractFEFunction, mesh::Mesh, fs::FunctionSpace)
+function _var_on_nodes_discontinuous(
+    f::AbstractFEFunction,
+    mesh::AbstractMesh,
+    fs::FunctionSpace,
+)
     celltypes = cells(mesh)
     c2n = connectivities_indices(mesh, :c2n)
 

@@ -1,7 +1,9 @@
 const mesh_dir = string(@__DIR__, "/../../input/mesh/")
 
-@testset "gmsh - domainLine_o1" begin
-    mesh = read_msh(mesh_dir * "domainLine_o1.msh")
+@testset "gmsh - line order1" begin
+    path = joinpath(tempdir, "mesh.msh")
+    Bcube.gen_line_mesh(path; nx = 11, lx = 2.0)
+    mesh = read_msh(path)
 
     @test topodim(mesh) === 1
     @test spacedim(mesh) === 1
@@ -13,8 +15,19 @@ const mesh_dir = string(@__DIR__, "/../../input/mesh/")
     @test cells(mesh) == [Bar2_t() for i in 1:ncells(mesh)]
 end
 
-@testset "gmsh - domainSquare_tri" begin
-    mesh = read_msh(mesh_dir * "domainSquare_tri.msh")
+@testset "gmsh - square with triangles" begin
+    path = joinpath(tempdir, "mesh.msh")
+    Bcube.gen_rectangle_mesh(
+        path,
+        :tri;
+        nx = 4,
+        ny = 4,
+        lx = 1.0,
+        ly = 1.0,
+        xc = 0.5,
+        yc = 0.5,
+    )
+    mesh = read_msh(path)
 
     @test topodim(mesh) === 2
     @test spacedim(mesh) === 2
@@ -97,19 +110,56 @@ end
     # end
 
     @testset "gmsh - autocompute space dim" begin
-        mesh = read_msh(mesh_dir * "domainLine_o1.msh")
+        # Line order 1
+        path = joinpath(tempdir, "mesh.msh")
+        Bcube.gen_line_mesh(path; nx = 11, lx = 2.0)
+        mesh = read_msh(path)
         @test spacedim(mesh) === 1
 
-        mesh = read_msh(mesh_dir * "domainLine_o1.msh", 3) # without autocompute
+        mesh = read_msh(path, 3) # without autocompute
         @test spacedim(mesh) === 3
 
-        mesh = read_msh(mesh_dir * "domainSquare_tri.msh")
+        # Square tri
+        path = joinpath(tempdir, "mesh.msh")
+        Bcube.gen_rectangle_mesh(
+            path,
+            :tri;
+            nx = 4,
+            ny = 4,
+            lx = 1.0,
+            ly = 1.0,
+            xc = 0.5,
+            yc = 0.5,
+        )
+        mesh = read_msh(path)
         @test spacedim(mesh) === 2
 
-        mesh = read_msh(mesh_dir * "domainSquare_tri.msh", 3) # without autocompute
+        mesh = read_msh(path, 3) # without autocompute
         @test spacedim(mesh) === 3
 
-        mesh = read_msh(mesh_dir * "sphere.msh")
+        # Sphere
+        path = joinpath(tempdir, "mesh.msh")
+        Bcube.gen_sphere_mesh(path)
+        mesh = read_msh(path)
         @test spacedim(mesh) === 3
+    end
+end
+
+@testset "gmsh - generators" begin
+    basename = "gmsh_line_mesh"
+    path = joinpath(tempdir, basename * ".msh")
+
+    n_partitions = 2 # with `3`, the result is not deterministic...
+    gen_line_mesh(
+        path;
+        nx = 12,
+        n_partitions = n_partitions,
+        split_files = true,
+        create_ghosts = true,
+    )
+
+    for i in 1:n_partitions
+        fname = basename * "_$i.msh"
+        @test fname2sum[fname] == bytes2hex(open(sha1, joinpath(tempdir, fname)))
     end
 end
