@@ -10,7 +10,7 @@ using ForwardDiff
 using LinearAlgebra
 using WriteVTK
 using Printf # just for tmp vtk, to be removed
-import LinearSolve: solve, solve!
+using LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
 
 const MAX_LENGTH_STATICARRAY = (10^6)
