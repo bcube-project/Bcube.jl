@@ -38,7 +38,6 @@ Numerous FEM-DG Julia packages are available, here is a non-exhaustive list;
 Any contribution(s) and/or remark(s) are welcome! Don't hesitate to open an issue to ask a question or signal a bug. PRs improving the code (new features, new elements, fixing bugs, ...) will be greatly appreciated.
 
 ## Gallery
-| [Helmholtz equation](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/helmholtz.html) | [Phase field solidification](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/phase_field_supercooled.html) | [Linear transport equation](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/linear_transport.html) |
+| [Helmholtz equation](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/helmholtz) | [Phase field solidification](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/phase_field_supercooled) | [Linear transport equation](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/linear_transport) |
 |-|-|-|
 | ![](https://bcube-project.github.io/BcubeTutorials.jl/dev/assets/helmholtz_x21_y21_vp6.png) | ![](https://bcube-project.github.io/BcubeTutorials.jl/dev/assets/phase-field-supercooled-rectangle.gif) | ![](https://bcube-project.github.io/BcubeTutorials.jl/dev/assets/linear_transport.gif) |
-|
