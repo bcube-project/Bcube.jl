@@ -94,7 +94,7 @@ function solve!(
     apply_homogeneous_dirichlet!(A, b0, U, V, system.mesh)
 
     # Inverse linear system
-    prob = LinearProblem(A, b0)
+    prob = LinearSolve.LinearProblem(A, b0)
     sol = LinearSolve.solve(prob, alg)
 
     # Update FEFunction
