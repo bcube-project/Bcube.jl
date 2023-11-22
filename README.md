@@ -40,4 +40,4 @@ Any contribution(s) and/or remark(s) are welcome! Don't hesitate to open an issu
 ## Gallery
 | [Helmholtz equation](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/helmholtz) | [Phase field solidification](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/phase_field_supercooled) | [Linear transport equation](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/linear_transport) |
 |-|-|-|
-| ![](https://bcube-project.github.io/BcubeTutorials.jl/dev/assets/helmholtz_x21_y21_vp6.png) | ![](https://bcube-project.github.io/BcubeTutorials.jl/dev/assets/phase-field-supercooled-rectangle.gif) | ![](https://bcube-project.github.io/BcubeTutorials.jl/dev/assets/linear_transport.gif) |
+| ![](https://bcube-project.github.io/BcubeTutorials.jl/dev/assets/helmholtz_x21_y21_vp6.png) | ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/phase-field-supercooled-rectangle.gif) | ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/linear_transport.gif) |
