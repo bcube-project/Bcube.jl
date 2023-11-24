@@ -1,6 +1,6 @@
 # Bcube.jl
 
-[![](https://img.shields.io/badge/docs-release-blue.svg)](https://bcube-project.github.io/Bcube.jl)
+[![](https://img.shields.io/badge/docs-release-blue.svg)](https://bcube-project.github.io/Bcube.jl) [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://bcube-project.github.io/Bcube.jl/dev)
 
 [![codecov](https://codecov.io/gh/bcube-project/Bcube.jl/branch/main/graph/badge.svg)](https://app.codecov.io/gh/bcube-project/Bcube.jl)
 [![Build Status](https://github.com/bcube-project/Bcube.jl/workflows/CI/badge.svg)](https://github.com/bcube-project/Bcube.jl/actions)
