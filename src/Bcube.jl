@@ -225,7 +225,7 @@ export assemble_dirichlet_vector,
     apply_homogeneous_dirichlet_to_vector!
 
 include("./assembler/affine_fe_system.jl")
-export AffineFESystem, solve, solve!
+export AffineFESystem
 
 include("./algebra/gradient.jl")
 export ∇
