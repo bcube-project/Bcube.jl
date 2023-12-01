@@ -260,14 +260,14 @@ end
     end
 
     @testset "Sphere" begin
-        mesh = read_msh(string(@__DIR__, "/../../input/mesh/sphere.msh")) # Radius = 1 => area = 4\pi
+        path = joinpath(tempdir, "mesh.msh")
+        Bcube.gen_sphere_mesh(path; radius = 1.0)
+        mesh = read_msh(path) # Radius = 1 => area = 4\pi
         c2n = connectivities_indices(mesh, :c2n)
-        S = 0.0
-        for icell in 1:ncells(mesh)
+        S = sum(1:ncells(mesh)) do icell
             cnodes = get_nodes(mesh, c2n[icell])
             ctype = cells(mesh)[icell]
-
-            S += integrate_ref(ξ -> 1.0, cnodes, ctype, Quadrature(1))
+            integrate_ref(ξ -> 1.0, cnodes, ctype, Quadrature(1))
         end
         @test isapprox(S, 4π; atol = 1e-1)
     end
@@ -523,9 +523,9 @@ end
         @test b[1] ≈ 0.75
 
         # Whole cylinder : build a cylinder of radius 1 and length 1, and compute its volume
-        gen_cylinder_mesh("mesh.msh", 1.0, 10)
-        mesh = read_msh("mesh.msh")
-        rm("mesh.msh")
+        path = joinpath(tempdir, "mesh.msh")
+        gen_cylinder_mesh(path, 1.0, 10)
+        mesh = read_msh(path)
 
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)

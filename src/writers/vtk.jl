@@ -36,7 +36,7 @@ function write_vtk(
         [MeshCell(vtk_entity(cells(mesh)[icell]), c2n[icell]) for icell in 1:ncells(mesh)]
 
     # Define mesh for vtk
-    new_name = @sprintf("%s_%08i", basename, it)
+    new_name = _build_fname_with_iterations(basename, it)
     vtkfile = vtk_grid(new_name, vtknodes, vtkcells)
 
     for (varname, (value, loc)) in vars
@@ -96,8 +96,10 @@ function write_vtk_discontinuous(
         count += _nnode
     end
 
-    _index_val =
-        [_vtk_index_from_lagrange(shape(celltypes[i]), _degree) for i in 1:ncells(mesh)]
+    _index_val = [
+        _vtk_lagrange_node_index_vtk_to_bcube(shape(celltypes[i]), _degree) for
+        i in 1:ncells(mesh)
+    ]
     index_val = similar(rawcat(_index_val))
     offset = 0
     for ind in _index_val
@@ -107,7 +109,7 @@ function write_vtk_discontinuous(
 
     # Define mesh for vtk
     #vtk_save(paraview_collection(basename))
-    new_name = @sprintf("%s_%08i", basename, it)
+    new_name = _build_fname_with_iterations(basename, it)
     vtkfile = vtk_grid(new_name, vtknodes, vtkcells)
 
     for (varname, (value, loc)) in vars
@@ -170,7 +172,7 @@ function write_vtk_bnd_discontinuous(
     end
 
     # Define mesh for vtk
-    new_name = @sprintf("%s_%08i", basename, it)
+    new_name = _build_fname_with_iterations(basename, it)
     vtkfile = vtk_grid(new_name, vtknodes, vtkcells)
 
     for (varname, (value, loc)) in vars
@@ -236,6 +238,12 @@ vtk_entity(::Triangle, ::Val{Degree}) where {Degree} = VTKCellTypes.VTK_LAGRANGE
 get_vtk_name(c::VTKCellType) = Val(Symbol(c.vtk_name))
 const VTK_LAGRANGE_QUADRILATERAL = get_vtk_name(VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL)
 const VTK_LAGRANGE_TRIANGLE = get_vtk_name(VTKCellTypes.VTK_LAGRANGE_TRIANGLE)
+
+"""
+Return the node numbering of the node designated by its position in the x and y direction.
+
+See https://www.kitware.com/modeling-arbitrary-order-lagrange-finite-elements-in-the-visualization-toolkit/.
+"""
 function _point_index_from_IJK(t::Val{:VTK_LAGRANGE_QUADRILATERAL}, degree, i, j)
     1 + _point_index_from_IJK_0based(t, degree, i - 1, j - 1)
 end
@@ -267,33 +275,177 @@ function _point_index_from_IJK_0based(::Val{:VTK_LAGRANGE_QUADRILATERAL}, degree
     return (offset + (i - 1) + (degree - 1) * (j - 1))
 end
 
-function _vtk_index_from_lagrange(shape::AbstractShape, degree)
+function _vtk_lagrange_node_index_vtk_to_bcube(shape::AbstractShape, degree)
     return 1:length(coords(FunctionSpace(Lagrange(), degree), shape))
 end
 
-function _vtk_index_from_lagrange(shape::Union{Square, Cube}, degree)
+"""
+Bcube node numbering -> VTK node numbering (in a cell)
+"""
+function _vtk_lagrange_node_index_bcube_to_vtk(shape::Union{Square, Cube}, degree)
     n = _get_num_nodes_per_dim(
         QuadratureRule(shape, Quadrature(QuadratureUniform(), Val(degree))),
     )
     IJK = CartesianIndices(ntuple(i -> 1:n[i], length(n)))
 
+    vtk_cell_name = get_vtk_name(vtk_entity(shape, Val(degree)))
+
+    # We loop over all the nodes designated by (i,j,k) and find the corresponding
+    # VTK index for each node.
     index = map(vec(IJK)) do ijk
-        _point_index_from_IJK(
-            get_vtk_name(vtk_entity(shape, Val(degree))),
-            degree,
-            Tuple(ijk)...,
-        )
+        _point_index_from_IJK(vtk_cell_name, degree, Tuple(ijk)...)
     end
-    return invperm(index)
+    return index
+end
+
+"""
+VTK node numbering (in a cell) -> Bcube node numbering
+"""
+function _vtk_lagrange_node_index_vtk_to_bcube(shape::Union{Square, Cube}, degree)
+    return invperm(_vtk_lagrange_node_index_bcube_to_vtk(shape, degree))
 end
 
 function _vtk_coords_from_lagrange(shape::AbstractShape, degree)
     return coords(FunctionSpace(Lagrange(), degree), shape)
 end
 
+"""
+Coordinates of the nodes in the VTK cell, ordered as expected by VTK.
+"""
 function _vtk_coords_from_lagrange(shape::Union{Square, Cube}, degree)
     fs = FunctionSpace(Lagrange(), degree)
     c = coords(fs, shape)
-    index = _vtk_index_from_lagrange(shape, degree)
+    index = _vtk_lagrange_node_index_vtk_to_bcube(shape, degree)
     return c[index]
+end
+
+"""
+    write_vtk_lagrange(
+        basename::String,
+        vars::Dict{String, F},
+        mesh::AbstractMesh,
+        U_export::AbstractFESpace,
+        it::Integer = -1,
+        time::Real = 0.0;
+        collection_append = false,
+        vtk_kwargs...,
+    ) where {F <: AbstractLazy}
+
+Write the provided FEFunction on the mesh with the precision of the Lagrange FESpace provided.
+
+`vars` is a dictionnary of variable name => FEFunction to write.
+
+# Example
+```julia
+mesh = rectangle_mesh(6, 7; xmin = -1, xmax = 1.0, ymin = -1, ymax = 1.0)
+u = FEFunction(TrialFESpace(FunctionSpace(:Lagrange, 4), mesh))
+projection_l2!(u, PhysicalFunction(x -> x[1]^2 + x[2]^2), mesh)
+
+vars = Dict("u" => u, "grad_u" => ∇(u))
+
+for degree_export in 1:5
+    U_export = TrialFESpace(FunctionSpace(:Lagrange, degree_export), mesh)
+    Bcube.write_vtk_lagrange(
+        joinpath(@__DIR__, "output"),
+        vars,
+        mesh,
+        U_export,
+    )
+end
+```
+
+# Dev notes
+- in order to write an ASCII file, you must pass both `ascii = true` and `append = false`
+- `collection_append` is not named `append` to enable passing correct `kwargs` to `vtk_grid`
+- remove (once fully validated) : `write_vtk_discontinuous`
+"""
+function write_vtk_lagrange(
+    basename::String,
+    vars::Dict{String, F},
+    mesh::AbstractMesh,
+    U_export::AbstractFESpace,
+    it::Integer = -1,
+    time::Real = 0.0;
+    collection_append = false,
+    vtk_kwargs...,
+) where {F <: AbstractLazy}
+    _vars = collect(values(vars))
+
+    # FE space stuff
+    fs_export = get_function_space(U_export)
+    @assert get_type(fs_export) <: Lagrange "Only FunctionSpace of type Lagrange are supported for now"
+    degree_export = get_degree(fs_export)
+    dhl_export = Bcube._get_dhl(U_export)
+    nd = ndofs(dhl_export)
+
+    # Find the number of components of each variable by evaluating it on the
+    # center of the first cell of the mesh
+    cinfo = CellInfo(mesh, 1)
+    ξ = center(shape(celltype(cinfo)))
+    cpoint = CellPoint(ξ, cinfo, ReferenceDomain())
+    ncomps = [length(materialize(var, cinfo)(cpoint)) for var in values(vars)]
+
+    # VTK stuff
+    coords_vtk = zeros(spacedim(mesh), nd)
+    values_vtk = ntuple(i -> zeros(ncomps[i], nd), length(_vars))
+    cells_vtk = MeshCell[]
+    sizehint!(cells_vtk, ncells(mesh))
+
+    # Loop over mesh cells
+    for cinfo in DomainIterator(CellDomain(mesh))
+        # Cell infos
+        icell = cellindex(cinfo)
+        ctype = celltype(cinfo)
+        _shape = shape(ctype)
+
+        # Get Lagrange dofs/nodes coordinates in ref space (Bcube order)
+        coords_bcube = coords(fs_export, _shape)
+
+        # Get VTK <-> BCUBE dofs/nodes mapping
+        v2b = Bcube._vtk_lagrange_node_index_vtk_to_bcube(_shape, degree_export)
+
+        # Add nodes coordinates to coords_vtk
+        for (iloc, ξ) in enumerate(coords_bcube)
+            # Global number of the node
+            iglob = dof(dhl_export, icell, 1, iloc)
+
+            # Create CellPoint (in reference domain)
+            cpoint = CellPoint(ξ, cinfo, ReferenceDomain())
+
+            # Map it to the physical domain and assign to VTK
+            coords_vtk[:, iglob] .= get_coord(change_domain(cpoint, PhysicalDomain()))
+
+            # Evaluate all vars on this node
+            for (ivar, var) in enumerate(_vars)
+                _var = materialize(var, cinfo)
+                values_vtk[ivar][:, iglob] .= _var(cpoint)
+            end
+        end
+
+        # Create the VTK cells with the correct ordering
+        iglobs = dof(dhl_export, icell)
+        push!(
+            cells_vtk,
+            MeshCell(vtk_entity(_shape, Val(degree_export)), view(iglobs, v2b)),
+        )
+    end
+
+    # Write VTK file
+    pvd = paraview_collection(basename; append = collection_append)
+    new_name = _build_fname_with_iterations(basename, it)
+    vtkfile = vtk_grid(new_name, coords_vtk, cells_vtk; vtk_kwargs...)
+
+    for (varname, value) in zip(keys(vars), values_vtk)
+        vtkfile[varname, VTKPointData()] = value
+    end
+
+    pvd[float(time)] = vtkfile
+    vtk_save(pvd)
+end
+
+"""
+Append the number of iteration (if positive) to the basename
+"""
+function _build_fname_with_iterations(basename::String, it::Integer)
+    it >= 0 ? @sprintf("%s_%08i", basename, it) : basename
 end

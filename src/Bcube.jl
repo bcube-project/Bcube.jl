@@ -10,7 +10,8 @@ using ForwardDiff
 using LinearAlgebra
 using WriteVTK
 using Printf # just for tmp vtk, to be removed
-import LinearSolve: solve, solve!
+# import LinearSolve: solve, solve!, LinearProblem
+import LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
 
 const MAX_LENGTH_STATICARRAY = (10^6)
@@ -224,7 +225,7 @@ export assemble_dirichlet_vector,
     apply_homogeneous_dirichlet_to_vector!
 
 include("./assembler/affine_fe_system.jl")
-export AffineFESystem, solve, solve!
+export AffineFESystem
 
 include("./algebra/gradient.jl")
 export ∇

@@ -1,10 +1,10 @@
 @testset "Limiter" begin
     @testset "LinearScalingLimiter" begin
-        tmp_path = "tmp.msh"
+        path = joinpath(tempdir, "mesh.msh")
         Lx = 3.0
         Ly = 1.0
         gen_rectangle_mesh(
-            tmp_path,
+            path,
             :quad;
             nx = 4,
             ny = 2,
@@ -13,8 +13,7 @@
             xc = Lx / 2,
             yc = Ly / 2,
         )
-        mesh = read_msh(tmp_path, 2) # '2' indicates the space dimension (3 by default)
-        rm(tmp_path)
+        mesh = read_msh(path, 2) # '2' indicates the space dimension (3 by default)
 
         c2n = connectivities_indices(mesh, :c2n)
         f = (k, x) -> begin
