@@ -13,6 +13,14 @@ function LazyOperators.materialize(lOp::Gradient, cInfo::CellInfo)
     Gradient(LazyOperators.materialize_args(get_args(lOp), cInfo))
 end
 
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{Vararg{AbstractCellFunction}}},
+    cPoint::CellPoint,
+) where {O}
+    f, = get_args(lOp)
+    Gradient(f, cPoint)
+end
+
 """
 Materialization of a `Gradient` on a `CellPoint`. Only valid for a function and a `CellPoint` defined on
 the reference domain.
@@ -69,14 +77,6 @@ TODO:
 * improve formulae with a reshape
 * Specialize for a ShapeFunction to use the hardcoded version instead of ForwardDiff
 """
-function LazyOperators.materialize(
-    lOp::Gradient{O, <:Tuple{Vararg{AbstractCellFunction{ReferenceDomain}}}},
-    cPoint::CellPoint{ReferenceDomain},
-) where {O}
-    f, = get_args(lOp)
-    Gradient(f, cPoint)
-end
-
 function Gradient(
     cellFunction::AbstractCellFunction{<:ReferenceDomain},
     cPoint::CellPoint{ReferenceDomain},
@@ -101,6 +101,15 @@ function Gradient(
     fs = get_function_space(cellFunction)
     n = Val(get_size(cellFunction))
     MapOver(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
+end
+
+function Gradient(
+    cellFunction::AbstractCellFunction{<:PhysicalDomain},
+    cPoint::CellPoint{ReferenceDomain},
+)
+    f = get_function(cellFunction)
+    x = change_domain(cPoint, PhysicalDomain())
+    return ForwardDiff.gradient(f, get_coord(x))
 end
 
 function grad_shape_functionsNA(fs::AbstractFunctionSpace, n::Val{1}, ctype, cnodes, ξ)

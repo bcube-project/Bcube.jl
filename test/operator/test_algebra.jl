@@ -47,5 +47,14 @@
         _g = Bcube.materialize(∇(g), cInfo)
         res = Bcube.integrate_on_ref(_g, cInfo, Quadrature(qDegree))
         @test all(isapprox.(res ./ convex_quad_area(cnodes), [1.0 2.0; 3.0 4.0]))
+
+        # Gradient of scalar PhysicalFunction
+        # Physical function is [x,y] -> x so its gradient is [x,y] -> [1, 0]
+        # so the integral is simply the volume of Ω
+        mesh = one_cell_mesh(:quad)
+        translate!(mesh, rand(2)) # `rand` to check that the ref->phys mapping is effective
+        scale!(mesh, 2.0)
+        dΩ = Measure(CellDomain(mesh), 1)
+        @test Bcube.compute(∫(∇(PhysicalFunction(x -> x[1])) ⋅ [1, 1])dΩ)[1] == 16.0
     end
 end
