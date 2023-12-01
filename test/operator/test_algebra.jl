@@ -57,4 +57,14 @@
         dΩ = Measure(CellDomain(mesh), 1)
         @test Bcube.compute(∫(∇(PhysicalFunction(x -> x[1])) ⋅ [1, 1])dΩ)[1] == 16.0
     end
+
+    @testset "algebra" begin
+        f = PhysicalFunction(x -> 0)
+        a = Bcube.NullOperator()
+        @test dcontract(a, a) == a
+        @test dcontract(rand(), a) == a
+        @test dcontract(a, rand()) == a
+        @test dcontract(f, a) == a
+        @test dcontract(a, f) == a
+    end
 end
