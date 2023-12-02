@@ -103,10 +103,22 @@ function Gradient(
     MapOver(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
 end
 
-function Gradient(cellFunction::AbstractCellFunction{<:PhysicalDomain}, cPoint::CellPoint)
+function Gradient(
+    cellFunction::AbstractCellFunction{<:PhysicalDomain, 1},
+    cPoint::CellPoint,
+)
     f = get_function(cellFunction)
     x = change_domain(cPoint, PhysicalDomain()) # transparent if already in PhysicalDomain
     return ForwardDiff.gradient(f, get_coord(x))
+end
+
+function Gradient(
+    cellFunction::AbstractCellFunction{<:PhysicalDomain, S},
+    cPoint::CellPoint,
+) where {S}
+    f = get_function(cellFunction)
+    x = change_domain(cPoint, PhysicalDomain()) # transparent if already in PhysicalDomain
+    return ForwardDiff.jacobian(f, get_coord(x))
 end
 
 function grad_shape_functionsNA(fs::AbstractFunctionSpace, n::Val{1}, ctype, cnodes, ξ)
