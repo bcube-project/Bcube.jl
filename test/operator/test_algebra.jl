@@ -56,6 +56,20 @@
         scale!(mesh, 2.0)
         dΩ = Measure(CellDomain(mesh), 1)
         @test Bcube.compute(∫(∇(PhysicalFunction(x -> x[1])) ⋅ [1, 1])dΩ)[1] == 16.0
+
+        # Gradient of a vector PhysicalFunction
+        mesh = one_cell_mesh(:quad)
+        translate!(mesh, rand(2))
+        scale!(mesh, 2.0)
+        sizeU = spacedim(mesh)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh; sizeU)
+        V = TestFESpace(U)
+        _f = x -> SA[2 * x[1]^2, x[1] * x[2]]
+        f = PhysicalFunction(_f, sizeU)
+        ∇f = PhysicalFunction(x -> ForwardDiff.jacobian(_f, x), (sizeU, spacedim(mesh)))
+        dΩ = Measure(CellDomain(mesh), 3)
+        l(v) = ∫(tr(∇(f) - ∇f) ⋅ v)dΩ
+        @test assemble_linear(l, V) == [0.0, 0.0, 0.0, 0.0]
     end
 
     @testset "algebra" begin

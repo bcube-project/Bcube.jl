@@ -211,11 +211,11 @@ struct CellFunction{DS, S, F <: Function} <: AbstractCellFunction{DS, S}
 end
 
 """
-    CellFunction(f::Function, domainstyle::DomainStyle, s::Int)
+    CellFunction(f::Function, domainstyle::DomainStyle, s)
 
 `size` is the codomain size of `f`.
 """
-function CellFunction(f::Function, ds::DomainStyle, size::Int)
+function CellFunction(f::Function, ds::DomainStyle, size)
     CellFunction{typeof(ds), size, typeof(f)}(f)
 end
 
