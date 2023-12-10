@@ -673,7 +673,7 @@ Compute an integral, independently from a FEM/DG framework (i.e without FESpace)
 
 Return an array (of size ncells) of the integral evaluated over each cell (or face).
 
-When integrating the constant function `x -> PhysicalFunction(x -> 1)`, the sum of this
+When integrating the constant function `PhysicalFunction(x -> 1)`, the sum of this
 result array will give you:
 * the volume of the `CellDomain` if the integration was performed over a `CellDomain`
 * the area of the `BoundaryFaceDomain` if the integration was performed over a `BoundaryFaceDomain`
