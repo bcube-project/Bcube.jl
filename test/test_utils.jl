@@ -46,5 +46,19 @@
         d = [SA[1 2; 10 20], SA[3 4 5; 30 40 50], SA[6 7; 60 70]]
         @test rawcat(d) == [1, 10, 2, 20, 3, 30, 4, 40, 5, 50, 6, 60, 7, 70]
         @test isa(rawcat(d), Vector)
+
+        x = [1, 2, 3]
+        @test rawcat(x) == x
+    end
+
+    @testset "matrix_2_vector_of_SA" begin
+        a = [
+            1 2 3
+            4 5 6
+        ]
+        b = Bcube.matrix_2_vector_of_SA(a)
+        @test b[1] == SA[1, 4]
+        @test b[2] == SA[2, 5]
+        @test b[3] == SA[3, 6]
     end
 end
