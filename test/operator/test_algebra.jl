@@ -59,7 +59,7 @@
 
         # Gradient of a vector PhysicalFunction
         mesh = one_cell_mesh(:quad)
-        translate!(mesh, rand(2))
+        translate!(mesh, SA[π, -3.14]) # the translation vector can be anything
         scale!(mesh, 2.0)
         sizeU = spacedim(mesh)
         U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh; sizeU)
