@@ -52,7 +52,7 @@
         # Physical function is [x,y] -> x so its gradient is [x,y] -> [1, 0]
         # so the integral is simply the volume of Ω
         mesh = one_cell_mesh(:quad)
-        translate!(mesh, rand(2)) # `rand` to check that the ref->phys mapping is effective
+        translate!(mesh, SA[-0.5, 1.0]) # the translation vector can be anything
         scale!(mesh, 2.0)
         dΩ = Measure(CellDomain(mesh), 1)
         @test Bcube.compute(∫(∇(PhysicalFunction(x -> x[1])) ⋅ [1, 1])dΩ)[1] == 16.0
