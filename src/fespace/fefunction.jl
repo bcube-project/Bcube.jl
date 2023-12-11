@@ -38,7 +38,7 @@ function Base.getindex(f::AbstractFEFunction{S}, i::CellInfo) where {S}
     ncomps = get_ncomponents(feSpace)
     q₀ = get_dof_values(f, cellindex(i), Val(ndofs))
     fcell = _interpolate(Val(ncomps), q₀, λ)
-    CellFunction(fcell, domainStyle, S)
+    CellFunction(fcell, domainStyle, Val(S))
 end
 
 # scalar case:

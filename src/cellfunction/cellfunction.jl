@@ -211,30 +211,59 @@ struct CellFunction{DS, S, F <: Function} <: AbstractCellFunction{DS, S}
 end
 
 """
-    CellFunction(f::Function, domainstyle::DomainStyle, s)
+    CellFunction(f::Function, domainstyle::DomainStyle, ::Val{S}) where {S}
 
-`size` is the codomain size of `f`.
+`S` is the codomain size of `f`.
 """
-function CellFunction(f::Function, ds::DomainStyle, size)
-    CellFunction{typeof(ds), size, typeof(f)}(f)
+function CellFunction(f::Function, ds::DomainStyle, ::Val{S}) where {S}
+    CellFunction{typeof(ds), S, typeof(f)}(f)
 end
 
 get_function(f::CellFunction) = f.f
 
 """
-    PhysicalFunction(f::Function, size = 1)
+    PhysicalFunction(f::Function, [size::Union{Integer, Tuple{Integer, Vararg{Integer}}} = 1])
+    PhysicalFunction(f::Function, ::Val{size}) where {size}
 
-Return a [`CellFunction`](@ref) defined on a `PhysicalDomain`. `size` is the size of
-the codomain of `f`.
+Return a [`CellFunction`](@ref) defined on a `PhysicalDomain`.
+`size` is the size of the codomain of `f`.
+
+## Note:
+Using a `Val` to precribe the size a of `PhysicalFunction` is
+recommanded to improve type-stability and performance.
 """
-PhysicalFunction(f::Function, size = 1) = CellFunction(f, PhysicalDomain(), size)
+function PhysicalFunction(
+    f::Function,
+    size::Union{Integer, Tuple{Integer, Vararg{Integer}}} = 1,
+)
+    CellFunction(f, PhysicalDomain(), Val(size))
+end
+
+function PhysicalFunction(f::Function, s::Val{size}) where {size}
+    CellFunction(f, PhysicalDomain(), s)
+end
 
 """
-    ReferenceFunction(f::Function, size = 1)
+    ReferenceFunction(f::Function, [size::Union{Integer, Tuple{Integer, Vararg{Integer}}} = 1])
+    ReferenceFunction(f::Function, ::Val{size}) where {size}
 
 Return a [`CellFunction`](@ref) defined on a `ReferenceDomain`.
+`size` is the size of the codomain of `f`.
+
+## Note:
+Using a `Val` to precribe the size a of `ReferenceFunction` is
+recommanded to improve type-stability and performance.
 """
-ReferenceFunction(f::Function, size = 1) = CellFunction(f, ReferenceDomain(), size)
+function ReferenceFunction(
+    f::Function,
+    size::Union{Integer, Tuple{Integer, Vararg{Integer}}} = 1,
+)
+    CellFunction(f, ReferenceDomain(), Val(size))
+end
+
+function ReferenceFunction(f::Function, s::Val{size}) where {size}
+    CellFunction(f, ReferenceDomain(), s)
+end
 
 function LazyOperators.materialize(::AbstractCellFunction, ::FaceInfo)
     error("Cannot integrate a `CellFunction` on a face : please select a `Side`")
