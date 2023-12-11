@@ -104,22 +104,17 @@ function Gradient(
 end
 
 function Gradient(
-    cellFunction::AbstractCellFunction{<:PhysicalDomain, 1},
-    cPoint::CellPoint,
-)
-    f = get_function(cellFunction)
-    x = change_domain(cPoint, PhysicalDomain()) # transparent if already in PhysicalDomain
-    return ForwardDiff.gradient(f, get_coord(x))
-end
-
-function Gradient(
     cellFunction::AbstractCellFunction{<:PhysicalDomain, S},
     cPoint::CellPoint,
 ) where {S}
     f = get_function(cellFunction)
     x = change_domain(cPoint, PhysicalDomain()) # transparent if already in PhysicalDomain
-    return ForwardDiff.jacobian(f, get_coord(x))
+    return _gradient_or_jacobian(Val(S), f, get_coord(x))
 end
+
+# dispatch on codomain size :
+_gradient_or_jacobian(::Val{1}, f, x) = ForwardDiff.gradient(f, x)
+_gradient_or_jacobian(::Val{S}, f, x) where {S} = ForwardDiff.jacobian(f, x)
 
 function grad_shape_functionsNA(fs::AbstractFunctionSpace, n::Val{1}, ctype, cnodes, ξ)
     grad = grad_shape_functions(fs, n, ctype, cnodes, ξ)
