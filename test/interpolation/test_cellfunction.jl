@@ -57,10 +57,10 @@ end
         b = Bcube.CellPoint((x1_phys, x2_phys), cellinfo, Bcube.PhysicalDomain())
         _f = x -> x[1] + x[2]
 
-        λref = Bcube.CellFunction(_f, Bcube.ReferenceDomain())
+        λref = Bcube.CellFunction(_f, Bcube.ReferenceDomain(), Val(1))
         @test λref(a) == _f.((x1_ref, x2_ref))
 
-        λphys = Bcube.CellFunction(_f, Bcube.PhysicalDomain())
+        λphys = Bcube.CellFunction(_f, Bcube.PhysicalDomain(), Val(1))
         @test λphys(a) == _f.((x1_phys, x2_phys))
     end
 end
