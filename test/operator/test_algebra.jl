@@ -81,4 +81,15 @@
         @test dcontract(f, a) == a
         @test dcontract(a, f) == a
     end
+
+    @testset "UniformScaling" begin
+        mesh = one_cell_mesh(:quad)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh; size = 2)
+        V = TestFESpace(U)
+        p = PhysicalFunction(x -> 3)
+        dΩ = Measure(CellDomain(mesh), 1)
+        l(v) = ∫((p * I) ⊡ ∇(v))dΩ
+        a = assemble_linear(l, V)
+        @test all(a .≈ [-3.0, 3.0, -3.0, 3.0, -3.0, -3.0, 3.0, 3.0])
+    end
 end
