@@ -229,8 +229,8 @@ Return a [`CellFunction`](@ref) defined on a `PhysicalDomain`.
 `size` is the size of the codomain of `f`.
 
 ## Note:
-Using a `Val` to precribe the size a of `PhysicalFunction` is
-recommanded to improve type-stability and performance.
+Using a `Val` to prescribe the size a of `PhysicalFunction` is
+recommended to improve type-stability and performance.
 """
 function PhysicalFunction(
     f::Function,
@@ -251,8 +251,8 @@ Return a [`CellFunction`](@ref) defined on a `ReferenceDomain`.
 `size` is the size of the codomain of `f`.
 
 ## Note:
-Using a `Val` to precribe the size a of `ReferenceFunction` is
-recommanded to improve type-stability and performance.
+Using a `Val` to prescribe the size a of `ReferenceFunction` is
+recommended to improve type-stability and performance.
 """
 function ReferenceFunction(
     f::Function,
