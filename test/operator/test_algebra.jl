@@ -82,7 +82,7 @@
         @test dcontract(a, f) == a
     end
 
-    @testset "UniformScaling"
+    @testset "UniformScaling" begin
         mesh = one_cell_mesh(:quad)
         U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh; size = 2)
         V = TestFESpace(U)
