@@ -576,7 +576,7 @@ Soustraction on an `Integration` is treated as a multiplication by "(-1)" :
 """
 Base.:-(a::Integration) = (-1) * a
 
-struct MultiIntegration{N, I <: Tuple{Vararg{<:Integration, N}}}
+struct MultiIntegration{N, I <: Tuple{Vararg{Integration, N}}}
     integrations::I
 end
 

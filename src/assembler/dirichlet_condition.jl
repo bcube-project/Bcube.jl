@@ -61,7 +61,7 @@ function apply_homogeneous_dirichlet_to_matrix!(
     U,
     V,
     mesh::AbstractMesh;
-    diag_values::Tuple{Vararg{<:Number, N}} = ntuple(i -> 1.0, N),
+    diag_values::Tuple{Vararg{Number, N}} = ntuple(i -> 1.0, N),
 ) where {N}
     callbacks = ntuple(
         i -> callback!(array, iglob, _, _) = begin
@@ -153,7 +153,7 @@ function apply_dirichlet_to_matrix!(
     U,
     V,
     mesh::AbstractMesh;
-    diag_values::Tuple{Vararg{<:Number, N}} = ntuple(i -> 1.0, N),
+    diag_values::Tuple{Vararg{Number, N}} = ntuple(i -> 1.0, N),
 ) where {N}
     callbacks = ntuple(
         i -> callback!(array, iglob, _, _) = begin
