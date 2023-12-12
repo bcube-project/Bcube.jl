@@ -1,18 +1,21 @@
 """
-    AbstractCellFunction{DS}
+    AbstractCellFunction{DS,S}
 
 Abstract type to represent a function defined in specific domain `DS`,
-which could be a `ReferenceDomain` or a `PhysicalDomain`.
+which could be a `ReferenceDomain` or a `PhysicalDomain`. `S` is the size
+of the codomain (i.e `S=length(f(x))`) where `f` is the `AbstractCellFunction`.
 
 # Subtypes should implement :
 * `get_function(f::AbstractCellFunction)`
 """
-abstract type AbstractCellFunction{DS} <: AbstractLazy end
+abstract type AbstractCellFunction{DS, S} <: AbstractLazy end
 
 """
     DomainStyle(f::AbstractCellFunction)
 """
 DomainStyle(f::AbstractCellFunction{DS}) where {DS} = DS()
+
+get_size(::AbstractCellFunction{DS, S}) where {DS, S} = S
 
 """
     get_function(f::AbstractCellFunction)
@@ -70,7 +73,7 @@ LazyOperators.materialize(f::AbstractCellFunction, x::CellInfo) = f
 LazyOperators.materialize(f::AbstractCellFunction, x::CellPoint) = f(x)
 
 """
-    abstract type AbstractShapeFunction{DS,S,FS} <: AbstractCellFunction{DS} end
+    abstract type AbstractShapeFunction{DS,S,FS} <: AbstractCellFunction{DS,S} end
 
 Abstract type to represent a shape function defined in specific domain `DS`,
 which could be a `ReferenceDomain` or a `PhysicalDomain`. `S` is the size
@@ -82,9 +85,8 @@ Subtypes should implement `AbstractCellFunction`:
 
 and its own specitic interface: [empty]
 """
-abstract type AbstractShapeFunction{DS, S, FS} <: AbstractCellFunction{DS} end
+abstract type AbstractShapeFunction{DS, S, FS} <: AbstractCellFunction{DS, S} end
 
-get_size(::AbstractShapeFunction{DS, S}) where {DS, S} = S
 get_function_space(::AbstractShapeFunction{DS, S, FS}) where {DS, S, FS} = FS()
 
 """
@@ -199,37 +201,69 @@ end
 LazyOperators.pretty_name_style(a::CellShapeFunctions) = Dict(:color => :light_green)
 
 """
-    CellFunction{DS,F<:Function} <: AbstractCellFunction{DS}
+    CellFunction{DS,S,F<:Function} <: AbstractCellFunction{DS,S}
 
 Subtype of [`AbstractCellFunction`](@ref) used to wrap a function
 defined on a domain of style` `DS` in the cell
 """
-struct CellFunction{DS, F <: Function} <: AbstractCellFunction{DS}
+struct CellFunction{DS, S, F <: Function} <: AbstractCellFunction{DS, S}
     f::F
 end
 
 """
-    CellFunction(f::Function, domainstyle::DomainStyle)
+    CellFunction(f::Function, domainstyle::DomainStyle, ::Val{S}) where {S}
+
+`S` is the codomain size of `f`.
 """
-function CellFunction(f::Function, ds::DomainStyle)
-    CellFunction{typeof(ds), typeof(f)}(f)
+function CellFunction(f::Function, ds::DomainStyle, ::Val{S}) where {S}
+    CellFunction{typeof(ds), S, typeof(f)}(f)
 end
 
 get_function(f::CellFunction) = f.f
 
 """
-    PhysicalFunction(f::Function)
+    PhysicalFunction(f::Function, [size::Union{Integer, Tuple{Integer, Vararg{Integer}}} = 1])
+    PhysicalFunction(f::Function, ::Val{size}) where {size}
 
 Return a [`CellFunction`](@ref) defined on a `PhysicalDomain`.
+`size` is the size of the codomain of `f`.
+
+## Note:
+Using a `Val` to prescribe the size a of `PhysicalFunction` is
+recommended to improve type-stability and performance.
 """
-PhysicalFunction(f::Function) = CellFunction(f, PhysicalDomain())
+function PhysicalFunction(
+    f::Function,
+    size::Union{Integer, Tuple{Integer, Vararg{Integer}}} = 1,
+)
+    CellFunction(f, PhysicalDomain(), Val(size))
+end
+
+function PhysicalFunction(f::Function, s::Val{size}) where {size}
+    CellFunction(f, PhysicalDomain(), s)
+end
 
 """
-    ReferenceFunction(f::Function)
+    ReferenceFunction(f::Function, [size::Union{Integer, Tuple{Integer, Vararg{Integer}}} = 1])
+    ReferenceFunction(f::Function, ::Val{size}) where {size}
 
 Return a [`CellFunction`](@ref) defined on a `ReferenceDomain`.
+`size` is the size of the codomain of `f`.
+
+## Note:
+Using a `Val` to prescribe the size a of `ReferenceFunction` is
+recommended to improve type-stability and performance.
 """
-ReferenceFunction(f::Function) = CellFunction(f, ReferenceDomain())
+function ReferenceFunction(
+    f::Function,
+    size::Union{Integer, Tuple{Integer, Vararg{Integer}}} = 1,
+)
+    CellFunction(f, ReferenceDomain(), Val(size))
+end
+
+function ReferenceFunction(f::Function, s::Val{size}) where {size}
+    CellFunction(f, ReferenceDomain(), s)
+end
 
 function LazyOperators.materialize(::AbstractCellFunction, ::FaceInfo)
     error("Cannot integrate a `CellFunction` on a face : please select a `Side`")
