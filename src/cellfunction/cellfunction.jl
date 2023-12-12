@@ -427,3 +427,8 @@ LazyOperators.materialize(a::Number, ::CellInfo) = a
 LazyOperators.materialize(a::Number, ::FaceInfo) = a
 LazyOperators.materialize(a::Number, ::CellPoint) = a
 LazyOperators.materialize(a::Number, ::FacePoint) = a
+
+LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::CellInfo) = a
+LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::FaceInfo) = a
+LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::CellPoint) = a
+LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::FacePoint) = a
