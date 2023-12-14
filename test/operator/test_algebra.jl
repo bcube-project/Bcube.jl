@@ -69,7 +69,8 @@
         ∇f = PhysicalFunction(x -> ForwardDiff.jacobian(_f, x), (sizeU, spacedim(mesh)))
         dΩ = Measure(CellDomain(mesh), 3)
         l(v) = ∫(tr(∇(f) - ∇f) ⋅ v)dΩ
-        @test assemble_linear(l, V) == [0.0, 0.0, 0.0, 0.0]
+        _a = assemble_linear(l, V)
+        @test all(isapprox.(_a, [0.0, 0.0, 0.0, 0.0]; atol = 100 * eps()))
     end
 
     @testset "algebra" begin

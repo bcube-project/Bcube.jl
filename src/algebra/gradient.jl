@@ -21,6 +21,14 @@ function LazyOperators.materialize(
     Gradient(f, cPoint)
 end
 
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{AbstractLazy}},
+    cPoint::CellPoint,
+) where {O}
+    f, = get_args(lOp)
+    Gradient(f, cPoint)
+end
+
 """
 Materialization of a `Gradient` on a `CellPoint`. Only valid for a function and a `CellPoint` defined on
 the reference domain.
@@ -81,6 +89,7 @@ function Gradient(
     cellFunction::AbstractCellFunction{<:ReferenceDomain},
     cPoint::CellPoint{ReferenceDomain},
 )
+    @show "grad AbstractCellFunction{<:ReferenceDomain}"
     cnodes = get_cellnodes(cPoint)
     ctype = get_celltype(cPoint)
     ξ = get_coord(cPoint)
@@ -90,6 +99,37 @@ function Gradient(
 end
 _Gradient(::Real, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient(f, ξ)
 _Gradient(::AbstractArray, f, ξ::AbstractArray, m) = ForwardDiff.jacobian(f, ξ) * m
+
+function Gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
+    @show "grad abstractLazy PhysicalDomain"
+    f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
+    valS = _size_codomain(f, get_coord(cPoint))
+    return _gradient_or_jacobian(valS, f, get_coord(cPoint))
+end
+
+function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
+    @show "grad abstractLazy ReferenceDomain"
+    m = mapping_jacobian_inv(get_cellnodes(cPoint), get_celltype(cPoint), get_coord(cPoint))
+    # @show m
+    f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
+    valS = _size_codomain(f, get_coord(cPoint))
+    return _gradient(valS, f, get_coord(cPoint), m)
+
+    # NOTE : Equivalent à ce qu'il y a au-dessus mais ça implique
+    #        de connaitre "mapping_inv" pour change_domain Phys->Ref,
+    #        ce qui n'est pas toujours le cas
+    #
+    # cPoint_phys = change_domain(cPoint, PhysicalDomain())
+    # f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint_phys), PhysicalDomain()))
+    # fx = f(get_coord(cPoint_phys))
+    # return _gradient_or_jacobian(Val(length(fx)), f, get_coord(cPoint_phys))
+end
+
+_size_codomain(f, x) = Val(length(f(x)))
+_size_codomain(f::AbstractCellFunction, x) = Val(get_size(f))
+
+_gradient(::Val{1}, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient(f, ξ)
+_gradient(::Val{S}, f, ξ::AbstractArray, m) where {S} = ForwardDiff.jacobian(f, ξ) * m
 
 function Gradient(
     cellFunction::AbstractCellShapeFunctions{<:ReferenceDomain},
@@ -101,15 +141,6 @@ function Gradient(
     fs = get_function_space(cellFunction)
     n = Val(get_size(cellFunction))
     MapOver(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
-end
-
-function Gradient(
-    cellFunction::AbstractCellFunction{<:PhysicalDomain, S},
-    cPoint::CellPoint,
-) where {S}
-    f = get_function(cellFunction)
-    x = change_domain(cPoint, PhysicalDomain()) # transparent if already in PhysicalDomain
-    return _gradient_or_jacobian(Val(S), f, get_coord(x))
 end
 
 # dispatch on codomain size :
