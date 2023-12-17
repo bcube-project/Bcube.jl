@@ -71,6 +71,39 @@
         l(v) = ∫(tr(∇(f) - ∇f) ⋅ v)dΩ
         _a = assemble_linear(l, V)
         @test all(isapprox.(_a, [0.0, 0.0, 0.0, 0.0]; atol = 100 * eps()))
+
+        @testset "AbstractLazy" begin
+            mesh = one_cell_mesh(:quad)
+            scale!(mesh, 3.0)
+            translate!(mesh, [4.0, 0.0])
+            U_sca = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+            U_vec = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh; size = 2)
+            V_sca = TestFESpace(U_sca)
+            V_vec = TestFESpace(U_vec)
+            u_sca = FEFunction(U_sca)
+            u_vec = FEFunction(U_vec)
+            dΩ = Measure(CellDomain(mesh), 2)
+            projection_l2!(u_sca, PhysicalFunction(x -> 3 * x[1] - 4x[2]), dΩ)
+            projection_l2!(
+                u_vec,
+                PhysicalFunction(x -> SA[2x[1] + 5x[2], 4x[1] - 3x[2]]),
+                dΩ,
+            )
+
+            l1(v) = ∫((∇(π * u_sca) ⋅ ∇(2 * u_sca)) ⋅ v)dΩ
+            l2(v) = ∫((∇(u_sca) ⋅ ∇(u_sca)) ⋅ v)dΩ
+
+            a1_sca = assemble_linear(l1, V_sca)
+            a2_sca = assemble_linear(l2, V_sca)
+            @test all(a1_sca .≈ (2π .* a2_sca))
+
+            V_vec = TestFESpace(U_vec)
+            l1_vec(v) = ∫((∇(π * u_vec) * u_vec) ⋅ v)dΩ
+            l2_vec(v) = ∫((∇(u_vec) * u_vec) ⋅ v)dΩ
+            a1_vec = assemble_linear(l1_vec, V_vec)
+            a2_vec = assemble_linear(l2_vec, V_vec)
+            @test all(a1_vec .≈ (π .* a2_vec))
+        end
     end
 
     @testset "algebra" begin

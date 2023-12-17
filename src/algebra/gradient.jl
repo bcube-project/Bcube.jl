@@ -89,7 +89,6 @@ function Gradient(
     cellFunction::AbstractCellFunction{<:ReferenceDomain},
     cPoint::CellPoint{ReferenceDomain},
 )
-    @show "grad AbstractCellFunction{<:ReferenceDomain}"
     cnodes = get_cellnodes(cPoint)
     ctype = get_celltype(cPoint)
     ξ = get_coord(cPoint)
@@ -101,16 +100,13 @@ _Gradient(::Real, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient
 _Gradient(::AbstractArray, f, ξ::AbstractArray, m) = ForwardDiff.jacobian(f, ξ) * m
 
 function Gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
-    @show "grad abstractLazy PhysicalDomain"
     f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
     valS = _size_codomain(f, get_coord(cPoint))
     return _gradient_or_jacobian(valS, f, get_coord(cPoint))
 end
 
 function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
-    @show "grad abstractLazy ReferenceDomain"
     m = mapping_jacobian_inv(get_cellnodes(cPoint), get_celltype(cPoint), get_coord(cPoint))
-    # @show m
     f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
     valS = _size_codomain(f, get_coord(cPoint))
     return _gradient(valS, f, get_coord(cPoint), m)
