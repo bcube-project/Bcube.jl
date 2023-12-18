@@ -97,26 +97,6 @@ TODO:
 * improve formulae with a reshape
 * Specialize for a ShapeFunction to use the hardcoded version instead of ForwardDiff
 """
-function Gradient(
-    cellFunction::AbstractCellFunction{<:ReferenceDomain},
-    cPoint::CellPoint{ReferenceDomain},
-)
-    cnodes = get_cellnodes(cPoint)
-    ctype = get_celltype(cPoint)
-    ξ = get_coord(cPoint)
-    f = get_function(cellFunction)
-    m = mapping_jacobian_inv(cnodes, ctype, ξ)
-    _Gradient(cellFunction(cPoint), f, ξ, m)
-end
-_Gradient(::Real, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient(f, ξ)
-_Gradient(::AbstractArray, f, ξ::AbstractArray, m) = ForwardDiff.jacobian(f, ξ) * m
-
-function Gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
-    f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
-    valS = _size_codomain(f, get_coord(cPoint))
-    return _gradient_or_jacobian(valS, f, get_coord(cPoint))
-end
-
 function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
     m = mapping_jacobian_inv(get_cellnodes(cPoint), get_celltype(cPoint), get_coord(cPoint))
     f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
@@ -136,6 +116,12 @@ _size_codomain(f::AbstractCellFunction, x) = Val(get_size(f))
 
 _gradient(::Val{1}, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient(f, ξ)
 _gradient(::Val{S}, f, ξ::AbstractArray, m) where {S} = ForwardDiff.jacobian(f, ξ) * m
+
+function Gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
+    f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
+    valS = _size_codomain(f, get_coord(cPoint))
+    return _gradient_or_jacobian(valS, f, get_coord(cPoint))
+end
 
 function Gradient(
     cellFunction::AbstractCellShapeFunctions{<:ReferenceDomain},
