@@ -199,20 +199,6 @@ end
 
 @inline allocate_dofs(feSpace::SingleFESpace, T = Float64) = zeros(T, get_ndofs(feSpace))
 
-function MultiplierFESpace(mesh::AbstractMesh, size::Int = 1, kwargs...)
-    fSpace = FunctionSpace(:Lagrange, 0)
-
-    iglob = collect(1:size)
-    offset = zeros(ncells(mesh), size)
-    for i in 1:size
-        offset[:, i] .= i - 1
-    end
-    ndofs = -1 * ones(ncells(mesh), size) # Temporary allocation for development purposes
-    dhl = DofHandler(iglob, offset, ndofs)
-
-    return SingleFESpace{size, typeof(fSpace)}(fSpace, dhl, true, Int[])
-end
-
 """
 A TrialFESpace is basically a SingleFESpace plus other attributes (related to boundary conditions)
 
@@ -308,6 +294,26 @@ function TrialFESpace(
         isContinuous = type == :continuous,
         kwargs...,
     )
+end
+
+"""
+A MultiplierFESpace can be viewed as a set of independant P0 elements.
+It is used to define Lagrange multipliers and assemble the associated augmented system (the system that adds the multipliers as unknowns).
+"""
+function MultiplierFESpace(mesh::AbstractMesh, size::Int = 1, kwargs...)
+    fSpace = FunctionSpace(:Lagrange, 0)
+
+    iglob = collect(1:size)
+    offset = zeros(ncells(mesh), size)
+    for i in 1:size
+        offset[:, i] .= i - 1
+    end
+    ndofs = ones(ncells(mesh), size) # Temporary allocation for development purposes
+    dhl = DofHandler(iglob, offset, ndofs)
+
+    feSpace = SingleFESpace{size, typeof(fSpace)}(fSpace, dhl, true, Int[])
+
+    return TrialFESpace{size, typeof(feSpace)}(feSpace, Dict{Int, Function}())
 end
 
 """

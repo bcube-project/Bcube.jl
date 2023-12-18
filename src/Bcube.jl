@@ -192,7 +192,7 @@ include("./fespace/dofhandler.jl")
 export dof, max_ndofs
 
 include("./fespace/fespace.jl")
-export TestFESpace, TrialFESpace, MultiFESpace, get_ndofs, get_fespace
+export TestFESpace, TrialFESpace, MultiplierFESpace, MultiFESpace, get_ndofs, get_fespace
 
 include("./fespace/fefunction.jl")
 export FEFunction, set_dof_values!, get_dof_values, get_fe_functions
