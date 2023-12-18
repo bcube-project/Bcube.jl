@@ -33,6 +33,18 @@ end
 Materialization of a `Gradient` on a `CellPoint`. Only valid for a function and a `CellPoint` defined on
 the reference domain.
 
+# Implementation
+The user writes mathematical expressions in the PhysicalDomain. So the gradient always represents the derivation
+with respect to the physical domain spatial coordinates, even if evaluated on a point expressed in the ReferenceDomain.
+
+The current Gradient implementation consists in applying ForwardDiff on the given operator 'u', on a point in the
+ReferenceDomain. That is to say, we compute ForwarDiff.derivative(ξ -> u ∘ F, ξ) (where F is the identity if u is defined
+is the ReferenceDomain). This gives ∇(u ∘ F)(ξ) = t∇(F)(ξ) * ∇(u)(F(x)).
+However, we only want ∇(u)(F(x)) : that's why a multiplication by the transpose of the inverse mapping jacobian is needed.
+
+An alternative approach would be to apply ForwardDiff in the PhysicalDomain : ForwarDiff.derivative(x -> u ∘ F^-1, x). The
+problem is that the inverse mapping F^-1 is not always defined.
+
 # Maths notes
 We use the following convention for any function f:R^n->R^p : ∇f is a tensor/matrix equal to ∂fi/∂xj. However when f
 is a scalar function, i.e f:R^n -> R, then ∇f is a column vector (∂f/∂x1, ∂f/∂x2, ...).
@@ -111,10 +123,8 @@ function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
     valS = _size_codomain(f, get_coord(cPoint))
     return _gradient(valS, f, get_coord(cPoint), m)
 
-    # NOTE : Equivalent à ce qu'il y a au-dessus mais ça implique
-    #        de connaitre "mapping_inv" pour change_domain Phys->Ref,
-    #        ce qui n'est pas toujours le cas
-    #
+    # ForwarDiff applied in the PhysicalDomain : not viable because
+    # the inverse mapping is not always known.
     # cPoint_phys = change_domain(cPoint, PhysicalDomain())
     # f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint_phys), PhysicalDomain()))
     # fx = f(get_coord(cPoint_phys))

@@ -120,6 +120,17 @@
         @test isapprox_arrays(mapping_inv(n, ct, x3), SA[1.0, 1.0]; rtol = tol)
         @test isapprox_arrays(mapping_inv(n, ct, x4), SA[-1.0, 1.0]; rtol = tol)
 
+        θ = π / 5
+        s = 3
+        t = SA[-1, 2]
+        R(θ) = SA[cos(θ) -sin(θ); sin(θ) cos(θ)]
+        mesh = one_cell_mesh(:quad)
+        mesh = transform(mesh, x -> R(θ) * (s .* x .+ t)) # scale, translate and rotate
+        c = CellInfo(mesh, 1)
+        cnodes = nodes(c)
+        ctype = Bcube.celltype(c)
+        @test all(mapping_jacobian_inv(cnodes, ctype, SA[0.0, 0.0]) .≈ R(-θ) ./ s)
+
         # Quad order 2
         xmin, ymin = -rand(2)
         xmax, ymax = rand(2)

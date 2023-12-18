@@ -103,6 +103,75 @@
             a1_vec = assemble_linear(l1_vec, V_vec)
             a2_vec = assemble_linear(l2_vec, V_vec)
             @test all(a1_vec .≈ (π .* a2_vec))
+
+            # Testing without assemble_*linear
+            θ = π / 5
+            s = 3
+            t = SA[-1, 2]
+            R = SA[cos(θ) -sin(θ); sin(θ) cos(θ)]
+            mesh = one_cell_mesh(:quad)
+
+            transform!(mesh, x -> R * (s .* x .+ t)) # scale, translate and rotate
+
+            # Select a cell and get its info
+            c = CellInfo(mesh, 1)
+            cnodes = nodes(c)
+            ctype = Bcube.celltype(c)
+            F = mapping(cnodes, ctype)
+            # tJinv = transpose(R ./ s) # if we want the analytic one...
+            tJinv(ξ) = transpose(mapping_jacobian_inv(cnodes, ctype, ξ))
+
+            # Test 1
+            u1 = PhysicalFunction(x -> x[1])
+            u2 = PhysicalFunction(x -> x[2])
+            u_a = u1 * u1 + 2 * u1 * u2 + u2 * u2 * u2
+            u_b = PhysicalFunction(x -> x[1]^2 + 2 * x[1] * x[2] + x[2]^3)
+            ∇u_ana = x -> SA[2 * (x[1] + x[2]); 2 * x[1] + 3 * x[2]^2]
+
+            ξ = Bcube.CellPoint(SA[0.5, -0.1], c, Bcube.ReferenceDomain())
+            x = Bcube.change_domain(ξ, Bcube.PhysicalDomain())
+            ∇u = ∇u_ana(Bcube.get_coord(x))
+            ∇u_a_ref = Bcube.materialize(∇(u_a), ξ)
+            ∇u_b_ref = Bcube.materialize(∇(u_b), ξ)
+            ∇u_a_phy = Bcube.materialize(∇(u_a), x)
+            ∇u_b_phy = Bcube.materialize(∇(u_b), x)
+            @test all(∇u_a_ref .≈ ∇u)
+            @test all(∇u_b_ref .≈ ∇u)
+            @test all(∇u_a_phy .≈ ∇u)
+            @test all(∇u_b_phy .≈ ∇u)
+
+            # Test 2
+            u1 = ReferenceFunction(ξ -> ξ[1])
+            u2 = ReferenceFunction(ξ -> ξ[2])
+            u_a = u1 * u1 + 2 * u1 * u2 + u2 * u2 * u2
+            u_b = ReferenceFunction(ξ -> ξ[1]^2 + 2 * ξ[1] * ξ[2] + ξ[2]^3)
+            ∇u_ana = ξ -> SA[2 * (ξ[1] + ξ[2]); 2 * ξ[1] + 3 * ξ[2]^2]
+
+            x = Bcube.CellPoint(SA[0.5, -0.1], c, Bcube.PhysicalDomain())
+            ξ = Bcube.change_domain(x, Bcube.ReferenceDomain()) # not always possible, but ok of for quad
+            ∇u = ∇u_ana(Bcube.get_coord(ξ))
+            _tJinv = tJinv(Bcube.get_coord(ξ))
+            ∇u_a_ref = Bcube.materialize(∇(u_a), ξ)
+            ∇u_b_ref = Bcube.materialize(∇(u_b), ξ)
+            ∇u_a_phy = Bcube.materialize(∇(u_a), x)
+            ∇u_b_phy = Bcube.materialize(∇(u_b), x)
+            @test all(∇u_a_ref .≈ _tJinv * ∇u)
+            @test all(∇u_b_ref .≈ _tJinv * ∇u)
+            @test all(∇u_a_phy .≈ _tJinv * ∇u)
+            @test all(∇u_b_phy .≈ _tJinv * ∇u)
+
+            # Test 3
+            u_phy = PhysicalFunction(x -> x[1]^2 + 2 * x[1] * x[2] + x[2]^3)
+            u_ref = ReferenceFunction(ξ -> ξ[1]^2 + 2 * ξ[1] * ξ[2] + ξ[2]^3)
+            ∇u_ana = t -> SA[2 * (t[1] + t[2]); 2 * t[1] + 3 * t[2]^2]
+
+            ξ = Bcube.CellPoint(SA[0.5, -0.1], c, Bcube.ReferenceDomain())
+            x = Bcube.change_domain(ξ, Bcube.PhysicalDomain())
+            ∇u_ref = ∇u_ana(Bcube.get_coord(ξ))
+            ∇u_phy = ∇u_ana(Bcube.get_coord(x))
+            _tJinv = tJinv(Bcube.get_coord(ξ))
+            @test all(Bcube.materialize(∇(u_phy + u_ref), ξ) .≈ ∇u_phy + _tJinv * ∇u_ref)
+            @test all(Bcube.materialize(∇(u_phy + u_ref), x) .≈ ∇u_phy + _tJinv * ∇u_ref)
         end
     end
 
