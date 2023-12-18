@@ -195,4 +195,19 @@
         a = assemble_linear(l, V)
         @test all(a .≈ [-3.0, 3.0, -3.0, 3.0, -3.0, -3.0, 3.0, 3.0])
     end
+
+    @testset "Pow" begin
+        mesh = one_cell_mesh(:quad)
+        u = PhysicalFunction(x -> 3.0)
+        v = PhysicalFunction(x -> 2.0)
+        cinfo = CellInfo(mesh, 1)
+        cpoint = Bcube.CellPoint(SA[0.1, 0.3], cinfo, Bcube.ReferenceDomain())
+
+        @test Bcube.materialize(u * u, cinfo)(cpoint) ≈ 9
+        @test Bcube.materialize(u^2, cinfo)(cpoint) ≈ 9
+        @test Bcube.materialize(u^v, cinfo)(cpoint) ≈ 9
+
+        a = Bcube.NullOperator()
+        @test a^u == a
+    end
 end
