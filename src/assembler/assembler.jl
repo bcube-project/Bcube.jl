@@ -102,7 +102,7 @@ function assemble_bilinear!(
     J::Vector{Int},
     X::Vector,
     f::Function,
-    measure::Measure{<:CellDomain},
+    measure::Measure,
     U::TrialFESpace,
     V::TestFESpace,
 )
@@ -111,90 +111,11 @@ function assemble_bilinear!(
     domain = get_domain(measure)
 
     # Loop over cells
-    for (i, cellinfo) in enumerate(DomainIterator(domain))
-        _λU, _λV = blockmap_bilinear_shape_functions(U, V, cellinfo)
-        g1 = materialize(f(_λU, _λV), cellinfo)
-        values = integrate_on_ref(g1, cellinfo, quadrature)
-        _append_contribution!(X, I, J, U, V, values, cellinfo, domain)
-    end
-
-    return nothing
-end
-
-"""
-    assemble_bilinear!(
-        I::Vector{Int},
-        J::Vector{Int},
-        X::Vector{T},
-        f::Function,
-        measure::Measure{<:AbstractFaceDomain},
-        U::TrialFESpace,
-        V::TestFESpace,
-    )
-
-In-place version of [`assemble_bilinear`](@ref).
-"""
-function assemble_bilinear!(
-    I::Vector{Int},
-    J::Vector{Int},
-    X::Vector,
-    f::Function,
-    measure::Measure{<:AbstractFaceDomain},
-    U::TrialFESpace,
-    V::TestFESpace,
-)
-    # Alias
-    quadrature = get_quadrature(measure)
-    domain = get_domain(measure)
-    mesh = get_mesh(domain)
-    c2n = connectivities_indices(mesh, :c2n)
-    f2n = connectivities_indices(mesh, :f2n)
-    f2c = connectivities_indices(mesh, :f2c)
-    celltypes = cells(mesh)
-    faceTypes = faces(mesh)
-
-    # Loop over faces
-    for kface in indices(domain)
-        # Neighbor cell i
-        i = f2c[kface][1]
-        ctype_i = cellTypes[i]
-        nnodes_i = Val(nnodes(ctype_i))
-        _c2n_i = c2n[i, nnodes_i]
-        cnodes_i = get_nodes(mesh, _c2n_i)
-        cinfo_i = CellInfo(i, ctype_i, cnodes_i, _c2n_i)
-
-        # Neighbor cell j
-        j = f2c[kface][2]
-        ctype_j = cellTypes[j]
-        nnodes_j = Val(nnodes(ctype_j))
-        _c2n_j = c2n[j, nnodes_j]
-        cnodes_j = get_nodes(mesh, _c2n_j)
-        cinfo_j = CellInfo(j, ctype_j, cnodes_j, _c2n_j)
-
-        # Face info
-        ftype = faceTypes[kface]
-        n_fnodes = Val(nnodes(ftype))
-        _f2n = f2n[kface, n_fnodes]
-        fnodes = get_nodes(mesh, _f2n)
-        error("TODO")
-        # # Integrate from cell i "point of view"
-        # finfo_ij = FaceInfo(cinfo_i, cinfo_j, ftype, fnodes, _f2n)
-        # λU_i = get_shape_functions(U, shape(ctype_i))
-        # λV_i = get_shape_functions(V, shape(ctype_i))
-
-        # jdofs = get_dofs(U, icell)
-        # idofs = get_dofs(V, icell)
-
-        # for (jdof, λⱼ) in zip(jdofs, λU)
-        #     for (idof, λᵢ) in zip(idofs, λV)
-        #         _g = f(λⱼ, λᵢ)
-        #         g = materialize(_g, cellinfo)
-
-        #         push!(I, idof)
-        #         push!(J, jdof)
-        #         push!(X, integrate_on_ref(g, cellinfo, quadrature))
-        #     end
-        # end
+    for (i, elementInfo) in enumerate(DomainIterator(domain))
+        _λU, _λV = blockmap_bilinear_shape_functions(U, V, elementInfo)
+        g1 = materialize(f(_λU, _λV), elementInfo)
+        values = _integrate_on_ref_element(g1, elementInfo, quadrature)
+        _append_contribution!(X, I, J, U, V, values, elementInfo, domain)
     end
 
     return nothing
