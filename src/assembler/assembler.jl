@@ -671,8 +671,13 @@ Base.repeat(a::SVector, ::Val{N}) where {N} = reduce(vcat, ntuple(i -> a, Val(N)
 
 Compute an integral, independently from a FEM/DG framework (i.e without FESpace)
 
-Return an array of the integral evaluated over each cell (or face). To get the sum over the whole
-domain, simply apply the `sum` function.
+Return an array (of size ncells) of the integral evaluated over each cell (or face).
+
+When integrating the constant function `PhysicalFunction(x -> 1)`, the sum of this
+result array will give you:
+* the volume of the `CellDomain` if the integration was performed over a `CellDomain`
+* the area of the `BoundaryFaceDomain` if the integration was performed over a `BoundaryFaceDomain`
+* **twice** the area of the `InteriorFaceDomain` if the integration was performed over an `InteriorFaceDomain`
 """
 function compute(integration::Integration)
     measure = get_measure(integration)

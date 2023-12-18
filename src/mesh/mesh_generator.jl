@@ -19,7 +19,12 @@ function basic_mesh(; coef_x = 1.0, coef_y = 1.0)
     # cell->node connectivity indices :
     cell2node = Connectivity([4, 4, 3], [1, 2, 6, 5, 2, 3, 7, 6, 3, 4, 7])
 
-    return Mesh(nodes, celltypes, cell2node)
+    # Prepare boundary nodes
+    bnd_name = "BORDER"
+    tag2name = Dict(1 => bnd_name)
+    tag2nodes = Dict(1 => collect(1:7))
+
+    return Mesh(nodes, celltypes, cell2node; bc_names = tag2name, bc_nodes = tag2nodes)
 end
 
 """
@@ -624,14 +629,14 @@ function transform!(mesh::AbstractMesh, fun)
 end
 
 """
-    translate(mesh::AbstractMesh, t::Vector{Float64})
+    translate(mesh::AbstractMesh, t::AbstractVector)
 
 Translate the input mesh with vector `t`.
 
 Usefull for debugging.
 """
-translate(mesh::AbstractMesh, t::AbstractVector{Float64}) = transform(mesh, x -> x + t)
-translate!(mesh::AbstractMesh, t::AbstractVector{Float64}) = transform!(mesh, x -> x + t)
+translate(mesh::AbstractMesh, t::AbstractVector) = transform(mesh, x -> x + t)
+translate!(mesh::AbstractMesh, t::AbstractVector) = transform!(mesh, x -> x + t)
 
 """
     _duplicate_mesh(mesh::AbstractMesh)

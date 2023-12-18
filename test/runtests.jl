@@ -3,6 +3,7 @@ using Test
 using StaticArrays
 using LinearAlgebra
 using DelimitedFiles
+using ForwardDiff
 using SHA: sha1
 
 # from :

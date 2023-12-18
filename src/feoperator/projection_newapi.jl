@@ -98,7 +98,7 @@ function cell_mean(u, dΩ::Measure)
     cache = build_cell_mean_cache(u, dΩ)
     return cell_mean(u, cache)
 end
-function cell_mean(u::MultiFieldFEFunction, cache::Tuple{Vararg{<:CellMeanCache}})
+function cell_mean(u::MultiFieldFEFunction, cache::Tuple{Vararg{CellMeanCache}})
     return map(get_fe_functions(u), cache) do uᵢ, cacheᵢ
         cell_mean(uᵢ, cacheᵢ)
     end

@@ -32,26 +32,26 @@ materialize(f::F, a::LazyMapOver) where {F <: Function} = lazy_map_over(f, a)
 
 (a::LazyMapOver)(x::Vararg{Any, N}) where {N} = materialize(a, x...)
 
-function lazy_map_over(f::F, a::Vararg{<:LazyMapOver, N}) where {F <: Function, N}
+function lazy_map_over(f::F, a::Vararg{LazyMapOver, N}) where {F <: Function, N}
     _tuplemap(f, _tuplemap(get_args, a)...)
 end
 
 """
-    _tuplemap(f::F, t::Vararg{<:NTuple{N1, Any}, N})
+    _tuplemap(f::F, t::Vararg{NTuple{N1, Any}, N})
 
 Transform (multi-)tuple `t` by applying `f` (elementwise) to each element, similarly to `Base.map(f, t...)`.
 This method is implemented recursively to help inference and improve performance.
 """
-@inline function _tuplemap(f::F, t::Vararg{<:NTuple{N1, Any}, N}) where {F, N, N1}
+@inline function _tuplemap(f::F, t::Vararg{NTuple{N1, Any}, N}) where {F, N, N1}
     @inline
     heads = map(first, t)
     tails = map(Base.tail, t)
     (f(heads...), _tuplemap(f, tails...)...)
 end
-@inline _tuplemap(f::F, ::Vararg{<:Tuple{}, N}) where {F, N} = ()
+@inline _tuplemap(f::F, ::Vararg{Tuple{}, N}) where {F, N} = ()
 
-# _first(a::NTuple{N}, b::Vararg{<:NTuple{N}}) where {N} = (first(a), _first(b)...)
-# _tail(a::NTuple{N}, b::Vararg{<:NTuple{N}}) where {N} = (first(a), _first(b)...)
+# _first(a::NTuple{N}, b::Vararg{NTuple{N}}) where {N} = (first(a), _first(b)...)
+# _tail(a::NTuple{N}, b::Vararg{NTuple{N}}) where {N} = (first(a), _first(b)...)
 # function _tuplemap(f::F, t1::Tuple{Vararg{Any, N}}, t2::Tuple{Vararg{Any, N}}) where {F, N}
 #     (f(first(t1), first(t2)), _tuplemap(f, Base.tail(t1), Base.tail(t2))...)
 # end
@@ -117,30 +117,30 @@ this method is implemented recursively and is based on method `_tuplemap`
 """
 function map_over(
     f::F,
-    args::Vararg{<:AbstractMapOver{<:Tuple{Vararg{Number}}}, N},
+    args::Vararg{AbstractMapOver{<:Tuple{Vararg{Number}}}, N},
 ) where {F <: Function, N}
     f_a = _tuplemap(f, _tuplemap(unwrap, args)...)
     T = get_basetype(typeof(first(args)))
     T(f_a)
 end
-function map_over(f::F, args::Vararg{<:AbstractMapOver, N}) where {F <: Function, N}
+function map_over(f::F, args::Vararg{AbstractMapOver, N}) where {F <: Function, N}
     f_a = _map_over(f, _tuplemap(unwrap, args)...)
     T = get_basetype(typeof(first(args)))
     T(f_a)
 end
-function _map_over(f::F, a::Vararg{<:Tuple, N}) where {F <: Function, N}
+function _map_over(f::F, a::Vararg{Tuple, N}) where {F <: Function, N}
     _heads = Base.heads(a...)
     _tails = Base.tails(a...)
     (__map_over(f, _heads...), _map_over(f, _tails...)...)
 end
-_map_over(f::F, a::Vararg{<:Tuple{}, N}) where {F <: Function, N} = ()
+_map_over(f::F, a::Vararg{Tuple{}, N}) where {F <: Function, N} = ()
 
-function _map_over(::Val{0}, f::F, a::Vararg{<:Tuple, N}) where {F <: Function, N}
+function _map_over(::Val{0}, f::F, a::Vararg{Tuple, N}) where {F <: Function, N}
     _tuplemap(f, a...)
 end
 
 __map_over(f::F, a::Vararg{Any, N}) where {F, N} = f(a...)
-__map_over(f::F, a::Vararg{<:AbstractMapOver, N}) where {F, N} = map_over(f, a...)
+__map_over(f::F, a::Vararg{AbstractMapOver, N}) where {F, N} = map_over(f, a...)
 
 pretty_name(a::AbstractMapOver) = string(get_basetype(a))
 pretty_name_style(a::AbstractMapOver) = Dict(:color => :blue)

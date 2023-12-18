@@ -13,9 +13,37 @@ function LazyOperators.materialize(lOp::Gradient, cInfo::CellInfo)
     Gradient(LazyOperators.materialize_args(get_args(lOp), cInfo))
 end
 
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{Vararg{AbstractCellFunction}}},
+    cPoint::CellPoint,
+) where {O}
+    f, = get_args(lOp)
+    Gradient(f, cPoint)
+end
+
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{AbstractLazy}},
+    cPoint::CellPoint,
+) where {O}
+    f, = get_args(lOp)
+    Gradient(f, cPoint)
+end
+
 """
 Materialization of a `Gradient` on a `CellPoint`. Only valid for a function and a `CellPoint` defined on
 the reference domain.
+
+# Implementation
+The user writes mathematical expressions in the PhysicalDomain. So the gradient always represents the derivation
+with respect to the physical domain spatial coordinates, even if evaluated on a point expressed in the ReferenceDomain.
+
+The current Gradient implementation consists in applying ForwardDiff on the given operator 'u', on a point in the
+ReferenceDomain. That is to say, we compute ForwarDiff.derivative(ξ -> u ∘ F, ξ) (where F is the identity if u is defined
+is the ReferenceDomain). This gives ∇(u ∘ F)(ξ) = t∇(F)(ξ) * ∇(u)(F(x)).
+However, we only want ∇(u)(F(x)) : that's why a multiplication by the transpose of the inverse mapping jacobian is needed.
+
+An alternative approach would be to apply ForwardDiff in the PhysicalDomain : ForwarDiff.derivative(x -> u ∘ F^-1, x). The
+problem is that the inverse mapping F^-1 is not always defined.
 
 # Maths notes
 We use the following convention for any function f:R^n->R^p : ∇f is a tensor/matrix equal to ∂fi/∂xj. However when f
@@ -69,27 +97,31 @@ TODO:
 * improve formulae with a reshape
 * Specialize for a ShapeFunction to use the hardcoded version instead of ForwardDiff
 """
-function LazyOperators.materialize(
-    lOp::Gradient{O, <:Tuple{Vararg{AbstractCellFunction{ReferenceDomain}}}},
-    cPoint::CellPoint{ReferenceDomain},
-) where {O}
-    f, = get_args(lOp)
-    Gradient(f, cPoint)
+function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
+    m = mapping_jacobian_inv(get_cellnodes(cPoint), get_celltype(cPoint), get_coord(cPoint))
+    f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
+    valS = _size_codomain(f, get_coord(cPoint))
+    return _gradient(valS, f, get_coord(cPoint), m)
+
+    # ForwarDiff applied in the PhysicalDomain : not viable because
+    # the inverse mapping is not always known.
+    # cPoint_phys = change_domain(cPoint, PhysicalDomain())
+    # f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint_phys), PhysicalDomain()))
+    # fx = f(get_coord(cPoint_phys))
+    # return _gradient_or_jacobian(Val(length(fx)), f, get_coord(cPoint_phys))
 end
 
-function Gradient(
-    cellFunction::AbstractCellFunction{<:ReferenceDomain},
-    cPoint::CellPoint{ReferenceDomain},
-)
-    cnodes = get_cellnodes(cPoint)
-    ctype = get_celltype(cPoint)
-    ξ = get_coord(cPoint)
-    f = get_function(cellFunction)
-    m = mapping_jacobian_inv(cnodes, ctype, ξ)
-    _Gradient(cellFunction(cPoint), f, ξ, m)
+_size_codomain(f, x) = Val(length(f(x)))
+_size_codomain(f::AbstractCellFunction, x) = Val(get_size(f))
+
+_gradient(::Val{1}, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient(f, ξ)
+_gradient(::Val{S}, f, ξ::AbstractArray, m) where {S} = ForwardDiff.jacobian(f, ξ) * m
+
+function Gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
+    f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
+    valS = _size_codomain(f, get_coord(cPoint))
+    return _gradient_or_jacobian(valS, f, get_coord(cPoint))
 end
-_Gradient(::Real, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient(f, ξ)
-_Gradient(::AbstractArray, f, ξ::AbstractArray, m) = ForwardDiff.jacobian(f, ξ) * m
 
 function Gradient(
     cellFunction::AbstractCellShapeFunctions{<:ReferenceDomain},
@@ -102,6 +134,10 @@ function Gradient(
     n = Val(get_size(cellFunction))
     MapOver(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
 end
+
+# dispatch on codomain size :
+_gradient_or_jacobian(::Val{1}, f, x) = ForwardDiff.gradient(f, x)
+_gradient_or_jacobian(::Val{S}, f, x) where {S} = ForwardDiff.jacobian(f, x)
 
 function grad_shape_functionsNA(fs::AbstractFunctionSpace, n::Val{1}, ctype, cnodes, ξ)
     grad = grad_shape_functions(fs, n, ctype, cnodes, ξ)

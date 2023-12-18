@@ -28,7 +28,7 @@ function get_dof_values(f::AbstractFEFunction, icell, n::Val{N}) where {N}
     error("`get_dof_values` is not defined for type $(typeof(f))")
 end
 
-function Base.getindex(f::AbstractFEFunction, i::CellInfo)
+function Base.getindex(f::AbstractFEFunction{S}, i::CellInfo) where {S}
     feSpace = get_fespace(f)
     fSpace = get_function_space(feSpace)
     domainStyle = DomainStyle(fSpace)
@@ -38,7 +38,7 @@ function Base.getindex(f::AbstractFEFunction, i::CellInfo)
     ncomps = get_ncomponents(feSpace)
     q₀ = get_dof_values(f, cellindex(i), Val(ndofs))
     fcell = _interpolate(Val(ncomps), q₀, λ)
-    CellFunction(fcell, domainStyle)
+    CellFunction(fcell, domainStyle, Val(S))
 end
 
 # scalar case:
