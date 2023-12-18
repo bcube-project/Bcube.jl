@@ -53,6 +53,9 @@ end
 
 Jacobian matrix of the inverse mapping : ``\\dfrac{\\partial F_i^{-1}}{\\partial x_j}``
 
+Contrary to `mapping_jacobian_inv`, this function is not always defined because the
+inverse mapping, F^-1, is not always defined.
+
 # Implementation
 Default version using LinearAlgebra to inverse the matrix, but can be specified for each shape (if it exists).
 """
