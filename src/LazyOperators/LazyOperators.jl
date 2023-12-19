@@ -1,7 +1,27 @@
 module LazyOperators
 
 import Base:
-    *, /, +, -, max, min, sqrt, abs, tan, sin, cos, tanh, sinh, cosh, atan, asin, acos, zero
+    *,
+    /,
+    +,
+    -,
+    ^,
+    max,
+    min,
+    sqrt,
+    abs,
+    tan,
+    sin,
+    cos,
+    tanh,
+    sinh,
+    cosh,
+    atan,
+    asin,
+    acos,
+    zero,
+    one,
+    materialize
 
 using LinearAlgebra
 import LinearAlgebra: dot, transpose, tr

@@ -2,7 +2,7 @@
 # Define rules for binary operators
 ###############################################################
 
-const LazyBinaryOp = (:*, :/, :+, :-, :max, :min, :dot)
+const LazyBinaryOp = (:*, :/, :+, :-, :^, :max, :min, :dot)
 
 for f in LazyBinaryOp
     @eval ($f)(a::AbstractLazy, b::AbstractLazy) = LazyOperator($f, a, b)
@@ -31,6 +31,7 @@ const LazyUnaryOp = (
     :asin,
     :acos,
     :zero,
+    :one,
 )
 
 for f in LazyUnaryOp
@@ -64,6 +65,13 @@ end
 Base.:/(a, ::NullOperator) = error("Division by an AbstractNullOperator is not allowed.")
 Base.:/(a::NullOperator, b) = a
 Base.:/(::NullOperator, ::NullOperator) = NullOperator()
+
+# For binary `^`:
+Base.:^(a, ::NullOperator) = error("Undefined")
+Base.:^(a::NullOperator, b) = a
+Base.:^(::NullOperator, ::NullOperator) = NullOperator() # or "I" ?
+Base.:^(a::AbstractLazy, ::NullOperator) = error("Undefined")
+Base.:^(a::NullOperator, b::AbstractLazy) = a
 
 ###############################################################
 # Define rules with `broadcasted`
