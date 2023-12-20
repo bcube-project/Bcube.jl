@@ -29,6 +29,15 @@ function LazyOperators.materialize(
     Gradient(f, cPoint)
 end
 
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple},
+    sideInfo::AbstractSide,
+) where {O}
+    arg = LazyOperators.materialize_args(get_args(lOp), sideInfo)
+    grad = Gradient(arg)
+    return grad
+end
+
 """
 Materialization of a `Gradient` on a `CellPoint`. Only valid for a function and a `CellPoint` defined on
 the reference domain.
@@ -201,4 +210,20 @@ function LazyOperators.materialize(
     cPoint::CellPoint,
 ) where {O}
     return materialize(Gradient(get_args(get_args(lOp)...)), cPoint)
+end
+
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{LazyMapOver}},
+    cPoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
+) where {O}
+    _a = tuplemap(x -> materialize(∇(x), cPoint), get_args(get_args(lOp)...))
+    return MapOver(_a)
+end
+
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{Vararg{AbstractCellFunction}}},
+    side::AbstractSide{Nothing, <:Tuple{FacePoint}},
+) where {O}
+    a = materialize(side)
+    materialize(lOp, a)
 end

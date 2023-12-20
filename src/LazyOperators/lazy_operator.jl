@@ -147,9 +147,9 @@ pretty_name(op::AbstractLazyOperator) = string(nameof(typeof(op)))
 pretty_name_style(::Type{<:AbstractLazyOperator}) = Dict(:color => :red)
 pretty_name_style(op::AbstractLazyOperator) = pretty_name_style(typeof(op))
 
-function materialize(lOp::AbstractLazyOperator, x)
+function materialize(lOp::AbstractLazyOperator, x::Vararg{Any, N}) where {N}
     op = get_operator(lOp)
-    args = materialize_args(get_args(lOp), x)
+    args = materialize_args(get_args(lOp), x...)
     materialize_op(op, args...)
 end
 
