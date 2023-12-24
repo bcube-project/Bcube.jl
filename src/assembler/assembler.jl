@@ -319,35 +319,35 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::CellInfo, dom
 end
 
 function _append_contribution!(X, I, J, U, V, values, elementInfo::FaceInfo, domain)
-    cellinfo_i = get_cellinfo_n(elementInfo)
-    cellinfo_j = get_cellinfo_p(elementInfo)
-    cellindex_i = cellindex(cellinfo_i)
-    cellindex_j = cellindex(cellinfo_j)
+    cellinfo_n = get_cellinfo_n(elementInfo)
+    cellinfo_p = get_cellinfo_p(elementInfo)
+    cellindex_n = cellindex(cellinfo_n)
+    cellindex_p = cellindex(cellinfo_p)
 
     unwrapValues = _unwrap_face_integrate(U, V, values)
 
-    nU_i = Val(get_ndofs(U, shape(celltype(cellinfo_i))))
-    nV_i = Val(get_ndofs(V, shape(celltype(cellinfo_i))))
-    nU_j = Val(get_ndofs(U, shape(celltype(cellinfo_j))))
-    nV_j = Val(get_ndofs(V, shape(celltype(cellinfo_j))))
+    nU_n = Val(get_ndofs(U, shape(celltype(cellinfo_n))))
+    nV_n = Val(get_ndofs(V, shape(celltype(cellinfo_n))))
+    nU_p = Val(get_ndofs(U, shape(celltype(cellinfo_p))))
+    nV_p = Val(get_ndofs(V, shape(celltype(cellinfo_p))))
 
-    col_dofs_U_i = get_dofs(U, cellindex_i, nU_i) # columns correspond to the TrialFunction on side⁻
-    row_dofs_V_i = get_dofs(V, cellindex_i, nV_i) # lines correspond to the TestFunction on side⁻
-    col_dofs_U_j = get_dofs(U, cellindex_j, nU_j) # columns correspond to the TrialFunction on side⁺
-    row_dofs_V_j = get_dofs(V, cellindex_j, nV_j) # lines correspond to the TestFunction on side⁺
+    col_dofs_U_n = get_dofs(U, cellindex_n, nU_n) # columns correspond to the TrialFunction on side⁻
+    row_dofs_V_n = get_dofs(V, cellindex_n, nV_n) # lines correspond to the TestFunction on side⁻
+    col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
+    row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
 
     matrixvalues = _pack_bilinear_face_contribution(
         (unwrapValues),
-        col_dofs_U_i,
-        row_dofs_V_i,
-        col_dofs_U_j,
-        row_dofs_V_j,
+        col_dofs_U_n,
+        row_dofs_V_n,
+        col_dofs_U_p,
+        row_dofs_V_p,
     )
     # for __a in matrixvalues
     #     display(__a)
     # end
     for (k, (row, col)) in enumerate(
-        Iterators.product((row_dofs_V_i, row_dofs_V_j), (col_dofs_U_i, col_dofs_U_j)),
+        Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
     )
         _rows, _cols = _cartesian_product(row, col)
         @assert length(_rows) == length(_cols) == length(matrixvalues[k])
@@ -365,9 +365,9 @@ function _pack_bilinear_face_contribution(
     col_dofs_U_p::SVector{NUp},
     row_dofs_V_p::SVector{NVp},
 ) where {NUn, NVn, NUp, NVp}
-    # show_lazy_operator(values)
-    # @show typeof(values)
-    # @show NUn, NVn, NUp, NVp
+    show_lazy_operator(values)
+    @show typeof(values)
+    @show NUn, NVn, NUp, NVp
 
     a11 = SMatrix{NVn, NUn}(values[1][j][i] for i in 1:NVn, j in 1:NUn)
     a21 = SMatrix{NVp, NUn}(values[2][j][i] for i in 1:NVp, j in 1:NUn)

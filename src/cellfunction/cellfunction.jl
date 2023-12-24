@@ -412,9 +412,17 @@ At the `CellInfo` level, the `FaceNormal` doesn't really have a materialization 
 LazyOperators.materialize(n::FaceNormal, ::CellInfo) = n
 
 function LazyOperators.materialize(
-    ::Side⁺{O, Tuple{FaceNormal}},
-    fPoint::FacePoint,
-) where {O}
+    n::FaceNormal,
+    sideFacePoint::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    n
+end
+
+function LazyOperators.materialize(
+    ::FaceNormal,
+    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
     fInfo = get_faceinfo(fPoint)
     ξface = get_coord(fPoint)
 
@@ -427,9 +435,10 @@ function LazyOperators.materialize(
 end
 
 function LazyOperators.materialize(
-    ::Side⁻{O, Tuple{FaceNormal}},
-    fPoint::FacePoint,
-) where {O}
+    ::FaceNormal,
+    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
     fInfo = get_faceinfo(fPoint)
     ξface = get_coord(fPoint)
 
