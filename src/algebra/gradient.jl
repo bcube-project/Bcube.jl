@@ -202,7 +202,7 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     cPoint::CellPoint,
 ) where {O}
-    return MapOver(materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...))
+    return materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...)
 end
 
 function LazyOperators.materialize(
@@ -224,6 +224,7 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{Vararg{AbstractCellFunction}}},
     side::AbstractSide{Nothing, <:Tuple{FacePoint}},
 ) where {O}
-    a = materialize(side)
-    materialize(lOp, a)
+    op_side = get_operator(side)
+    cellPoint = op_side(get_args(side)...)
+    materialize(lOp, cellPoint)
 end

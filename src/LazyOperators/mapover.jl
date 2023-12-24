@@ -162,7 +162,7 @@ A container used to wrap data for which all materialized
 operators on that data must be map over it.
 This corresponds to the non-lazy version of `LazyMapOver`.
 """
-struct MapOver{A} <: AbstractMapOver{A}
+struct MapOver{A <: Tuple} <: AbstractMapOver{A}
     args::A
 end
 

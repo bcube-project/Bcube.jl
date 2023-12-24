@@ -128,6 +128,7 @@ function assemble_bilinear!(
             #materialize(side_p(_λU), elementInfo)(fpoint)
             #@show materialize(side_p(_λU), elementInfo)(fpoint)
             _g1(fpoint)
+            #@descend _g1(fpoint)
             @show _g1(fpoint)
             show_lazy_operator(_g1(fpoint))
             #error("ici")
@@ -367,6 +368,7 @@ function _pack_bilinear_face_contribution(
     # show_lazy_operator(values)
     # @show typeof(values)
     # @show NUn, NVn, NUp, NVp
+
     a11 = SMatrix{NVn, NUn}(values[1][j][i] for i in 1:NVn, j in 1:NUn)
     a21 = SMatrix{NVp, NUn}(values[2][j][i] for i in 1:NVp, j in 1:NUn)
     a12 = SMatrix{NVn, NUp}(values[3][j][i] for i in 1:NVn, j in 1:NUp)
@@ -805,12 +807,11 @@ function LazyOperators.materialize(
     # println("====== ", typeof(a))
     # println("====== ", typeof(point))
     # select side
-    _args = get_operator(point)(get_args(a))
-    # println("====== ", typeof(_args))
+    _args, = get_operator(point)(get_args(a))
+    __args, = get_args(_args)
     # show_lazy_operator(_args)
-    # error("ici")
-    _a = tuplemap(x -> materialize(∇(x), point), _args)
-    return MapOver(_a)
+    # show_lazy_operator(__args)
+    return materialize(∇(__args), point)
 end
 function LazyOperators.materialize(
     a::T,

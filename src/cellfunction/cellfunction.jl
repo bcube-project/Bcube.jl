@@ -362,11 +362,12 @@ function LazyOperators.materialize(a::AbstractCellFunction, sidefInfo::AbstractS
     return materialize(a, op_side(get_args(sidefInfo)...))
 end
 
-function LazyOperators.materialize(side::AbstractSide, fPoint::FacePoint)
-    op_side = get_operator(side)
-    cPoint = op_side(fPoint)
-    return materialize(get_args(side)..., cPoint)
-end
+# function LazyOperators.materialize(side::AbstractSide, fPoint::FacePoint)
+#     op_side = get_operator(side)
+#     cPoint = op_side(fPoint)
+#     return materialize(get_args(side)..., cPoint)
+# end
+
 function materialize(a::LazyMapOver, x::AbstractSide{Nothing, <:Tuple{FaceInfo}})
     LazyMapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
 end
@@ -376,7 +377,11 @@ end
 materialize(::NullOperator, ::AbstractSide) = NullOperator()
 
 function LazyOperators.materialize(side::AbstractSide, x)
-    return materialize_args(get_args(side), wrap_side(side, x))
+    #@show "##### materialize(side::AbstractSide, x)"
+    #@show typeof(get_args(side))
+    a = materialize_args(get_args(side), wrap_side(side, x))
+    #@show typeof(a)
+    return LazyOperators.may_unwrap_tuple(a)
 end
 
 # function LazyOperators.materialize(

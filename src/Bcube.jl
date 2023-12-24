@@ -215,6 +215,12 @@ export ∫,
     assemble,
     result
 
+include("./algebra/gradient.jl")
+export ∇
+
+include("./algebra/algebra.jl")
+export FaceNormal, otimes, ⊗, dcontract, ⊡
+
 include("./assembler/assembler.jl")
 export assemble_bilinear, assemble_linear, assemble_linear!
 
@@ -226,12 +232,6 @@ export assemble_dirichlet_vector,
 
 include("./assembler/affine_fe_system.jl")
 export AffineFESystem
-
-include("./algebra/gradient.jl")
-export ∇
-
-include("./algebra/algebra.jl")
-export FaceNormal, otimes, ⊗, dcontract, ⊡
 
 include("./feoperator/projection_newapi.jl")
 export projection_l2!
