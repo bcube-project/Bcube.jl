@@ -85,8 +85,8 @@ for f in LazyBinaryOp
     @eval ($f)(a::AbstractMapOver, b) = map_over(Base.Fix2($f, b), a)
     @eval ($f)(a, b::AbstractMapOver) = map_over(Base.Fix1($f, a), b)
     #fix ambiguity
-    # @eval ($f)(a::AbstractLazy, b::AbstractMapOver) = ($f)(a, LazyWrap(b))
-    # @eval ($f)(a::AbstractMapOver, b::AbstractLazy) = ($f)(LazyWrap(a), b)
+    @eval ($f)(a::AbstractMapOver, b::AbstractLazy) = map_over(Base.Fix2($f, b), a)
+    @eval ($f)(a::AbstractLazy, b::AbstractMapOver) = map_over(Base.Fix1($f, a), b)
 end
 
 for f in LazyUnaryOp

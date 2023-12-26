@@ -372,7 +372,7 @@ function materialize(a::LazyMapOver, x::AbstractSide{Nothing, <:Tuple{FaceInfo}}
     LazyMapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
 end
 function materialize(a::LazyMapOver, x::AbstractSide{Nothing, <:Tuple{FacePoint}})
-    MapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
+    MapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a)...)
 end
 materialize(::NullOperator, ::AbstractSide) = NullOperator()
 
