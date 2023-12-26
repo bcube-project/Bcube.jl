@@ -136,6 +136,7 @@ function Gradient(
     cellFunction::AbstractCellShapeFunctions{<:ReferenceDomain},
     cPoint::CellPoint{ReferenceDomain},
 )
+    error("12398989")
     cnodes = get_cellnodes(cPoint)
     ctype = get_celltype(cPoint)
     ξ = get_coord(cPoint)
@@ -202,13 +203,14 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     cPoint::CellPoint,
 ) where {O}
-    return materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...)
+    return MapOver(materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...))
 end
 
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver{<:CellShapeFunctions}}},
     cPoint::CellPoint,
 ) where {O}
+    error("898983")
     return materialize(Gradient(get_args(get_args(lOp)...)), cPoint)
 end
 
