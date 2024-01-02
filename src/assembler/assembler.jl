@@ -280,19 +280,6 @@ function __assemble_linear!(b, f, V, measure::Measure)
         # Materialize the operation to perform on the current element
         vₑ = blockmap_shape_functions(V, elementInfo)
         fᵥ = materialize(f(vₑ), elementInfo)
-        if false
-            show_lazy_operator(fᵥ)
-            if isa(elementInfo, FaceInfo)
-                point = FacePoint(SA[1.0, 2.0], elementInfo, ReferenceDomain())
-            else
-                point = CellPoint(SA[1.0, 2.0], elementInfo, ReferenceDomain())
-            end
-            #@descend fᵥ(point)
-            show_lazy_operator(vₑ)
-            show_lazy_operator(materialize(vₑ, point))
-            error("klklk")
-            show_lazy_operator(fᵥ(point))
-        end
         values = _integrate_on_ref_element(fᵥ, elementInfo, quadrature)
         _update_b!(b, V, values, elementInfo, domain)
     end
@@ -435,7 +422,7 @@ function _update_b!(b, V, values, elementInfo::FaceInfo, domain)
     # Then, if the face has two side, we seek the values from the opposite side
     unwrapValues = _unwrap_face_integrate(V, values)
     # show_lazy_operator(unwrapValues)
-    values_i = map(identity, map(identity, map(first, unwrapValues)))
+    values_i = map(identity, map(identity, map(first, (unwrapValues,))))
     idofs = get_dofs(V, cellindex(get_cellinfo_n(elementInfo)))
     _update_b!(b, idofs, values_i)
     if (domain isa InteriorFaceDomain) ||
@@ -798,6 +785,15 @@ end
 
 function LazyOperators.materialize(a::FaceSidePair, side::Side⁺{Nothing, <:Tuple{FaceInfo}})
     return FaceSidePair(NullOperator(), materialize(a.data[2], side))
+end
+
+function LazyOperators.materialize(
+    a::Gradient{O, <:Tuple{AbstractFaceSidePair}},
+    point::AbstractSide{Nothing, <:Tuple{FacePoint}},
+) where {O}
+    _args, = get_operator(point)(get_args(a))
+    __args, = get_args(_args)
+    return materialize(∇(__args), point)
 end
 
 """

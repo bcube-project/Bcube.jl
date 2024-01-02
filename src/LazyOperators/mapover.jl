@@ -168,3 +168,7 @@ end
 
 MapOver(args::Vararg{Any, N}) where {N} = MapOver{typeof(args)}(args)
 get_basetype(::Type{<:MapOver}) = MapOver
+
+may_wrap_as_mapover(a) = _may_wrap_as_mapover(a)
+_may_wrap_as_mapover(a::Tuple) = MapOver(a)
+_may_wrap_as_mapover(a::Tuple{<:MapOver}) = a[1]

@@ -136,13 +136,12 @@ function Gradient(
     cellFunction::AbstractCellShapeFunctions{<:ReferenceDomain},
     cPoint::CellPoint{ReferenceDomain},
 )
-    error("12398989")
     cnodes = get_cellnodes(cPoint)
     ctype = get_celltype(cPoint)
     ξ = get_coord(cPoint)
     fs = get_function_space(cellFunction)
     n = Val(get_size(cellFunction))
-    MapOver(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
+    LazyOperators.may_wrap_as_mapover(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
 end
 
 # dispatch on codomain size :
@@ -203,23 +202,33 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     cPoint::CellPoint,
 ) where {O}
-    return MapOver(materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...))
+    return LazyOperators.may_wrap_as_mapover(
+        materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...),
+    )
 end
 
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver{<:CellShapeFunctions}}},
     cPoint::CellPoint,
 ) where {O}
-    error("898983")
     return materialize(Gradient(get_args(get_args(lOp)...)), cPoint)
 end
 
 function LazyOperators.materialize(
-    lOp::Gradient{O, <:Tuple{LazyMapOver}},
-    cPoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
+    lOp::Gradient{O, <:Tuple{LazyMapOver{<:CellShapeFunctions}}},
+    sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
 ) where {O}
-    _a = tuplemap(x -> materialize(∇(x), cPoint), get_args(get_args(lOp)...))
-    return MapOver(_a)
+    op_side = get_operator(sidePoint)
+    cellPoint = op_side(get_args(sidePoint)...)
+    return materialize(Gradient(get_args(get_args(lOp)...)), cellPoint)
+end
+
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{LazyMapOver}},
+    sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
+) where {O}
+    _a = tuplemap(x -> materialize(∇(x), sidePoint), get_args(get_args(lOp)...))
+    return LazyOperators.may_wrap_as_mapover(_a)
 end
 
 function LazyOperators.materialize(

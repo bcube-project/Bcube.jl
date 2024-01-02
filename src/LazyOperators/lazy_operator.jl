@@ -9,9 +9,9 @@ and optionally:
 """
 abstract type AbstractLazy end
 
-function materialize(a::AbstractLazy, x)
-    error("`materialize` is not defined for:\n $(typeof(a)) \n and:\n $(typeof(x))")
-end
+# function materialize(a::AbstractLazy, x)
+#     error("`materialize` is not defined for:\n $(typeof(a)) \n and:\n $(typeof(x))")
+# end
 
 # default rule on tuple is to apply materialize on each element of the tuple
 materialize(t::Tuple, x::Vararg{Any, N}) where {N} = LazyWrap(_materialize(t, x...))
