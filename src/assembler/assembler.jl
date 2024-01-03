@@ -113,34 +113,8 @@ function assemble_bilinear!(
     # Loop over cells
     for (i, elementInfo) in enumerate(DomainIterator(domain))
         _λU, _λV = blockmap_bilinear_shape_functions(U, V, elementInfo)
-
-        if isa(elementInfo, FaceInfo) && i == -1 || 1 == 0 #DEBUG
-            if isa(elementInfo, FaceInfo)
-                point = FacePoint(SA[1.0, 2.0], elementInfo, ReferenceDomain())
-            else
-                point = CellPoint(SA[1.0, 2.0], elementInfo, ReferenceDomain())
-            end
-            #println("=== assemble_bilinear! ====")
-            show_lazy_operator(f(_λU, _λV))
-            _g1 = materialize(f(_λU, _λV), elementInfo)
-            show_lazy_operator(_g1)
-            #show_lazy_operator(materialize(side_p(_λU), elementInfo)(fpoint))
-            ##aa = materialize(side_p(_λU), elementInfo)
-            #error("ici")
-            #show_lazy_operator(aa)
-            # @descend materialize(side_p(_λU), elementInfo)
-            #materialize(side_p(_λU), elementInfo)(fpoint)
-            #@show materialize(side_p(_λU), elementInfo)(fpoint)
-            _g1(point)
-            # @descend _g1(point)
-            @show _g1(point)
-            show_lazy_operator(_g1(point))
-            error("ici234")
-            #println("=== OK assemble_bilinear! ====")
-        end
         g1 = materialize(f(_λU, _λV), elementInfo)
         values = _integrate_on_ref_element(g1, elementInfo, quadrature)
-        #@show i, values
         _append_contribution!(X, I, J, U, V, values, elementInfo, domain)
     end
 
@@ -231,7 +205,6 @@ function assemble_linear!(
     # apply `l` on `NullOperator` to get the type
     # of the result of `l` and use it for dispatch
     # (`Integration` or `MultiIntegration` case).
-    #@show typeof(l(_null_operator(V)))
     _assemble_linear!(b, l, V, l(_null_operator(V)))
     return nothing
 end
@@ -349,9 +322,7 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::FaceInfo, dom
         col_dofs_U_p,
         row_dofs_V_p,
     )
-    # for __a in matrixvalues
-    #     display(__a)
-    # end
+
     for (k, (row, col)) in enumerate(
         Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
     )
@@ -386,10 +357,6 @@ function _pack_bilinear_face_contribution(
     col_dofs_U_p::SVector{NUp},
     row_dofs_V_p::SVector{NVp},
 ) where {NUn, NVn, NUp, NVp}
-    # show_lazy_operator(values)
-    # @show typeof(values)
-    # @show NUn, NVn, NUp, NVp
-
     a11 = SMatrix{NVn, NUn}(values[1][j][i] for i in 1:NVn, j in 1:NUn)
     a21 = SMatrix{NVp, NUn}(values[2][j][i] for i in 1:NVp, j in 1:NUn)
     a12 = SMatrix{NVn, NUp}(values[3][j][i] for i in 1:NVn, j in 1:NUp)
@@ -421,7 +388,6 @@ function _update_b!(b, V, values, elementInfo::FaceInfo, domain)
     # First, we get the values from the integration on the positive/negative side
     # Then, if the face has two side, we seek the values from the opposite side
     unwrapValues = _unwrap_face_integrate(V, values)
-    # show_lazy_operator(unwrapValues)
     values_i = map(identity, map(identity, map(first, (unwrapValues,))))
     idofs = get_dofs(V, cellindex(get_cellinfo_n(elementInfo)))
     _update_b!(b, idofs, values_i)

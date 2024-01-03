@@ -78,15 +78,10 @@ function get_args(a::AbstractLazyWrap)
     error("Function `get_args` is not defined for type $(typeof(a))")
 end
 function materialize(a::AbstractLazyWrap, x::Vararg{Any, N}) where {N}
-    #@show "~~~~materialize(a::AbstractLazyWrap"
     a = materialize_args(get_args(a), x...)
     may_unwrap_tuple(a)
 end
-# Do not return a tuple when only one element is wrapped:
-# function materialize(a::AbstractLazyWrap{<:Tuple{T}}, x::Vararg{Any, N}) where {N, T}
-#     @show "~~~~materialize(a::AbstractLazyWrap{<:Tuple{T}}"
-#     first(materialize_args(get_args(a), x...))
-# end
+
 unwrap(a) = a
 unwrap(a::AbstractLazyWrap) = get_args(a)
 
@@ -155,18 +150,7 @@ pretty_name_style(op::AbstractLazyOperator) = pretty_name_style(typeof(op))
 
 function materialize(lOp::AbstractLazyOperator, x::Vararg{Any, N}) where {N}
     op = get_operator(lOp)
-    # if isa(op, typeof(+)) || 1 == 1
-    #     printstyled(typeof(op), "\n"; color = :red)
-    #     printstyled(typeof(get_args(lOp)), "\n"; color = :red)
-    #     #aa = materialize(first(get_args(lOp)), x...)
-    #     #printstyled(typeof(aa), "\n"; color = :red)
-    #     #@descend materialize_args(get_args(lOp), x...)
-    # end
     args = materialize_args(get_args(lOp), x...)
-    # if isa(op, typeof(+)) || 1 == 1
-    #     #printstyled(typeof(aa) == typeof(first(args)), "\n"; color = :green)
-    #     printstyled(typeof(args), "\n"; color = :green)
-    # end
     materialize_op(op, args...)
 end
 
@@ -210,22 +194,9 @@ _may_apply_on_splat(f, a) = f(a)
 # avoid:
 # @inline materialize_args(args::Tuple, x ) = map(Base.Fix2(materialize, x), args)
 # as inference seems to fail rapidely
-function materialize_args(args::Tuple, x::Vararg{Any, N}) where {N}
-    # printstyled("MATERIALIZE_ARGS", "\n"; color = :yellow)
-    a = _materialize_args(args, x...)
-    # printstyled("MATERIALIZE_ARGS FIN", "\n"; color = :yellow)
-    a
-end
+materialize_args(args::Tuple, x::Vararg{Any, N}) where {N} = _materialize_args(args, x...)
 function _materialize_args(args::Tuple, x::Vararg{Any, N}) where {N}
-    #printstyled("-----------", typeof(first(args)), "\n"; color = :light_cyan)
-    # @show ">>>>>>>>>>>", typeof(materialize(first(args), x...))
-    a = (materialize(first(args), x...), _materialize_args(Base.tail(args), x...)...)
-
-    # printstyled("+++++++++++", typeof(a), "\n"; color = :blue)
-    # if isa(a, Tuple{<:Tuple})
-    #     error("oco")
-    # end
-    return a
+    (materialize(first(args), x...), _materialize_args(Base.tail(args), x...)...)
 end
 _materialize_args(args::Tuple{}, x::Vararg{Any, N}) where {N} = ()
 

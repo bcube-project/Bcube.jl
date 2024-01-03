@@ -377,10 +377,7 @@ end
 materialize(::NullOperator, ::AbstractSide) = NullOperator()
 
 function LazyOperators.materialize(side::AbstractSide, x)
-    #@show "##### materialize(side::AbstractSide, x)"
-    #@show typeof(get_args(side))
     a = materialize_args(get_args(side), wrap_side(side, x))
-    #@show typeof(a)
     return LazyOperators.may_unwrap_tuple(a)
 end
 
