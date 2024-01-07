@@ -141,7 +141,7 @@ function Gradient(
     ξ = get_coord(cPoint)
     fs = get_function_space(cellFunction)
     n = Val(get_size(cellFunction))
-    LazyOperators.may_wrap_as_mapover(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
+    MapOver(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
 end
 
 # dispatch on codomain size :
@@ -202,9 +202,7 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     cPoint::CellPoint,
 ) where {O}
-    return LazyOperators.may_wrap_as_mapover(
-        materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...),
-    )
+    return MapOver(materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...))
 end
 
 function LazyOperators.materialize(
@@ -227,8 +225,8 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
 ) where {O}
-    _a = tuplemap(x -> materialize(∇(x), sidePoint), get_args(get_args(lOp)...))
-    return LazyOperators.may_wrap_as_mapover(_a)
+    ∇x = tuplemap(x -> materialize(∇(x), sidePoint), get_args(get_args(lOp)...))
+    return MapOver(∇x)
 end
 
 function LazyOperators.materialize(
