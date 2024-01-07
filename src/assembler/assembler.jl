@@ -388,7 +388,7 @@ function _update_b!(b, V, values, elementInfo::FaceInfo, domain)
     # First, we get the values from the integration on the positive/negative side
     # Then, if the face has two side, we seek the values from the opposite side
     unwrapValues = _unwrap_face_integrate(V, values)
-    values_i = map(identity, map(identity, map(first, (unwrapValues,))))
+    values_i = map(identity, map(identity, map(first, unwrapValues)))
     idofs = get_dofs(V, cellindex(get_cellinfo_n(elementInfo)))
     _update_b!(b, idofs, values_i)
     if (domain isa InteriorFaceDomain) ||
@@ -751,6 +751,20 @@ end
 
 function LazyOperators.materialize(a::FaceSidePair, side::Side⁺{Nothing, <:Tuple{FaceInfo}})
     return FaceSidePair(NullOperator(), materialize(a.data[2], side))
+end
+
+function LazyOperators.materialize(
+    a::FaceSidePair,
+    side::Side⁻{Nothing, <:Tuple{FacePoint}},
+)
+    return MapOver(materialize(a.data[1], side), NullOperator())
+end
+
+function LazyOperators.materialize(
+    a::FaceSidePair,
+    side::Side⁺{Nothing, <:Tuple{FacePoint}},
+)
+    return MapOver(NullOperator(), materialize(a.data[2], side))
 end
 
 function LazyOperators.materialize(

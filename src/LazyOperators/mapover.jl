@@ -85,8 +85,8 @@ for f in LazyBinaryOp
     @eval ($f)(a::AbstractMapOver, b) = map_over(Base.Fix2($f, b), a)
     @eval ($f)(a, b::AbstractMapOver) = map_over(Base.Fix1($f, a), b)
     #fix ambiguity
-    @eval ($f)(a::AbstractMapOver, b::AbstractLazy) = map_over(Base.Fix2($f, b), a)
-    @eval ($f)(a::AbstractLazy, b::AbstractMapOver) = map_over(Base.Fix1($f, a), b)
+    #@eval ($f)(a::AbstractMapOver, b::AbstractLazy) = map_over(Base.Fix2($f, b), a)
+    #@eval ($f)(a::AbstractLazy, b::AbstractMapOver) = map_over(Base.Fix1($f, a), b)
 end
 
 for f in LazyUnaryOp
@@ -169,6 +169,4 @@ end
 MapOver(args::Vararg{Any, N}) where {N} = MapOver{typeof(args)}(args)
 get_basetype(::Type{<:MapOver}) = MapOver
 
-may_wrap_as_mapover(a) = _may_wrap_as_mapover(a)
-_may_wrap_as_mapover(a::Tuple) = MapOver(a)
-_may_wrap_as_mapover(a::Tuple{<:MapOver}) = a[1]
+may_wrap_as_mapover(a) = MapOver(a)

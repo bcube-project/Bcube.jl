@@ -78,8 +78,8 @@ function get_args(a::AbstractLazyWrap)
     error("Function `get_args` is not defined for type $(typeof(a))")
 end
 function materialize(a::AbstractLazyWrap, x::Vararg{Any, N}) where {N}
-    a = materialize_args(get_args(a), x...)
-    may_unwrap_tuple(a)
+    args = materialize_args(get_args(a), x...)
+    may_unwrap_tuple(args)
 end
 
 unwrap(a) = a
