@@ -786,6 +786,8 @@ abstract type AbstractBilinearFaceSidePair{A} <: AbstractLazyWrap{A} end
 
 LazyOperators.pretty_name_style(::AbstractBilinearFaceSidePair) = Dict(:color => :yellow)
 get_args(a::AbstractBilinearFaceSidePair) = a.data
+get_basetype(a::AbstractBilinearFaceSidePair) = get_basetype(typeof(a))
+get_basetype(::Type{<:AbstractBilinearFaceSidePair}) = error("To be defined")
 
 function LazyOperators.materialize(
     a::AbstractBilinearFaceSidePair,
@@ -824,14 +826,13 @@ function LazyOperators.materialize(
     return materialize(∇(__args), point)
 end
 function LazyOperators.materialize(
-    a::T,
+    a::AbstractBilinearFaceSidePair,
     side::AbstractSide{Nothing, <:Tuple{FaceInfo}},
-) where {T <: AbstractBilinearFaceSidePair}
-    # @show "/////////////////// je materialize ici 98980"
-    # @show T
-    res = T(tuplemap(x -> materialize(x, side), get_args(a)))
-    # @show res
-    return res
+)
+    T = get_basetype(a)
+    return T(tuplemap(x -> materialize(x, side), get_args(a)))
+    # op = get_operator(side)
+    # return op(res)
 end
 # function LazyOperators.materialize(
 #     a::T,
@@ -847,6 +848,7 @@ struct BilinearTrialFaceSidePair{A} <: AbstractBilinearFaceSidePair{A}
 end
 BilinearTrialFaceSidePair(a...) = BilinearTrialFaceSidePair(a)
 LazyOperators.pretty_name(::BilinearTrialFaceSidePair) = "BilinearTrialFaceSidePair"
+get_basetype(::Type{<:BilinearTrialFaceSidePair}) = BilinearTrialFaceSidePair
 # function get_args_bilinear(a::BilinearTrialFaceSidePair)
 #     u⁻ = first(a.data)
 #     u⁺ = last(a.data)
@@ -868,6 +870,7 @@ struct BilinearTestFaceSidePair{A} <: AbstractBilinearFaceSidePair{A}
 end
 BilinearTestFaceSidePair(a...) = BilinearTestFaceSidePair(a)
 LazyOperators.pretty_name(::BilinearTestFaceSidePair) = "BilinearTestFaceSidePair"
+get_basetype(::Type{<:BilinearTestFaceSidePair}) = BilinearTestFaceSidePair
 
 # function get_args_bilinear(a::BilinearTestFaceSidePair)
 #     v⁻ = first(a.data)
@@ -876,8 +879,10 @@ LazyOperators.pretty_name(::BilinearTestFaceSidePair) = "BilinearTestFaceSidePai
 # end
 
 function side_n(a::BilinearTestFaceSidePair)
+    # @show "******************je passe ici side_n BilinearTestFaceSidePair"
     Side⁻(LazyMapOver((a.data[1], NullOperator(), a.data[3], NullOperator())))
 end
 function side_p(a::BilinearTestFaceSidePair)
+    # @show "******************je passe ici side_p BilinearTestFaceSidePair"
     Side⁺(LazyMapOver((NullOperator(), a.data[2], NullOperator(), a.data[4])))
 end

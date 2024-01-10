@@ -265,10 +265,6 @@ function ReferenceFunction(f::Function, s::Val{size}) where {size}
     CellFunction(f, ReferenceDomain(), s)
 end
 
-function LazyOperators.materialize(::AbstractCellFunction, ::FaceInfo)
-    error("Cannot integrate a `CellFunction` on a face : please select a `Side`")
-end
-
 ## TEMPORARY : should be moved in files where each function space is defined !
 DomainStyle(fs::FunctionSpace{<:Lagrange}) = ReferenceDomain()
 DomainStyle(fs::FunctionSpace{<:Taylor}) = ReferenceDomain()
@@ -336,11 +332,12 @@ end
 #     op_side = get_operator(side)
 #     return op_side(materialize_args(get_args(side), wrap_side(side, fInfo))...)
 # end
-wrap_side(::T, a::T) where {T <: AbstractSide} = a
 wrap_side(::Side⁻, a::Side⁺) = error("invalid")
 wrap_side(::Side⁺, a::Side⁻) = error("invalid")
 wrap_side(::Side⁺, a) = Side⁺(a)
 wrap_side(::Side⁻, a) = Side⁻(a)
+wrap_side(::Side⁻, a::Side⁻) = a
+wrap_side(::Side⁺, a::Side⁺) = a
 
 # function LazyOperators.materialize(a::AbstractLazy, side::AbstractSide)
 #     _materialize_on_side(a, side)
@@ -389,6 +386,10 @@ end
 
 side_p(a::AbstractLazy) = Side⁺(a)
 side_n(a::AbstractLazy) = Side⁻(a)
+side_p(a::Side⁺) = a
+side_p(a::Side⁻) = error("invalid")
+side_n(a::Side⁺) = error("invalid")
+side_n(a::Side⁻) = a
 side_p(::NullOperator) = NullOperator()
 side_n(::NullOperator) = NullOperator()
 
@@ -463,3 +464,8 @@ LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::CellInfo) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::FaceInfo) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::CellPoint) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::FacePoint) = a
+
+LazyOperators.materialize(f::Function, ::AbstractLazy) = f
+LazyOperators.materialize(a::AbstractArray{<:Number}, ::AbstractLazy) = a
+LazyOperators.materialize(a::Number, ::AbstractLazy) = a
+LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::AbstractLazy) = a
