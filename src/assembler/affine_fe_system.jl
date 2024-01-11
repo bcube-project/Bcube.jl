@@ -45,9 +45,17 @@ function AffineFESystem(a, l, U, V)
 
     # Retrieve Mesh from `a`
     op = a(NullOperator(), NullOperator())
-    measure = get_measure(op)
-    domain = get_domain(measure)
-    mesh = get_mesh(domain)
+    if op isa MultiIntegration
+        measures = map(get_measure, (op...,))
+        domains = map(get_domain, measures)
+        meshes = map(get_mesh, domains)
+        @assert all(x -> x == meshes[1], meshes) "All integrations must be defined on the same mesh"
+        mesh = meshes[1]
+    else
+        measure = get_measure(op)
+        domain = get_domain(measure)
+        mesh = get_mesh(domain)
+    end
 
     return AffineFESystem(A, b, U, V, mesh)
 end
