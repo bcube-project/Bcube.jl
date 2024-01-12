@@ -332,36 +332,17 @@ end
 #     op_side = get_operator(side)
 #     return op_side(materialize_args(get_args(side), wrap_side(side, fInfo))...)
 # end
-wrap_side(::Side⁻, a::Side⁺) = error("invalid")
-wrap_side(::Side⁺, a::Side⁻) = error("invalid")
+wrap_side(::Side⁻, a::Side⁺) = error("invalid : cannot `Side⁺` with `Side⁻`")
+wrap_side(::Side⁺, a::Side⁻) = error("invalid : cannot `Side⁻` with `Side⁺`")
 wrap_side(::Side⁺, a) = Side⁺(a)
 wrap_side(::Side⁻, a) = Side⁻(a)
 wrap_side(::Side⁻, a::Side⁻) = a
 wrap_side(::Side⁺, a::Side⁺) = a
 
-# function LazyOperators.materialize(a::AbstractLazy, side::AbstractSide)
-#     _materialize_on_side(a, side)
-# end
-# function LazyOperators.materialize(
-#     a::AbstractLazyWrap{<:Tuple{T}},
-#     side::AbstractSide,
-# ) where {T}
-#     LazyWrap(_materialize_on_side(a, side))
-# end
-# function _materialize_on_side(a, side::AbstractSide)
-#     op_side = get_operator(side)
-#     return materialize(a, op_side(get_args(side)...))
-# end
 function LazyOperators.materialize(a::AbstractCellFunction, sidefInfo::AbstractSide)
     op_side = get_operator(sidefInfo)
     return materialize(a, op_side(get_args(sidefInfo)...))
 end
-
-# function LazyOperators.materialize(side::AbstractSide, fPoint::FacePoint)
-#     op_side = get_operator(side)
-#     cPoint = op_side(fPoint)
-#     return materialize(get_args(side)..., cPoint)
-# end
 
 function materialize(a::LazyMapOver, x::AbstractSide{Nothing, <:Tuple{FaceInfo}})
     LazyMapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
@@ -376,19 +357,11 @@ function LazyOperators.materialize(side::AbstractSide, x)
     return LazyOperators.may_unwrap_tuple(a)
 end
 
-# function LazyOperators.materialize(
-#     side::AbstractSide,
-#     sidefInfo::AbstractSide{Nothing, <:Tuple{FacePoint}},
-# )
-#     op_side = get_operator(sidefInfo)
-#     return materialize(get_args(side)..., op_side(get_args(sidefInfo)...))
-# end
-
 side_p(a::AbstractLazy) = Side⁺(a)
 side_n(a::AbstractLazy) = Side⁻(a)
 side_p(a::Side⁺) = a
-side_p(a::Side⁻) = error("invalid")
-side_n(a::Side⁺) = error("invalid")
+side_p(a::Side⁻) = error("invalid : cannot apply `side_p` on `Side⁻`")
+side_n(a::Side⁺) = error("invalid : cannot apply `side_n` on `Side⁺`")
 side_n(a::Side⁻) = a
 side_p(::NullOperator) = NullOperator()
 side_n(::NullOperator) = NullOperator()

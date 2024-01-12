@@ -34,8 +34,7 @@ function LazyOperators.materialize(
     sideInfo::AbstractSide,
 ) where {O}
     arg = LazyOperators.materialize_args(get_args(lOp), sideInfo)
-    grad = Gradient(arg)
-    return grad
+    return Gradient(arg)
 end
 
 """
