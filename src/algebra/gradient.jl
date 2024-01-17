@@ -230,9 +230,9 @@ end
 
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{Vararg{AbstractCellFunction}}},
-    side::AbstractSide{Nothing, <:Tuple{FacePoint}},
+    sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
 ) where {O}
-    op_side = get_operator(side)
-    cellPoint = op_side(get_args(side)...)
+    op_side = get_operator(sidePoint)
+    cellPoint = op_side(get_args(sidePoint)...)
     materialize(lOp, cellPoint)
 end
