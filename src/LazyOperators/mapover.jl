@@ -85,8 +85,8 @@ for f in LazyBinaryOp
     @eval ($f)(a::AbstractMapOver, b) = map_over(Base.Fix2($f, b), a)
     @eval ($f)(a, b::AbstractMapOver) = map_over(Base.Fix1($f, a), b)
     #fix ambiguity
-    # @eval ($f)(a::AbstractLazy, b::AbstractMapOver) = ($f)(a, LazyWrap(b))
-    # @eval ($f)(a::AbstractMapOver, b::AbstractLazy) = ($f)(LazyWrap(a), b)
+    #@eval ($f)(a::AbstractMapOver, b::AbstractLazy) = map_over(Base.Fix2($f, b), a)
+    #@eval ($f)(a::AbstractLazy, b::AbstractMapOver) = map_over(Base.Fix1($f, a), b)
 end
 
 for f in LazyUnaryOp
@@ -164,7 +164,7 @@ A container used to wrap data for which all materialized
 operators on that data must be map over it.
 This corresponds to the non-lazy version of `LazyMapOver`.
 """
-struct MapOver{A} <: AbstractMapOver{A}
+struct MapOver{A <: Tuple} <: AbstractMapOver{A}
     args::A
 end
 

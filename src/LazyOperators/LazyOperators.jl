@@ -27,6 +27,7 @@ using LinearAlgebra
 import LinearAlgebra: dot, transpose, tr
 
 export AbstractLazy
+export AbstractLazyWrap
 export AbstractLazyOperator
 export LazyOperator
 export LazyWrap
