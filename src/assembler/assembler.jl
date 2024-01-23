@@ -445,8 +445,8 @@ on a cell domain, where `U` and `V` are `AbstractMultiFESpace`
 function _count_n_elts(
     U::AbstractMultiFESpace{N, Tu},
     V::AbstractMultiFESpace{N, Tv},
-    domain::CellDomain{M, IND},
-) where {M, IND, N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}
+    domain::AbstractDomain,
+) where {N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}
     n = 0
     for _U in U
         for _V in V
@@ -454,6 +454,20 @@ function _count_n_elts(
         end
     end
     return n
+end
+
+"""
+Count the (maximum) number of elements in the matrix corresponding to the bilinear assembly of U, V
+on a boundary face domain, where `U` and `V` are `TrialFESpace` and `TestFESpace`
+TO DO: for the moment this function is not really implemented. It requires to be able to distinguish between
+the usual TrialsFESpace and MultiplierFESpace.
+"""
+function _count_n_elts(
+    U::TrialFESpace,
+    V::TestFESpace,
+    domain::BoundaryFaceDomain{M, BC, L, C},
+) where {M, BC, L, C}
+    return 1
 end
 
 maywrap(x) = LazyWrap(x)
