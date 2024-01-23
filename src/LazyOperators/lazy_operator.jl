@@ -9,10 +9,6 @@ and optionally:
 """
 abstract type AbstractLazy end
 
-function materialize(a::AbstractLazy, x)
-    error("`materialize` is not defined for:\n $(typeof(a)) \n and:\n $(typeof(x))")
-end
-
 # default rule on tuple is to apply materialize on each element of the tuple
 materialize(t::Tuple, x::Vararg{Any, N}) where {N} = LazyWrap(_materialize(t, x...))
 function _materialize(t::Tuple, x::Vararg{Any, N}) where {N}
@@ -78,14 +74,15 @@ function get_args(a::AbstractLazyWrap)
     error("Function `get_args` is not defined for type $(typeof(a))")
 end
 function materialize(a::AbstractLazyWrap, x::Vararg{Any, N}) where {N}
-    materialize_args(get_args(a), x...)
+    args = materialize_args(get_args(a), x...)
+    may_unwrap_tuple(args)
 end
-# Do not return a tuple when only one element is wrapped:
-function materialize(a::AbstractLazyWrap{<:Tuple{T}}, x::Vararg{Any, N}) where {N, T}
-    first(materialize_args(get_args(a), x...))
-end
+
 unwrap(a) = a
 unwrap(a::AbstractLazyWrap) = get_args(a)
+
+may_unwrap_tuple(t::Tuple) = t
+may_unwrap_tuple(t::Tuple{T}) where {T} = first(t)
 
 pretty_name(a::AbstractLazyWrap) = "$(typeof(a))"
 pretty_name_style(::AbstractLazyWrap) = Dict(:color => :light_black)
@@ -147,9 +144,9 @@ pretty_name(op::AbstractLazyOperator) = string(nameof(typeof(op)))
 pretty_name_style(::Type{<:AbstractLazyOperator}) = Dict(:color => :red)
 pretty_name_style(op::AbstractLazyOperator) = pretty_name_style(typeof(op))
 
-function materialize(lOp::AbstractLazyOperator, x)
+function materialize(lOp::AbstractLazyOperator, x::Vararg{Any, N}) where {N}
     op = get_operator(lOp)
-    args = materialize_args(get_args(lOp), x)
+    args = materialize_args(get_args(lOp), x...)
     materialize_op(op, args...)
 end
 

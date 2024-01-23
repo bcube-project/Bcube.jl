@@ -63,6 +63,11 @@ Implement function `materialize` of the `AbstractLazy` interface.
 """
 LazyOperators.materialize(f::AbstractFEFunction, i::CellInfo) = f[i]
 
+function LazyOperators.materialize(f::AbstractFEFunction, side::AbstractSide)
+    op_side = get_operator(side)
+    return materialize(f, op_side(get_args(side)...))
+end
+
 """ dev notes : introduced for BcubeParallel """
 abstract type AbstractSingleFieldFEFunction{S} <: AbstractFEFunction{S} end
 struct SingleFieldFEFunction{S, FE <: AbstractFESpace, V} <:

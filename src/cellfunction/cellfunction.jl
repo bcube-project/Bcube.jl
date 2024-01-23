@@ -265,10 +265,6 @@ function ReferenceFunction(f::Function, s::Val{size}) where {size}
     CellFunction(f, ReferenceDomain(), s)
 end
 
-function LazyOperators.materialize(::AbstractCellFunction, ::FaceInfo)
-    error("Cannot integrate a `CellFunction` on a face : please select a `Side`")
-end
-
 ## TEMPORARY : should be moved in files where each function space is defined !
 DomainStyle(fs::FunctionSpace{<:Lagrange}) = ReferenceDomain()
 DomainStyle(fs::FunctionSpace{<:Taylor}) = ReferenceDomain()
@@ -336,37 +332,37 @@ end
 #     op_side = get_operator(side)
 #     return op_side(materialize_args(get_args(side), wrap_side(side, fInfo))...)
 # end
-wrap_side(::AbstractSide, a::AbstractSide) = a
-wrap_side(::Side⁻, a::Side⁺) = Side⁻(get_args(a)...)
-wrap_side(::Side⁺, a::Side⁻) = Side⁺(get_args(a)...)
-wrap_side(::Side⁺, a::FaceInfo) = Side⁺(a)
-wrap_side(::Side⁻, a::FaceInfo) = Side⁻(a)
+wrap_side(::Side⁻, a::Side⁺) = error("invalid : cannot `Side⁺` with `Side⁻`")
+wrap_side(::Side⁺, a::Side⁻) = error("invalid : cannot `Side⁻` with `Side⁺`")
+wrap_side(::Side⁺, a) = Side⁺(a)
+wrap_side(::Side⁻, a) = Side⁻(a)
+wrap_side(::Side⁻, a::Side⁻) = a
+wrap_side(::Side⁺, a::Side⁺) = a
 
-function LazyOperators.materialize(a::AbstractLazy, sidefInfo::AbstractSide)
+function LazyOperators.materialize(a::AbstractCellFunction, sidefInfo::AbstractSide)
     op_side = get_operator(sidefInfo)
     return materialize(a, op_side(get_args(sidefInfo)...))
 end
 
-function LazyOperators.materialize(side::AbstractSide, fPoint::FacePoint)
-    op_side = get_operator(side)
-    cPoint = op_side(fPoint)
-    return materialize(get_args(side)..., cPoint)
-end
 function materialize(a::LazyMapOver, x::AbstractSide{Nothing, <:Tuple{FaceInfo}})
     LazyMapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
 end
+function materialize(a::LazyMapOver, x::AbstractSide{Nothing, <:Tuple{FacePoint}})
+    MapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
+end
 materialize(::NullOperator, ::AbstractSide) = NullOperator()
 
-# function LazyOperators.materialize(
-#     side::AbstractSide,
-#     sidefInfo::AbstractSide{Nothing, <:Tuple{FacePoint}},
-# )
-#     op_side = get_operator(sidefInfo)
-#     return materialize(get_args(side)..., op_side(get_args(sidefInfo)...))
-# end
+function LazyOperators.materialize(side::AbstractSide, x)
+    a = materialize_args(get_args(side), wrap_side(side, x))
+    return LazyOperators.may_unwrap_tuple(a)
+end
 
 side_p(a::AbstractLazy) = Side⁺(a)
 side_n(a::AbstractLazy) = Side⁻(a)
+side_p(a::Side⁺) = a
+side_p(a::Side⁻) = error("invalid : cannot apply `side_p` on `Side⁻`")
+side_n(a::Side⁺) = error("invalid : cannot apply `side_n` on `Side⁺`")
+side_n(a::Side⁻) = a
 side_p(::NullOperator) = NullOperator()
 side_n(::NullOperator) = NullOperator()
 
@@ -385,9 +381,17 @@ At the `CellInfo` level, the `FaceNormal` doesn't really have a materialization 
 LazyOperators.materialize(n::FaceNormal, ::CellInfo) = n
 
 function LazyOperators.materialize(
-    ::Side⁺{O, Tuple{FaceNormal}},
-    fPoint::FacePoint,
-) where {O}
+    n::FaceNormal,
+    sideFacePoint::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    n
+end
+
+function LazyOperators.materialize(
+    ::FaceNormal,
+    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
     fInfo = get_faceinfo(fPoint)
     ξface = get_coord(fPoint)
 
@@ -400,9 +404,10 @@ function LazyOperators.materialize(
 end
 
 function LazyOperators.materialize(
-    ::Side⁻{O, Tuple{FaceNormal}},
-    fPoint::FacePoint,
-) where {O}
+    ::FaceNormal,
+    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
     fInfo = get_faceinfo(fPoint)
     ξface = get_coord(fPoint)
 
@@ -432,3 +437,8 @@ LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::CellInfo) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::FaceInfo) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::CellPoint) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::FacePoint) = a
+
+LazyOperators.materialize(f::Function, ::AbstractLazy) = f
+LazyOperators.materialize(a::AbstractArray{<:Number}, ::AbstractLazy) = a
+LazyOperators.materialize(a::Number, ::AbstractLazy) = a
+LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::AbstractLazy) = a

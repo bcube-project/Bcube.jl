@@ -441,6 +441,9 @@ end
 
 const AbstractMultiTestFESpace{N} = AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}}
 
+const AbstractMultiTrialFESpace{N} =
+    AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}}
+
 Base.parent(mfeSpace::MultiFESpace) = mfeSpace
 
 """

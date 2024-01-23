@@ -90,7 +90,7 @@ end
         J::Vector{Int},
         X::Vector{T},
         f::Function,
-        measure::Measure{<:CellDomain},
+        measure::Measure,
         U::TrialFESpace,
         V::TestFESpace,
     )
@@ -102,7 +102,7 @@ function assemble_bilinear!(
     J::Vector{Int},
     X::Vector,
     f::Function,
-    measure::Measure{<:CellDomain},
+    measure::Measure,
     U::TrialFESpace,
     V::TestFESpace,
 )
@@ -111,90 +111,11 @@ function assemble_bilinear!(
     domain = get_domain(measure)
 
     # Loop over cells
-    for (i, cellinfo) in enumerate(DomainIterator(domain))
-        _λU, _λV = blockmap_bilinear_shape_functions(U, V, cellinfo)
-        g1 = materialize(f(_λU, _λV), cellinfo)
-        values = integrate_on_ref(g1, cellinfo, quadrature)
-        _append_contribution!(X, I, J, U, V, values, cellinfo, domain)
-    end
-
-    return nothing
-end
-
-"""
-    assemble_bilinear!(
-        I::Vector{Int},
-        J::Vector{Int},
-        X::Vector{T},
-        f::Function,
-        measure::Measure{<:AbstractFaceDomain},
-        U::TrialFESpace,
-        V::TestFESpace,
-    )
-
-In-place version of [`assemble_bilinear`](@ref).
-"""
-function assemble_bilinear!(
-    I::Vector{Int},
-    J::Vector{Int},
-    X::Vector,
-    f::Function,
-    measure::Measure{<:AbstractFaceDomain},
-    U::TrialFESpace,
-    V::TestFESpace,
-)
-    # Alias
-    quadrature = get_quadrature(measure)
-    domain = get_domain(measure)
-    mesh = get_mesh(domain)
-    c2n = connectivities_indices(mesh, :c2n)
-    f2n = connectivities_indices(mesh, :f2n)
-    f2c = connectivities_indices(mesh, :f2c)
-    celltypes = cells(mesh)
-    faceTypes = faces(mesh)
-
-    # Loop over faces
-    for kface in indices(domain)
-        # Neighbor cell i
-        i = f2c[kface][1]
-        ctype_i = cellTypes[i]
-        nnodes_i = Val(nnodes(ctype_i))
-        _c2n_i = c2n[i, nnodes_i]
-        cnodes_i = get_nodes(mesh, _c2n_i)
-        cinfo_i = CellInfo(i, ctype_i, cnodes_i, _c2n_i)
-
-        # Neighbor cell j
-        j = f2c[kface][2]
-        ctype_j = cellTypes[j]
-        nnodes_j = Val(nnodes(ctype_j))
-        _c2n_j = c2n[j, nnodes_j]
-        cnodes_j = get_nodes(mesh, _c2n_j)
-        cinfo_j = CellInfo(j, ctype_j, cnodes_j, _c2n_j)
-
-        # Face info
-        ftype = faceTypes[kface]
-        n_fnodes = Val(nnodes(ftype))
-        _f2n = f2n[kface, n_fnodes]
-        fnodes = get_nodes(mesh, _f2n)
-        error("TODO")
-        # # Integrate from cell i "point of view"
-        # finfo_ij = FaceInfo(cinfo_i, cinfo_j, ftype, fnodes, _f2n)
-        # λU_i = get_shape_functions(U, shape(ctype_i))
-        # λV_i = get_shape_functions(V, shape(ctype_i))
-
-        # jdofs = get_dofs(U, icell)
-        # idofs = get_dofs(V, icell)
-
-        # for (jdof, λⱼ) in zip(jdofs, λU)
-        #     for (idof, λᵢ) in zip(idofs, λV)
-        #         _g = f(λⱼ, λᵢ)
-        #         g = materialize(_g, cellinfo)
-
-        #         push!(I, idof)
-        #         push!(J, jdof)
-        #         push!(X, integrate_on_ref(g, cellinfo, quadrature))
-        #     end
-        # end
+    for elementInfo in DomainIterator(domain)
+        λu, λv = blockmap_bilinear_shape_functions(U, V, elementInfo)
+        g1 = materialize(f(λu, λv), elementInfo)
+        values = _integrate_on_ref_element(g1, elementInfo, quadrature)
+        _append_contribution!(X, I, J, U, V, values, elementInfo, domain)
     end
 
     return nothing
@@ -375,6 +296,85 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::CellInfo, dom
     end
     return nothing
 end
+
+function _append_contribution!(X, I, J, U, V, values, elementInfo::FaceInfo, domain)
+    cellinfo_n = get_cellinfo_n(elementInfo)
+    cellinfo_p = get_cellinfo_p(elementInfo)
+    cellindex_n = cellindex(cellinfo_n)
+    cellindex_p = cellindex(cellinfo_p)
+
+    unwrapValues = _unwrap_face_integrate(U, V, values)
+
+    nU_n = Val(get_ndofs(U, shape(celltype(cellinfo_n))))
+    nV_n = Val(get_ndofs(V, shape(celltype(cellinfo_n))))
+    nU_p = Val(get_ndofs(U, shape(celltype(cellinfo_p))))
+    nV_p = Val(get_ndofs(V, shape(celltype(cellinfo_p))))
+
+    col_dofs_U_n = get_dofs(U, cellindex_n, nU_n) # columns correspond to the TrialFunction on side⁻
+    row_dofs_V_n = get_dofs(V, cellindex_n, nV_n) # lines correspond to the TestFunction on side⁻
+    col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
+    row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
+
+    matrixvalues = _pack_bilinear_face_contribution(
+        unwrapValues,
+        col_dofs_U_n,
+        row_dofs_V_n,
+        col_dofs_U_p,
+        row_dofs_V_p,
+    )
+
+    for (k, (row, col)) in enumerate(
+        Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
+    )
+        _append_bilinear!(I, J, X, row, col, matrixvalues[k])
+    end
+    return nothing
+end
+
+function _append_bilinear!(I, J, X, row, col, vals)
+    _rows, _cols = _cartesian_product(row, col)
+    @assert length(_rows) == length(_cols) == length(vals)
+    append!(I, _rows)
+    append!(J, _cols)
+    append!(X, vec(vals))
+end
+_append_bilinear!(I, J, X, row, col, vals::NullOperator) = nothing
+function _append_bilinear!(
+    I,
+    J,
+    X,
+    row,
+    col,
+    vals::Union{T, SMatrix{M, N, T}},
+) where {M, N, T <: NullOperator}
+    nothing
+end
+
+function _pack_bilinear_face_contribution(
+    values,
+    col_dofs_U_n::SVector{NUn},
+    row_dofs_V_n::SVector{NVn},
+    col_dofs_U_p::SVector{NUp},
+    row_dofs_V_p::SVector{NVp},
+) where {NUn, NVn, NUp, NVp}
+    a11 = SMatrix{NVn, NUn}(values[1][j][i] for i in 1:NVn, j in 1:NUn)
+    a21 = SMatrix{NVp, NUn}(values[2][j][i] for i in 1:NVp, j in 1:NUn)
+    a12 = SMatrix{NVn, NUp}(values[3][j][i] for i in 1:NVn, j in 1:NUp)
+    a22 = SMatrix{NVp, NUp}(values[4][j][i] for i in 1:NVp, j in 1:NUp)
+    return a11, a21, a12, a22
+end
+Base.getindex(::Bcube.LazyOperators.NullOperator, i) = NullOperator()
+
+function _unwrap_face_integrate(
+    ::Union{TrialFESpace, AbstractMultiTrialFESpace},
+    ::Union{TestFESpace, AbstractMultiTestFESpace},
+    a,
+)
+    return _recursive_unwrap(a)
+end
+
+_recursive_unwrap(a::LazyOperators.AbstractMapOver) = map(_recursive_unwrap, unwrap(a))
+_recursive_unwrap(a) = unwrap(a)
 
 function _update_b!(b, V, values, elementInfo::CellInfo, domain)
     idofs = get_dofs(V, cellindex(elementInfo))
@@ -612,6 +612,36 @@ function blockmap_bilinear_shape_functions(
     blockU, blockV
 end
 
+function blockmap_bilinear_shape_functions(
+    U::AbstractFESpace,
+    V::AbstractFESpace,
+    cellinfo_u::AbstractCellInfo,
+    cellinfo_v::AbstractCellInfo,
+)
+    λU = get_shape_functions(U, shape(celltype(cellinfo_u)))
+    λV = get_shape_functions(V, shape(celltype(cellinfo_v)))
+    blockV, blockU = _blockmap_bilinear(λV, λU)
+    blockU, blockV
+end
+
+function blockmap_bilinear_shape_functions(
+    U::AbstractFESpace,
+    V::AbstractFESpace,
+    faceinfo::FaceInfo,
+)
+    cellinfo_n = get_cellinfo_n(faceinfo)
+    cellinfo_p = get_cellinfo_p(faceinfo)
+    U_nn, V_nn = blockmap_bilinear_shape_functions(U, V, cellinfo_n, cellinfo_n)
+    U_pn, V_pn = blockmap_bilinear_shape_functions(U, V, cellinfo_n, cellinfo_p)
+    U_np, V_np = blockmap_bilinear_shape_functions(U, V, cellinfo_p, cellinfo_n)
+    U_pp, V_pp = blockmap_bilinear_shape_functions(U, V, cellinfo_p, cellinfo_p)
+
+    return (
+        LazyWrap(BilinearTrialFaceSidePair(U_nn, U_pn, U_np, U_pp)),
+        LazyWrap(BilinearTestFaceSidePair(V_nn, V_pn, V_np, V_pp)),
+    )
+end
+
 """
 From tuples ``a=(a_1, a_2, …, a_i, …, a_m)`` and ``b=(b_1, b_2, …, b_j, …, b_n)``,
 it builds `A` and `B` which correspond formally to the following two matrices :
@@ -689,30 +719,127 @@ function compute(integration::Integration)
 end
 
 """
-    AbstractFaceSidePair <: AbstractLazy
+    AbstractFaceSidePair{A} <: AbstractLazyWrap{A}
 
 # Interface:
 * `side_n(a::AbstractFaceSidePair)`
 * `side_p(a::AbstractFaceSidePair)`
 """
-abstract type AbstractFaceSidePair <: AbstractLazy end
+abstract type AbstractFaceSidePair{A} <: AbstractLazyWrap{A} end
+LazyOperators.get_args(a::AbstractFaceSidePair) = a.data
+LazyOperators.pretty_name(::AbstractFaceSidePair) = "AbstractFaceSidePair"
+LazyOperators.pretty_name_style(::AbstractFaceSidePair) = Dict(:color => :yellow)
 
-struct FaceSidePair{T1, T2}
-    data_n::T1
-    data_p::T2
+struct FaceSidePair{A} <: AbstractFaceSidePair{A}
+    data::A
 end
-side_n(a::FaceSidePair) = MapOver((a.data_n, NullOperator()))
-side_p(a::FaceSidePair) = MapOver((NullOperator(), a.data_p))
+
+FaceSidePair(a, b) = FaceSidePair((a, b))
+LazyOperators.pretty_name(::FaceSidePair) = "FaceSidePair"
+
+side_n(a::FaceSidePair) = Side⁻(LazyMapOver((a.data[1], NullOperator())))
+side_p(a::FaceSidePair) = Side⁺(LazyMapOver((NullOperator(), a.data[2])))
 
 function LazyOperators.materialize(a::FaceSidePair, cPoint::CellPoint)
-    _a = (materialize(a.data_n, cPoint), materialize(a.data_p, cPoint))
+    _a = (materialize(a.data[1], cPoint), materialize(a.data[2], cPoint))
     return MapOver(_a)
 end
 
 function LazyOperators.materialize(a::FaceSidePair, side::Side⁻{Nothing, <:Tuple{FaceInfo}})
-    return FaceSidePair(materialize(a.data_n, side), NullOperator())
+    return FaceSidePair(materialize(a.data[1], side), NullOperator())
 end
 
 function LazyOperators.materialize(a::FaceSidePair, side::Side⁺{Nothing, <:Tuple{FaceInfo}})
-    return FaceSidePair(NullOperator(), materialize(a.data_p, side))
+    return FaceSidePair(NullOperator(), materialize(a.data[2], side))
+end
+
+function LazyOperators.materialize(
+    a::FaceSidePair,
+    side::Side⁻{Nothing, <:Tuple{FacePoint}},
+)
+    return MapOver(materialize(a.data[1], side), NullOperator())
+end
+
+function LazyOperators.materialize(
+    a::FaceSidePair,
+    side::Side⁺{Nothing, <:Tuple{FacePoint}},
+)
+    return MapOver(NullOperator(), materialize(a.data[2], side))
+end
+
+function LazyOperators.materialize(
+    a::Gradient{O, <:Tuple{AbstractFaceSidePair}},
+    point::AbstractSide{Nothing, <:Tuple{FacePoint}},
+) where {O}
+    _args, = get_operator(point)(get_args(a))
+    __args, = get_args(_args)
+    return materialize(∇(__args), point)
+end
+
+"""
+    AbstractBilinearFaceSidePair{A} <: AbstractLazyWrap{A}
+
+# Interface:
+    * get_args_bilinear(a::AbstractBilinearFaceSidePair)
+"""
+abstract type AbstractBilinearFaceSidePair{A} <: AbstractLazyWrap{A} end
+
+LazyOperators.pretty_name_style(::AbstractBilinearFaceSidePair) = Dict(:color => :yellow)
+get_args(a::AbstractBilinearFaceSidePair) = a.data
+get_basetype(a::AbstractBilinearFaceSidePair) = get_basetype(typeof(a))
+get_basetype(::Type{<:AbstractBilinearFaceSidePair}) = error("To be defined")
+
+function LazyOperators.materialize(
+    a::AbstractBilinearFaceSidePair,
+    point::AbstractSide{Nothing, <:Tuple{FacePoint}},
+)
+    args = tuplemap(x -> materialize(x, point), get_args(a))
+    return MapOver(args)
+end
+
+function LazyOperators.materialize(
+    a::Gradient{Nothing, <:Tuple{AbstractBilinearFaceSidePair}},
+    point::AbstractSide{Nothing, <:Tuple{FacePoint}},
+)
+    op_side = get_operator(point)
+    args, = get_args(op_side(get_args(a))...)
+    return materialize(∇(args), point)
+end
+
+function LazyOperators.materialize(
+    a::AbstractBilinearFaceSidePair,
+    side::AbstractSide{Nothing, <:Tuple{FaceInfo}},
+)
+    T = get_basetype(a)
+    return T(tuplemap(x -> materialize(x, side), get_args(a)))
+end
+
+struct BilinearTrialFaceSidePair{A} <: AbstractBilinearFaceSidePair{A}
+    data::A
+end
+
+BilinearTrialFaceSidePair(a...) = BilinearTrialFaceSidePair(a)
+LazyOperators.pretty_name(::BilinearTrialFaceSidePair) = "BilinearTrialFaceSidePair"
+get_basetype(::Type{<:BilinearTrialFaceSidePair}) = BilinearTrialFaceSidePair
+
+function side_n(a::BilinearTrialFaceSidePair)
+    Side⁻(LazyMapOver((a.data[1], a.data[2], NullOperator(), NullOperator())))
+end
+function side_p(a::BilinearTrialFaceSidePair)
+    Side⁺(LazyMapOver((NullOperator(), NullOperator(), a.data[3], a.data[4])))
+end
+
+struct BilinearTestFaceSidePair{A} <: AbstractBilinearFaceSidePair{A}
+    data::A
+end
+
+BilinearTestFaceSidePair(a...) = BilinearTestFaceSidePair(a)
+LazyOperators.pretty_name(::BilinearTestFaceSidePair) = "BilinearTestFaceSidePair"
+get_basetype(::Type{<:BilinearTestFaceSidePair}) = BilinearTestFaceSidePair
+
+function side_n(a::BilinearTestFaceSidePair)
+    Side⁻(LazyMapOver((a.data[1], NullOperator(), a.data[3], NullOperator())))
+end
+function side_p(a::BilinearTestFaceSidePair)
+    Side⁺(LazyMapOver((NullOperator(), a.data[2], NullOperator(), a.data[4])))
 end
