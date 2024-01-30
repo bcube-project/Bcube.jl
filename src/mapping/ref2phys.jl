@@ -159,18 +159,6 @@ end
 
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
-    n::Val{1},
-    ctype::AbstractEntityType,
-    cnodes,
-    ξ::AbstractQuadratureNode,
-)
-    # Gradient of reference shape functions
-    ∇λ = grad_shape_functions(fs, n, ξ)
-    return ∇λ * mapping_jacobian_inv(cnodes, ctype, get_coord(ξ))
-end
-
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
     n::Val{N},
     ctype::AbstractEntityType,
     cnodes,
@@ -237,23 +225,6 @@ end
     end
 end
 
-function grad_shape_functions_NA(
-    fs::AbstractFunctionSpace,
-    n::Val{N},
-    ctype::AbstractEntityType,
-    cnodes,
-    ξ,
-) where {N}
-    ∇λ_sca = grad_shape_functions(fs, Val(1), ctype, cnodes, ξ) # Matrix of size (ndofs_sca, nspa)
-    ∇λ_vec = _build_grad_impl(∇λ_sca, n)
-    return ∇λ_vec
-end
-
-"""
-    grad_shape_functions(fs::AbstractFunctionSpace, ctype::AbstractEntityType{2}, cnodes::AbstractArray{Node{3}}, ξ)
-
-Gradient computation for a hypersurface : a surface (of topo dim 2) in a 3D space.
-"""
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
     ctype::AbstractEntityType{2},
@@ -263,14 +234,6 @@ function grad_shape_functions(
     return _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
 end
 
-"""
-    grad_shape_functions(fs::AbstractFunctionSpace, ctype::AbstractEntityType{1}, cnodes::AbstractArray{Node{2,T},N}, ξ) where {T, N}
-
-Gradient computation for a hypersurface : a line (of topo dim 1) in a 2D space.
-
-Exact copy of `grad_shape_functions(fs::AbstractFunctionSpace, ctype::AbstractEntityType{2}, cnodes::AbstractArray{Node{3,T},N}, ξ) where {T, N}`,
-but I don't feel fixing it right now cause we will soon improve the whole dispatch on grad_shape_functions`
-"""
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
     ctype::AbstractEntityType{1},
