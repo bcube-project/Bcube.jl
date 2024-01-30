@@ -366,13 +366,13 @@ side_n(a::Side⁻) = a
 side_p(::NullOperator) = NullOperator()
 side_n(::NullOperator) = NullOperator()
 
+side_p(n) = Side⁺(n)
+side_n(n) = Side⁻(n)
+
 """
 Represent the face normal of a face
 """
 struct FaceNormal <: AbstractLazy end
-
-side_p(n) = Side⁺(n)
-side_n(n) = Side⁻(n)
 
 """
 At the `CellInfo` level, the `FaceNormal` doesn't really have a materialization and stays lazy
@@ -417,6 +417,38 @@ function LazyOperators.materialize(
     ctype = celltype(cInfo)
 
     return normal(cnodes, ctype, kside, ξface)
+end
+
+"""
+Represent the normal of a cell, in the context of a hypersurface.
+"""
+struct CellNormal <: AbstractLazy end
+
+LazyOperators.materialize(ν::CellNormal, ::CellInfo) = ν
+
+function LazyOperators.materialize(::CellNormal, cPoint::CellPoint{ReferenceDomain})
+    cnodes = get_cellnodes(cPoint)
+    ctype = get_celltype(cPoint)
+    ξ = get_coord(cPoint)
+    return cell_normal(cnodes, ctype, ξ)
+end
+
+"""
+Represent the tangential projector associated to an hypersurface
+"""
+struct TangentialProjector <: AbstractLazy end
+
+LazyOperators.materialize(P::TangentialProjector, ::CellInfo) = P
+
+function LazyOperators.materialize(
+    ::TangentialProjector,
+    cPoint::CellPoint{ReferenceDomain},
+)
+    cnodes = get_cellnodes(cPoint)
+    ctype = get_celltype(cPoint)
+    ξ = get_coord(cPoint)
+    ν = cell_normal(cnodes, ctype, ξ)
+    return I - (ν ⊗ ν)
 end
 
 LazyOperators.materialize(f::Function, ::CellInfo) = f
