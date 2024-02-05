@@ -382,7 +382,7 @@ LazyOperators.materialize(n::FaceNormal, ::CellInfo) = n
 
 function LazyOperators.materialize(
     n::FaceNormal,
-    sideFacePoint::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
 )
     n
 end
@@ -420,21 +420,11 @@ function LazyOperators.materialize(
 end
 
 """
-Represent the normal of a cell, in the context of a hypersurface.
-"""
-struct CellNormal <: AbstractLazy end
-
-LazyOperators.materialize(ν::CellNormal, ::CellInfo) = ν
-
-function LazyOperators.materialize(::CellNormal, cPoint::CellPoint{ReferenceDomain})
-    cnodes = get_cellnodes(cPoint)
-    ctype = get_celltype(cPoint)
-    ξ = get_coord(cPoint)
-    return cell_normal(cnodes, ctype, ξ)
-end
-
-"""
-Represent the tangential projector associated to an hypersurface
+Represent the tangential projector associated to an hypersurface. Its expression is
+```math
+    P = I - \\nu \\otimes \\nu
+```
+where ``\\nu`` is the cell normal vector.
 """
 struct TangentialProjector <: AbstractLazy end
 
@@ -447,6 +437,45 @@ function LazyOperators.materialize(
     cnodes = get_cellnodes(cPoint)
     ctype = get_celltype(cPoint)
     ξ = get_coord(cPoint)
+    return _tangential_projector(cnodes, ctype, ξ)
+end
+
+function LazyOperators.materialize(
+    P::TangentialProjector,
+    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    P
+end
+
+function LazyOperators.materialize(
+    ::TangentialProjector,
+    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+    cInfo = get_cellinfo_n(fInfo)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    ξ = get_coord(fPoint)
+
+    return _tangential_projector(cnodes, ctype, ξ)
+end
+
+function LazyOperators.materialize(
+    ::TangentialProjector,
+    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+    cInfo = get_cellinfo_p(fInfo)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    ξ = get_coord(fPoint)
+
+    return _tangential_projector(cnodes, ctype, ξ)
+end
+
+function _tangential_projector(cnodes, ctype, ξ)
     ν = cell_normal(cnodes, ctype, ξ)
     return I - (ν ⊗ ν)
 end

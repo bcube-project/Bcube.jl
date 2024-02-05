@@ -227,8 +227,9 @@ end
 
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
+    ::Val{1},
     ctype::AbstractEntityType{2},
-    cnodes::AbstractArray{Node{3}},
+    cnodes::AbstractArray{<:Node{3}},
     ξ,
 )
     return _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
@@ -236,33 +237,31 @@ end
 
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
+    ::Val{1},
     ctype::AbstractEntityType{1},
-    cnodes::AbstractArray{Node{2}},
+    cnodes::AbstractArray{<:Node{2}},
     ξ,
 )
     return _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
 end
 
 function _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
-    # Corresponding shape
+    # First, we compute the "augmented" jacobian.
+    #
+    # Rq: we could do this elsewhere, for instance in mapping.jl.
+    # However, since this augmented jacobian already calls `mapping_jacobian`
+    # it would not be as easy as specializing `mapping_jacobian` for the hypersurface
+    # case. As long as this portion of code is not duplicated elsewhere, I prefer to
+    # keep it here.
     s = shape(ctype)
-
-    # Get reference shape functions
-    λ = shape_functions(fs, s)
-
-    # Mapping jacobian
     Jref = mapping_jacobian(cnodes, ctype, ξ)
+    ν = cell_normal(cnodes, ctype, ξ)
+    J = hcat(Jref, ν)
 
-    # Compute cell normal
-    n⃗ = cell_normal(cnodes, ctype, ξ)
-
-    # Form augmented jacobian (if Jref and n⃗ are StaticArrays, the below array is also a SA)
-    J = [Jref n⃗]
-
-    # Compute shape functions gradient : we "add a dimension" to the ref gradient
-    # The original formulae is grad(lambda_i) = transpose(Jinv) * grad(lambda_ref_i)
-    # But given our definition of grad(lambda) (matrix), the formulae becomes the below one
-    ∇λ = hcat(grad_shape_functions(fs, s, ξ), zeros(ndofs(fs, s))) * inv(J)
+    # Compute shape functions gradient : we "add a dimension" to the ref gradient,
+    # and then right-multiply by the inverse of the jacobian
+    z = @SVector zeros(ndofs(fs, s))
+    ∇λ = hcat(grad_shape_functions(fs, s, ξ), z) * inv(J)
 
     return ∇λ
 end
