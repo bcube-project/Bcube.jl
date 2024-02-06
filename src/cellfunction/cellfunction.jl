@@ -456,9 +456,9 @@ function LazyOperators.materialize(
     cInfo = get_cellinfo_n(fInfo)
     cnodes = nodes(cInfo)
     ctype = celltype(cInfo)
-    ξ = get_coord(fPoint)
+    ξcell = get_coord(side_n(fPoint))
 
-    return _tangential_projector(cnodes, ctype, ξ)
+    return _tangential_projector(cnodes, ctype, ξcell)
 end
 
 function LazyOperators.materialize(
@@ -470,15 +470,80 @@ function LazyOperators.materialize(
     cInfo = get_cellinfo_p(fInfo)
     cnodes = nodes(cInfo)
     ctype = celltype(cInfo)
-    ξ = get_coord(fPoint)
+    ξcell = get_coord(side_p(fPoint))
 
-    return _tangential_projector(cnodes, ctype, ξ)
+    return _tangential_projector(cnodes, ctype, ξcell)
 end
 
+"""
+Warning : `cell_normal` is a "cell" operator, not a "face" operator.
+So ξ is expected to be in the reference domain of the cell.
+"""
 function _tangential_projector(cnodes, ctype, ξ)
     ν = cell_normal(cnodes, ctype, ξ)
     return I - (ν ⊗ ν)
 end
+
+# struct TangentialRotation <: AbstractLazy end
+
+# function LazyOperators.materialize(
+#     R::TangentialRotation,
+#     ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+# )
+#     R
+# end
+
+# function LazyOperators.materialize(
+#     ::TangentialRotation,
+#     sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
+# )
+#     fPoint, = get_args(sideFacePoint)
+#     fInfo = get_faceinfo(fPoint)
+#     ξ = get_coord(fPoint)
+
+#     cInfo_n = get_cellinfo_n(fInfo)
+#     cnodes_n = nodes(cInfo_n)
+#     ctype_n = celltype(cInfo_n)
+
+#     cInfo_p = get_cellinfo_p(fInfo)
+#     cnodes_p = nodes(cInfo_p)
+#     ctype_p = celltype(cInfo_p)
+
+#     return _tangential_rotation(cnodes_n, cnodes_p, ctype_n, ctype_p, ξ)
+# end
+
+# function _tangential_rotation(
+#     cnodes_n::AbstractArray{Node{3, T}, N},
+#     cnodes_p,
+#     ctype_n::AbstractEntityType{2},
+#     ctype_p,
+#     ξ,
+# ) where {T, N}
+
+#     # We choose to use `cell_normal` instead of `normal`,
+#     # but we could do the same with the latter.
+#     ν_n = cell_normal(cnodes_n, ctype_n, ξ)
+#     ν_p = cell_normal(cnodes_p, ctype_p, ξ)
+
+#     _cos = ν_n ⋅ ν_p
+#     _sin = cross(ν_n, ν_p) # this is not really a 'sinus', it is (sinus x u)
+#     u = normalize(_sin) # WARNING, SHOULD CHECK IF NOT ZERO
+
+#     _R = _cos * I + _cross_product_matrix(_sin) + (1 - _cos) * (u ⊗ u)
+
+#     error("xi not correct")
+
+#     return _R
+# end
+
+# function _cross_product_matrix(a)
+#     @assert size(a) == (3, 1)
+#     SA[
+#         0 (-a[3]) a[2]
+#         a[3] 0 (-a[1])
+#         (-a[2]) a[1] 0
+#     ]
+# end
 
 LazyOperators.materialize(f::Function, ::CellInfo) = f
 LazyOperators.materialize(f::Function, ::CellPoint) = f
