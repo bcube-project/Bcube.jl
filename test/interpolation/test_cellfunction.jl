@@ -225,7 +225,7 @@ end
         v2_in_1 = _R * v2
         ν1 = Bcube.cell_normal(cnodes_n, ctype_n, ξ_n)
         @test v2 ⋅ u ≈ v2_in_1 ⋅ u
-        @test ν1 ⋅ v2_in_1 ≈ 0.0
+        @test abs(ν1 ⋅ v2_in_1) < 1e-16
 
         _R = Bcube.materialize(side_p(R), fPoint)
         v1 = normalize(Bcube.coords(D) - Bcube.coords(B)) * 2
@@ -233,7 +233,7 @@ end
         v1_in_2 = _R * v1
         ν2 = Bcube.cell_normal(cnodes_p, ctype_p, ξ_p)
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u
-        @test ν2 ⋅ v1_in_2 ≈ 0.0
+        @test abs(ν2 ⋅ v1_in_2) < 1e-16
 
         #--- 2
         A = Node([0.0, 0.0, 0.0])
@@ -285,6 +285,6 @@ end
         v1_in_2 = _R * v1
         ν2 = Bcube.cell_normal(cnodes_p, ctype_p, ξ_p)
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u
-        @test ν2 ⋅ v1_in_2 ≈ 0.0
+        @test abs(ν2 ⋅ v1_in_2) < 1e-16
     end
 end
