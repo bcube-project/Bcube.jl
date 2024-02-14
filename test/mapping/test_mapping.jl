@@ -17,7 +17,7 @@
         @test isapprox_arrays(Bcube.mapping(ctype, cnodes, [-1.0]), [xmin]; rtol = tol)
         @test isapprox_arrays(Bcube.mapping(ctype, cnodes, [1.0]), [xmax]; rtol = tol)
         @test isapprox_arrays(
-            Bcube.mapping_jacobian(cnodes, ctype, rand(1)),
+            Bcube.mapping_jacobian(ctype, cnodes, rand(1)),
             @SVector[(xmax - xmin) / 2.0];
             rtol = tol,
         )
@@ -52,7 +52,7 @@
         @test isapprox(Bcube.mapping(ctype, cnodes, [1.0, 0.0]), x2, rtol = eps())
         @test isapprox(Bcube.mapping(ctype, cnodes, [0.0, 1.0]), x3, rtol = eps())
         @test isapprox_arrays(
-            Bcube.mapping_jacobian(cnodes, ctype, rand(2)),
+            Bcube.mapping_jacobian(ctype, cnodes, rand(2)),
             SA[
                 (xmax-xmin) 0.0
                 0.0 (ymax-ymin)
@@ -119,7 +119,7 @@
         @test isapprox(Bcube.mapping(ctype, cnodes, [1.0, 1.0]), x3, rtol = eps())
         @test isapprox(Bcube.mapping(ctype, cnodes, [-1.0, 1.0]), x4, rtol = eps())
         @test isapprox(
-            Bcube.mapping_jacobian(cnodes, ctype, rand(2)),
+            Bcube.mapping_jacobian(ctype, cnodes, rand(2)),
             SA[
                 (xmax-xmin) 0.0
                 0.0 (ymax-ymin)

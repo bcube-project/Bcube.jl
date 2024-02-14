@@ -503,7 +503,7 @@ end
             cnodes = get_nodes(m)
 
             @test isapprox_arrays(
-                Bcube.mapping_jacobian(cnodes, ctype, ξηζ),
+                Bcube.mapping_jacobian(ctype, cnodes, ξηζ),
                 s .* I3;
                 rtol = 1e-14,
             )

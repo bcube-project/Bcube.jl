@@ -423,7 +423,7 @@ function integrate_ref(
     return apply_quadrature2(f, shape(ctype), quadrature, mapstyle)
 end
 function _apply_curvilinear_metric1((g_ref, cnodes, ctype), x)
-    m = norm(mapping_jacobian(cnodes, ctype, x))
+    m = norm(mapping_jacobian(ctype, cnodes, x))
     map(gx -> m * gx, g_ref(x)) # `map` is needed by legacy
     #m*g_ref(x) ok for new api
 end
@@ -444,7 +444,7 @@ function integrate_on_ref(
 end
 
 function _apply_curvilinear_metric((g, cellinfo), x)
-    m = norm(mapping_jacobian(nodes(cellinfo), celltype(cellinfo), get_coord(x)))
+    m = norm(mapping_jacobian(celltype(cellinfo), nodes(cellinfo), get_coord(x)))
     cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
     m * g(cellpoint)
 end
@@ -480,7 +480,7 @@ function integrate_ref(
     mapstyle::MapComputeQuadratureStyle,
 )
     I = function (ξ)
-        J = mapping_jacobian(cnodes, ctype, ξ)
+        J = mapping_jacobian(ctype, cnodes, ξ)
         return norm(J[:, 1] × J[:, 2])
     end
     return apply_quadrature(ξ -> I(ξ), g_ref, shape(ctype), quadrature)

@@ -28,7 +28,7 @@ function normal(::isCurvilinear, ctype::AbstractEntityType, cnodes, iside, ξ)
     # Since a Line has always only two nodes, the node is necessary the `iside`-th
     ξ_cell = coords(Line())[iside]
 
-    return normalize(mapping_jacobian(cnodes, ctype, ξ_cell) .* normal(shape(ctype), iside))
+    return normalize(mapping_jacobian(ctype, cnodes, ξ_cell) .* normal(shape(ctype), iside))
 end
 
 function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
@@ -40,13 +40,13 @@ function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
     fnodes = [cnodes[i] for i in faces2nodes(ctype)[iside]] # @ghislainb : need better solution to index
 
     # Get face direction vector (face Jacobian)
-    u = mapping_jacobian(fnodes, ftype, ξ)
+    u = mapping_jacobian(ftype, fnodes, ξ)
 
     # Get face parametrization function
     fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
 
     # Compute surface jacobian
-    J = mapping_jacobian(cnodes, ctype, fp(ξ))
+    J = mapping_jacobian(ctype, cnodes, fp(ξ))
 
     # Compute vector that will help orient outward normal
     orient = mapping(ctype, cnodes, fp(ξ)) - center(ctype, cnodes)
@@ -89,7 +89,7 @@ function cell_normal(
     cnodes::AbstractArray{Node{2, T}, N},
     ξ,
 ) where {T, N}
-    Jref = mapping_jacobian(cnodes, ctype, ξ)
+    Jref = mapping_jacobian(ctype, cnodes, ξ)
     return normalize(SA[-Jref[2], Jref[1]])
 end
 
@@ -98,7 +98,7 @@ function cell_normal(
     cnodes::AbstractArray{Node{3, T}, N},
     ξ,
 ) where {T, N}
-    J = mapping_jacobian(cnodes, ctype, ξ)
+    J = mapping_jacobian(ctype, cnodes, ξ)
     return normalize(J[:, 1] × J[:, 2])
 end
 
@@ -241,7 +241,7 @@ function _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
     # case. As long as this portion of code is not duplicated elsewhere, I prefer to
     # keep it here.
     s = shape(ctype)
-    Jref = mapping_jacobian(cnodes, ctype, ξ)
+    Jref = mapping_jacobian(ctype, cnodes, ξ)
     ν = cell_normal(ctype, cnodes, ξ)
     J = hcat(Jref, ν)
 

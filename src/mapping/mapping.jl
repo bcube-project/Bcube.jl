@@ -41,10 +41,10 @@ Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 27-hexa.
 Map the reference 6-nodes prism [0,1] x [0,1] x [-1,1] on the 6-penta (prism).
 
 """
-function mapping(::AbstractEntityType, cnodes, ξ)
-    error("Function 'mapping' is not defined for this AbstractEntityType")
+function mapping(type_or_shape, cnodes, ξ)
+    error("Function 'mapping' is not defined for $(typeof(type_or_shape))")
 end
-mapping(ctype::AbstractEntityType, cnodes) = ξ -> mapping(ctype, cnodes, ξ)
+mapping(type_or_shape, cnodes) = ξ -> mapping(type_or_shape, cnodes, ξ)
 
 """
     mapping_inv(::AbstractEntityType, cnodes, x)
@@ -106,14 +106,42 @@ mapping_inv(::AbstractEntityType, cnodes, x) =
 mapping_inv(ctype::AbstractEntityType, cnodes) = x -> mapping_inv(ctype, cnodes, x)
 
 """
-    mapping_jacobian(nodes, ctype::AbstractEntityType, ξ)
+    mapping_jacobian(ctype::AbstractEntityType, cnodes, ξ)
 
 Jacobian matrix of the mapping : ``\\dfrac{\\partial F_i}{\\partial \\xi_j}``.
 
 # Implementation
 Default version using ForwardDiff, but can be specified for each shape.
+
+# `::Bar2_t`
+Mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
+``\\dfrac{\\partial F}{\\partial \\xi} = \\dfrac{x_r - x_l}{2}``
+
+# `::Bar3_t`
+Mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
+``\\dfrac{\\partial F}{\\partial \\xi} = \\frac{1}{2} \\left( (2\\xi - 1) M_1 + (2\\xi + 1)M_2 - 4 \\xi M_3\\right)
+
+# `::Tri3_t`
+Mapping's jacobian matrix for the reference 3-nodes Triangle [0,1] x [0,1] to the local
+triangle mapping.
+```math
+\\dfrac{\\partial F_i}{\\partial \\xi_j} =
+\\begin{pmatrix}
+    M_2 - M_1 & M_3 - M_1
+\\end{pmatrix}
+```
+
+# `::Quad4_t`
+Mapping's jacobian matrix for the reference square [-1,1] x [-1,1]
+to the 4-quadrilateral
+```math
+\\frac{\\partial F}{\\partial \\xi} = -M_1 + M_2 + M_3 - M_4 + \\eta (M_1 - M_2 + M_3 - M_4)
+```
+```math
+\\frac{\\partial F}{\\partial \\eta} = -M_1 - M_2 + M_3 + M_4 + \\xi (M_1 - M_2 + M_3 - M_4)
+```
 """
-function mapping_jacobian(cnodes, ctype::AbstractEntityType, ξ)
+function mapping_jacobian(ctype::AbstractEntityType, cnodes, ξ)
     ForwardDiff.jacobian(η -> mapping(ctype, cnodes, η), ξ)
 end
 
@@ -142,33 +170,20 @@ inverse mapping, F^-1, is not always defined.
 Default version using LinearAlgebra to inverse the matrix, but can be specified for each shape (if it exists).
 """
 function mapping_inv_jacobian(cnodes, ctype::AbstractEntityType, x)
-    inv(mapping_jacobian(cnodes, ctype, mapping_inv(ctype, cnodes, x)))
+    inv(mapping_jacobian(ctype, cnodes, mapping_inv(ctype, cnodes, x)))
 end
 
 """
-    mapping_det_jacobian(nodes, etype::AbstractEntityType, ξ)
+    mapping_det_jacobian(cnodes, ctype::AbstractEntityType, ξ)
 
 Absolute value of the determinant of the mapping Jacobian matrix, expressed in the reference element.
 
 # Implementation
 Default version using `mapping_jacobian`, but can be specified for each shape.
 """
-function mapping_det_jacobian(nodes, etype::AbstractEntityType, ξ)
-    abs(det(mapping_jacobian(nodes, etype, ξ)))
+function mapping_det_jacobian(cnodes, ctype::AbstractEntityType, ξ)
+    abs(det(mapping_jacobian(ctype, cnodes, ξ)))
 end
-
-"""
-    mapping(cshape::AbstractShape, cnodes, ξ)
-
-Returns the mapping of the an abstract shape (=ref element) to a target element defined by its `nodes`.
-
-For instance, if `cshape == Line`, then the mapping is the same wether the input is the Shape or a `Bar2_t`.
-However if the cell is of type `Bar3_t`, it is still the `Bar2_t` mapping that is returned.
-"""
-function mapping(cshape::AbstractShape, cnodes, ξ)
-    error("Function 'mapping' is not defined for this shape")
-end
-mapping(cshape::AbstractShape, cnodes) = ξ -> mapping(cshape, cnodes, ξ)
 
 """
     mapping_face(cshape::AbstractShape, side)
@@ -222,16 +237,9 @@ function mapping_inv(::Bar2_t, cnodes, x)
     SA[(2 * x[1] - cnodes[2].x[1] - cnodes[1].x[1]) / (cnodes[2].x[1] - cnodes[1].x[1])]
 end
 
-"""
-    mapping_jacobian(nodes, ::Bar2_t, ξ)
-
-Mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
-
-``\\dfrac{\\partial F}{\\partial \\xi} = \\dfrac{x_r - x_l}{2}``
-"""
-function mapping_jacobian(nodes, ::Bar2_t, ξ)
-    axes(nodes) == (Base.OneTo(2),) || error("Invalid number of nodes")
-    @inbounds (nodes[2].x .- nodes[1].x) ./ 2.0
+function mapping_jacobian(::Bar2_t, cnodes, ξ)
+    axes(cnodes) == (Base.OneTo(2),) || error("Invalid number of nodes")
+    @inbounds (cnodes[2].x .- cnodes[1].x) ./ 2.0
 end
 
 """
@@ -267,15 +275,9 @@ function mapping(::Bar3_t, cnodes, ξ)
     (1 .- ξ) .* (1 .+ ξ) .* cnodes[3].x
 end
 
-"""
-    mapping_jacobian(nodes, ::Bar3_t, ξ)
-
-Mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
-
-``\\dfrac{\\partial F}{\\partial \\xi} = \\frac{1}{2} \\left( (2\\xi - 1) M_1 + (2\\xi + 1)M_2 - 4 \\xi M_3\\right)
-"""
-function mapping_jacobian(nodes, ::Bar3_t, ξ)
-    (nodes[1].x .* (2 .* ξ .- 1) + nodes[2].x .* (2 .* ξ .+ 1) - nodes[3].x .* 4 .* ξ) ./ 2
+function mapping_jacobian(::Bar3_t, cnodes, ξ)
+    (cnodes[1].x .* (2 .* ξ .- 1) + cnodes[2].x .* (2 .* ξ .+ 1) - cnodes[3].x .* 4 .* ξ) ./
+    2
 end
 
 """
@@ -311,21 +313,8 @@ function mapping_inv(::Tri3_t, cnodes, x)
     ] / (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
 end
 
-"""
-    mapping_jacobian(nodes, ::Tri3_t, ξ)
-
-Mapping's jacobian matrix for the reference 3-nodes Triangle [0,1] x [0,1] to the local
-triangle mapping.
-
-```math
-\\dfrac{\\partial F_i}{\\partial \\xi_j} =
-\\begin{pmatrix}
-    M_2 - M_1 & M_3 - M_1
-\\end{pmatrix}
-```
-"""
-function mapping_jacobian(nodes, ::Tri3_t, ξ)
-    return hcat(nodes[2].x - nodes[1].x, nodes[3].x - nodes[1].x)
+function mapping_jacobian(::Tri3_t, cnodes, ξ)
+    return hcat(cnodes[2].x - cnodes[1].x, cnodes[3].x - cnodes[1].x)
 end
 
 """
@@ -441,30 +430,19 @@ function mapping_inv(::Quad4_t, cnodes, x)
     return a .* x[1] + b .* x[2] + c
 end
 
-"""
-    mapping_jacobian(nodes, ::Quad4_t, ξ)
-
-Mapping's jacobian matrix for the reference square [-1,1] x [-1,1]
-to the 4-quadrilateral
-
-```math
-\\frac{\\partial F}{\\partial \\xi} = -M_1 + M_2 + M_3 - M_4 + \\eta (M_1 - M_2 + M_3 - M_4)
-\\frac{\\partial F}{\\partial \\eta} = -M_1 - M_2 + M_3 + M_4 + \\xi (M_1 - M_2 + M_3 - M_4)
-```
-"""
-function mapping_jacobian(nodes, ::Quad4_t, ξ)
+function mapping_jacobian(::Quad4_t, cnodes, ξ)
     return hcat(
-        -nodes[1].x + nodes[2].x + nodes[3].x - nodes[4].x +
-        ξ[2] .* (nodes[1].x - nodes[2].x + nodes[3].x - nodes[4].x),
-        -nodes[1].x - nodes[2].x +
-        nodes[3].x +
-        nodes[4].x +
-        ξ[1] .* (nodes[1].x - nodes[2].x + nodes[3].x - nodes[4].x),
+        -cnodes[1].x + cnodes[2].x + cnodes[3].x - cnodes[4].x +
+        ξ[2] .* (cnodes[1].x - cnodes[2].x + cnodes[3].x - cnodes[4].x),
+        -cnodes[1].x - cnodes[2].x +
+        cnodes[3].x +
+        cnodes[4].x +
+        ξ[1] .* (cnodes[1].x - cnodes[2].x + cnodes[3].x - cnodes[4].x),
     ) ./ 4
 end
 
 """
-    mapping_jacobian(nodes, ::Quad4_t, ξ)
+    mapping_jacobian_inv(nodes, ::Quad4_t, ξ)
 
 Inverse of mapping's jacobian matrix for the reference square [-1,1] x [-1,1]
 to the 4-quadrilateral
@@ -668,18 +646,18 @@ function mapping(::Hexa8_t, cnodes, ξηζ)
     ) ./ 8
 end
 
-function mapping_jacobian(nodes, ::Hexa8_t, ξηζ)
+function mapping_jacobian(::Hexa8_t, cnodes, ξηζ)
     ξ = ξηζ[1]
     η = ξηζ[2]
     ζ = ξηζ[3]
-    M1 = nodes[1].x
-    M2 = nodes[2].x
-    M3 = nodes[3].x
-    M4 = nodes[4].x
-    M5 = nodes[5].x
-    M6 = nodes[6].x
-    M7 = nodes[7].x
-    M8 = nodes[8].x
+    M1 = cnodes[1].x
+    M2 = cnodes[2].x
+    M3 = cnodes[3].x
+    M4 = cnodes[4].x
+    M5 = cnodes[5].x
+    M6 = cnodes[6].x
+    M7 = cnodes[7].x
+    M8 = cnodes[8].x
     return hcat(
         ((M2 - M1) * (1 - η) + (M3 - M4) * (1 + η)) * (1 - ζ) +
         ((M6 - M5) * (1 - η) + (M7 - M8) * (1 + η)) * (1 + ζ),
@@ -758,16 +736,16 @@ function mapping(::Penta6_t, cnodes, ξηζ)
     ) ./ 2.0
 end
 
-function mapping_jacobian(nodes, ::Penta6_t, ξηζ)
+function mapping_jacobian(::Penta6_t, cnodes, ξηζ)
     ξ = ξηζ[1]
     η = ξηζ[2]
     ζ = ξηζ[3]
-    M1 = nodes[1].x
-    M2 = nodes[2].x
-    M3 = nodes[3].x
-    M4 = nodes[4].x
-    M5 = nodes[5].x
-    M6 = nodes[6].x
+    M1 = cnodes[1].x
+    M2 = cnodes[2].x
+    M3 = cnodes[3].x
+    M4 = cnodes[4].x
+    M5 = cnodes[5].x
+    M6 = cnodes[6].x
     return hcat(
         (1 - ζ) * (M2 - M1) + (1 + ζ) * (M5 - M4),
         (1 - ζ) * (M3 - M1) + (1 + ζ) * (M6 - M4),
