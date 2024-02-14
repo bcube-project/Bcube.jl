@@ -75,7 +75,7 @@ function write_vtk_discontinuous(
     # Create coordinates arrays
     # vtknodes = reshape([coords(n)[idim] for i in 1:ncells(mesh) for n in get_nodes(mesh,c2n[i]) for idim in 1:spaceDim],spaceDim,:)
     _coords = [
-        mapping(get_nodes(mesh, c2n[i]), celltypes[i], ξ)[idim] for i in 1:ncells(mesh)
+        mapping(celltypes[i], get_nodes(mesh, c2n[i]), ξ)[idim] for i in 1:ncells(mesh)
         for ξ in _vtk_coords_from_lagrange(shape(celltypes[i]), _degree) for
         idim in 1:spaceDim
     ]
@@ -155,7 +155,7 @@ function write_vtk_bnd_discontinuous(
         sideᵢ = cell_side(celltypes[icell], c2n[icell], f2n[iface])
         localfacedofs = idof_by_face_with_bounds(fs, shape(celltypes[icell]))[sideᵢ]
         ξ = coords(fs, shape(celltypes[icell]))[localfacedofs]
-        xdofs = map(_ξ -> mapping(get_nodes(mesh, c2n[icell]), celltypes[icell], _ξ), ξ)
+        xdofs = map(_ξ -> mapping(celltypes[icell], get_nodes(mesh, c2n[icell]), _ξ), ξ)
         ftype = entity(face_shapes(shape(celltypes[icell]), sideᵢ), Val(degree))
         ftype, rawcat(xdofs)
     end
