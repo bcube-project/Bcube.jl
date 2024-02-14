@@ -202,17 +202,7 @@ include("./integration/measure.jl")
 export AbstractMeasure, Measure, get_domain
 
 include("./integration/integration.jl")
-export ∫,
-    integrate,
-    integrate_ref,
-    integrate_n_ref,
-    integrate_n,
-    getcache_∫,
-    InvMassMatrix,
-    sparse,
-    IntegralResult,
-    assemble,
-    result
+export ∫, getcache_∫, InvMassMatrix, sparse, IntegralResult, assemble, result
 
 include("./algebra/gradient.jl")
 export ∇
