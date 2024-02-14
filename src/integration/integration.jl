@@ -116,7 +116,7 @@ function integrate_ref(
     quadrature::AbstractQuadrature,
     cqStyle::AbstractComputeQuadratureStyle,
 )
-    integrate_ref(topology_style(cnodes, ctype), g_ref, cnodes, ctype, quadrature, cqStyle)
+    integrate_ref(topology_style(ctype, cnodes), g_ref, cnodes, ctype, quadrature, cqStyle)
 end
 
 """
@@ -140,7 +140,7 @@ function integrate_on_ref(
     cqStyle::AbstractComputeQuadratureStyle,
 )
     integrate_on_ref(
-        topology_style(nodes(cellinfo), celltype(cellinfo)),
+        topology_style(celltype(cellinfo), nodes(cellinfo)),
         g,
         cellinfo,
         quadrature,

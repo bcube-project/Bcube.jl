@@ -20,7 +20,7 @@ Note that the "face" normal vector of a curve is the "direction" vector at the g
 
 """
 function normal(ctype::AbstractEntityType, cnodes, iside, ξ)
-    normal(topology_style(cnodes, ctype), ctype, cnodes, iside, ξ)
+    normal(topology_style(ctype, cnodes), ctype, cnodes, iside, ξ)
 end
 
 function normal(::isCurvilinear, ctype::AbstractEntityType, cnodes, iside, ξ)
@@ -114,7 +114,7 @@ won't be appropriate.
 center(ctype::AbstractEntityType, cnodes) = mapping(cnodes, ctype, center(shape(ctype)))
 
 """
-    grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ::AbstractEntityType, nodes, ξ) where N
+    grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N
 
 Gradient, with respect to the local coordinate system, of the shape functions associated to the `FunctionSpace`.
 

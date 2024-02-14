@@ -44,8 +44,7 @@ export nnodes,
     f2n_from_c2n,
     coords,
     cell_side,
-    oriented_cell_side,
-    topology_style
+    oriented_cell_side
 
 include("./mesh/shape.jl")
 export Line,
