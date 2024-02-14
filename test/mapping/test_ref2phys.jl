@@ -10,16 +10,16 @@
         xtest = range(xmin, xmax; length = 5)
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
-        ct = cells(mesh)[1]
-        Finv = mapping_inv(cnodes, ct)
+        ctype = cells(mesh)[1]
+        Finv = mapping_inv(cnodes, ctype)
 
-        xc = center(cnodes, ct)
+        xc = center(cnodes, ctype)
         @test isapprox_arrays(xc, [(xmin + xmax) / 2])
 
         #- Taylor degree 0
         fs = FunctionSpace(:Taylor, 0)
         dhl = Bcube.DofHandler(mesh, fs, 1, false)
-        λ = x -> shape_functions(fs, shape(ct), Finv(x))
+        λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         r = rand()
         q = [r]
         u = interpolate(λ, q[dof(dhl, 1)])
@@ -41,7 +41,7 @@
         #- Taylor degree 1
         fs = FunctionSpace(:Taylor, 1)
         dhl = Bcube.DofHandler(mesh, fs, 1, false)
-        λ = x -> shape_functions(fs, shape(ct), Finv(x))
+        λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         coef = rand()
         q = [coef * (xmin + xmax) / 2, (xmax - xmin) * coef] # f(x) = coef*x
         u = interpolate(λ, q[dof(dhl, 1)])
@@ -68,30 +68,30 @@
         xmax = 3.0
         cnodes = [Node([xmin]), Node([xmax])]
         ctype = Bar2_t()
-        @test isapprox_arrays(normal(cnodes, ctype, 1, rand(1)), [-1.0])
-        @test isapprox_arrays(normal(cnodes, ctype, 2, rand(1)), [1.0])
+        @test isapprox_arrays(normal(ctype, cnodes, 1, rand(1)), [-1.0])
+        @test isapprox_arrays(normal(ctype, cnodes, 2, rand(1)), [1.0])
 
         # Bar2_t in 2D
         xmin = [-2.0, -1.0]
         xmax = [3.0, 4.0]
         cnodes = [Node(xmin), Node(xmax)]
         ctype = Bar2_t()
-        @test normal(cnodes, ctype, 1, rand(1)) ≈ √(2) / 2 .* [-1, -1]
-        @test normal(cnodes, ctype, 2, rand(1)) ≈ √(2) / 2 .* [1, 1]
+        @test normal(ctype, cnodes, 1, rand(1)) ≈ √(2) / 2 .* [-1, -1]
+        @test normal(ctype, cnodes, 2, rand(1)) ≈ √(2) / 2 .* [1, 1]
 
         # Bar2_t in 3D
         xmin = [-2.0, -1.0, 5.0]
         xmax = [3.0, 4.0, 0.0]
         cnodes = [Node(xmin), Node(xmax)]
         ctype = Bar2_t()
-        @test normal(cnodes, ctype, 1, rand(1)) ≈ √(3) / 3 * [-1, -1, 1]
-        @test normal(cnodes, ctype, 2, rand(1)) ≈ √(3) / 3 * [1, 1, -1]
+        @test normal(ctype, cnodes, 1, rand(1)) ≈ √(3) / 3 * [-1, -1, 1]
+        @test normal(ctype, cnodes, 2, rand(1)) ≈ √(3) / 3 * [1, 1, -1]
 
         # Bar3_t in 3D (checked graphically, see notebook)
         cnodes = [Node([0.0, 0.0, 1.0]), Node([1.0, 0.0, 3.0]), Node([0.5, 0.5, 2.0])]
         ctype = Bar3_t()
-        @test normal(cnodes, ctype, 1, rand(1)) ≈ 1.0 / 3.0 .* [-1, -2, -2]
-        @test normal(cnodes, ctype, 2, rand(1)) ≈ 1.0 / 3.0 .* [1, -2, 2]
+        @test normal(ctype, cnodes, 1, rand(1)) ≈ 1.0 / 3.0 .* [-1, -2, -2]
+        @test normal(ctype, cnodes, 2, rand(1)) ≈ 1.0 / 3.0 .* [1, -2, 2]
     end
 
     @testset "Triangle" begin
@@ -99,18 +99,18 @@
         # Triangle3_t in 2D
         cnodes = [Node([0.0, 0.0]), Node([1.0, 1.0]), Node([0.0, 2.0])]
         ctype = Tri3_t()
-        @test normal(cnodes, ctype, 1, myrand(1, -1.0, 1.0)) ≈ √(2) / 2 .* [1, -1]
-        @test normal(cnodes, ctype, 2, myrand(1, -1.0, 1.0)) ≈ √(2) / 2 .* [1, 1]
-        @test normal(cnodes, ctype, 3, myrand(1, -1.0, 1.0)) ≈ [-1.0, 0.0]
+        @test normal(ctype, cnodes, 1, myrand(1, -1.0, 1.0)) ≈ √(2) / 2 .* [1, -1]
+        @test normal(ctype, cnodes, 2, myrand(1, -1.0, 1.0)) ≈ √(2) / 2 .* [1, 1]
+        @test normal(ctype, cnodes, 3, myrand(1, -1.0, 1.0)) ≈ [-1.0, 0.0]
 
         # Triangle3_t in 3D (checked graphically, see notebook)
         cnodes = [Node([-0.5, -1.0, -0.3]), Node([0.5, 0.0, 0.0]), Node([-0.5, 1.0, 0.5])]
         ctype = Tri3_t()
-        @test normal(cnodes, ctype, 1, myrand(1, -1.0, 1.0)) ≈
+        @test normal(ctype, cnodes, 1, myrand(1, -1.0, 1.0)) ≈
               [0.7162290778315695, -0.6203055406219843, -0.3197451240319506]
-        @test normal(cnodes, ctype, 2, myrand(1, -1.0, 1.0)) ≈
+        @test normal(ctype, cnodes, 2, myrand(1, -1.0, 1.0)) ≈
               [0.7396002616336388, 0.647150228929434, 0.1849000654084097]
-        @test normal(cnodes, ctype, 3, myrand(1, -1.0, 1.0)) ≈
+        @test normal(ctype, cnodes, 3, myrand(1, -1.0, 1.0)) ≈
               [-0.9957173250742359, -0.034335080174973664, 0.08583770043743415]
     end
 
@@ -129,10 +129,10 @@
         ]
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
-        ct = cells(mesh)[1]
-        Finv = mapping_inv(cnodes, ct)
+        ctype = cells(mesh)[1]
+        Finv = mapping_inv(cnodes, ctype)
 
-        xc = center(cnodes, ct)
+        xc = center(cnodes, ctype)
         @test all(
             map(
                 (x, y) -> isapprox(x, y; rtol = eps()),
@@ -144,7 +144,7 @@
         #- Taylor degree 0
         fs = FunctionSpace(:Taylor, 0)
         dhl = Bcube.DofHandler(mesh, fs, 1, false)
-        λ = shape_functions(fs, shape(ct))
+        λ = shape_functions(fs, shape(ctype))
         r = rand()
         q = [r]
         u = interpolate(λ, q[dof(dhl, 1)])
@@ -166,7 +166,7 @@
         #- Taylor degree 1
         fs = FunctionSpace(:Taylor, 1)
         dhl = Bcube.DofHandler(mesh, fs, 1, false)
-        λ = x -> shape_functions(fs, shape(ct), Finv(x))
+        λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         coefx, coefy = rand(2)
         q = [[coefx, coefy] ⋅ xc, Δx * coefx, Δy * coefy] # f(x,y) = coefx*x + coefy*y
         u = interpolate(λ, q[dof(dhl, 1)])
@@ -198,7 +198,7 @@
         )
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
-        ct = cells(mesh)[1]
+        ctype = cells(mesh)[1]
 
         AB = B - A
         BC = C - B
@@ -210,10 +210,10 @@
         nCD = normalize(-[-CD[2], CD[1]])
         nDA = normalize(-[-DA[2], DA[1]])
 
-        @test isapprox_arrays(normal(cnodes, ct, 1, rand(2)), nAB)
-        @test isapprox_arrays(normal(cnodes, ct, 2, rand(2)), nBC)
-        @test isapprox_arrays(normal(cnodes, ct, 3, rand(2)), nCD)
-        @test isapprox_arrays(normal(cnodes, ct, 4, rand(2)), nDA)
+        @test isapprox_arrays(normal(ctype, cnodes, 1, rand(2)), nAB)
+        @test isapprox_arrays(normal(ctype, cnodes, 2, rand(2)), nBC)
+        @test isapprox_arrays(normal(ctype, cnodes, 3, rand(2)), nCD)
+        @test isapprox_arrays(normal(ctype, cnodes, 4, rand(2)), nDA)
 
         # Quad9
         # Normals (checked graphically, see notebook)
@@ -231,13 +231,13 @@
         ctype = Quad9_t()
 
         xq = [0.5773502691896258]
-        @test normal(cnodes, ctype, 1, -xq) ≈ [-0.35921060405354993, -0.9332565252573828]
-        @test normal(cnodes, ctype, 1, xq) ≈ [0.3592106040535497, -0.9332565252573829]
-        @test normal(cnodes, ctype, 2, -xq) ≈ [0.8660254037844385, -0.5000000000000004]
-        @test normal(cnodes, ctype, 2, xq) ≈ [0.8660254037844386, 0.5000000000000003]
-        @test normal(cnodes, ctype, 3, -xq) ≈ [0.3592106040535492, 0.9332565252573829]
-        @test normal(cnodes, ctype, 3, xq) ≈ [-0.3592106040535494, 0.9332565252573829]
-        @test normal(cnodes, ctype, 4, -xq) ≈ [-0.8660254037844388, 0.5]
-        @test normal(cnodes, ctype, 4, xq) ≈ [-0.8660254037844385, -0.5000000000000001]
+        @test normal(ctype, cnodes, 1, -xq) ≈ [-0.35921060405354993, -0.9332565252573828]
+        @test normal(ctype, cnodes, 1, xq) ≈ [0.3592106040535497, -0.9332565252573829]
+        @test normal(ctype, cnodes, 2, -xq) ≈ [0.8660254037844385, -0.5000000000000004]
+        @test normal(ctype, cnodes, 2, xq) ≈ [0.8660254037844386, 0.5000000000000003]
+        @test normal(ctype, cnodes, 3, -xq) ≈ [0.3592106040535492, 0.9332565252573829]
+        @test normal(ctype, cnodes, 3, xq) ≈ [-0.3592106040535494, 0.9332565252573829]
+        @test normal(ctype, cnodes, 4, -xq) ≈ [-0.8660254037844388, 0.5]
+        @test normal(ctype, cnodes, 4, xq) ≈ [-0.8660254037844385, -0.5000000000000001]
     end
 end

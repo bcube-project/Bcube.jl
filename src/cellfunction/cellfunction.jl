@@ -400,7 +400,7 @@ function LazyOperators.materialize(
     cnodes = nodes(cInfo)
     ctype = celltype(cInfo)
 
-    return normal(cnodes, ctype, kside, ξface)
+    return normal(ctype, cnodes, kside, ξface)
 end
 
 function LazyOperators.materialize(
@@ -416,7 +416,7 @@ function LazyOperators.materialize(
     cnodes = nodes(cInfo)
     ctype = celltype(cInfo)
 
-    return normal(cnodes, ctype, kside, ξface)
+    return normal(ctype, cnodes, kside, ξface)
 end
 
 """

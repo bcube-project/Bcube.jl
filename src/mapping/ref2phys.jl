@@ -1,6 +1,7 @@
 
 """
-normal(cnodes, ctype::AbstractEntityType, iside, ξ)
+    normal(ctype::AbstractEntityType, cnodes, iside, ξ)
+    normal(::TopologyStyle, ctype::AbstractEntityType, cnodes, iside, ξ)
 
 Normal vector of the `iside`th face of a cell, evaluated at position `ξ` in the face reference element.
 So for the normal vector of the face of triangle living in a 3D space, `ξ` will be 1D (because the face
@@ -10,19 +11,19 @@ Beware this function needs the nodes `cnodes` and the type `ctype` of the cell (
 
 TODO: If `iside` is positive, then the outward normal (with respect to the cell) is returned, otherwise
 the inward normal is returned.
+
+# `::isCurvilinear`
+Note that the "face" normal vector of a curve is the "direction" vector at the given extremity.
+
+# `::isVolumic`
+``n^{loc} = J^{-\\intercal} n^{ref}``
+
 """
-function normal(cnodes, ctype::AbstractEntityType, iside, ξ)
-    normal(topology_style(cnodes, ctype), cnodes, ctype, iside, ξ)
+function normal(ctype::AbstractEntityType, cnodes, iside, ξ)
+    normal(topology_style(cnodes, ctype), ctype, cnodes, iside, ξ)
 end
 
-"""
-    normal(::isCurvilinear, cnodes, ctype::AbstractEntityType, iside, ξ)
-
-Compute the "face" normal vector of a curve at its `iside`-th side.
-
-Note that the "face" normal vector of a curve is the "direction" vector at the given extremity.
-"""
-function normal(::isCurvilinear, cnodes, ctype::AbstractEntityType, iside, ξ)
+function normal(::isCurvilinear, ctype::AbstractEntityType, cnodes, iside, ξ)
     # mapping face-reference-element (here, a node) to cell-reference-element (here, a Line)
     # Since a Line has always only two nodes, the node is necessary the `iside`-th
     ξ_cell = coords(Line())[iside]
@@ -30,28 +31,7 @@ function normal(::isCurvilinear, cnodes, ctype::AbstractEntityType, iside, ξ)
     return normalize(mapping_jacobian(cnodes, ctype, ξ_cell) .* normal(shape(ctype), iside))
 end
 
-"""
-    normal(::isVolumic, cnodes, ctype::AbstractEntityType, iside, ξ)
-
-Compute the normal of the `iside`-th side of a cell (same topology dim. as the space).
-
-``n^{loc} = J^{-\\intercal} n^{ref}``
-"""
-function normal(::isVolumic, cnodes, ctype::AbstractEntityType, iside, ξ)
-    # Cell shape
-    cshape = shape(ctype)
-
-    # Face parametrization to send ξ from ref-face-element to the ref-cell-element
-    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
-
-    # Inverse of the Jacobian matrix (but here `y` is in the cell-reference element)
-    # Warning : do not use `mapping_inv_jacobian` which requires the knowledge of `mapping_inv` (useless here)
-    Jinv(y) = mapping_jacobian_inv(cnodes, ctype, y)
-
-    return normalize(transpose(Jinv(fp(ξ))) * normal(cshape, iside))
-end
-
-function normal(::isSurfacic, cnodes, ctype::AbstractEntityType, iside, ξ)
+function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
     # Get cell shape and face type and shape
     cshape = shape(ctype)
     ftype = facetypes(ctype)[iside]
@@ -76,6 +56,20 @@ function normal(::isSurfacic, cnodes, ctype::AbstractEntityType, iside, ξ)
 
     # Orient normal outward and normalize
     return normalize(orient ⋅ n .* n)
+end
+
+function normal(::isVolumic, ctype::AbstractEntityType, cnodes, iside, ξ)
+    # Cell shape
+    cshape = shape(ctype)
+
+    # Face parametrization to send ξ from ref-face-element to the ref-cell-element
+    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
+
+    # Inverse of the Jacobian matrix (but here `y` is in the cell-reference element)
+    # Warning : do not use `mapping_inv_jacobian` which requires the knowledge of `mapping_inv` (useless here)
+    Jinv(y) = mapping_jacobian_inv(cnodes, ctype, y)
+
+    return normalize(transpose(Jinv(fp(ξ))) * normal(cshape, iside))
 end
 
 """

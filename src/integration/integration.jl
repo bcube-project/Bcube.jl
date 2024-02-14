@@ -248,7 +248,7 @@ function integrate_n(
     # so it doesn't need to be mapped. However for the second argument of `g` we need to send ξ from
     # the face-reference-element to the cell-reference-element to the cell-local-element.
     return integrate_ref(
-        ξ -> g(normal(cnodes, ctype, iside, ξ), mapping(cnodes, ctype, fp(ξ))),
+        ξ -> g(normal(ctype, cnodes, iside, ξ), mapping(cnodes, ctype, fp(ξ))),
         fnodes,
         ftype,
         quadrature,
@@ -283,7 +283,7 @@ function integrate_n_ref(
     # so it doesn't need to be mapped. However for the second argument of `gref` we need to send x from
     # the face-reference-element to the cell-reference-element
     return integrate_ref(
-        ξ -> g_ref(normal(cnodes, ctype, iside, ξ), fp(ξ)),
+        ξ -> g_ref(normal(ctype, cnodes, iside, ξ), fp(ξ)),
         fnodes,
         ftype,
         quadrature,
