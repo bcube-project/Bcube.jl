@@ -13,7 +13,7 @@
         ctype = cells(mesh)[1]
         Finv = mapping_inv(cnodes, ctype)
 
-        xc = center(cnodes, ctype)
+        xc = center(ctype, cnodes)
         @test isapprox_arrays(xc, [(xmin + xmax) / 2])
 
         #- Taylor degree 0
@@ -132,7 +132,7 @@
         ctype = cells(mesh)[1]
         Finv = mapping_inv(cnodes, ctype)
 
-        xc = center(cnodes, ctype)
+        xc = center(ctype, cnodes)
         @test all(
             map(
                 (x, y) -> isapprox(x, y; rtol = eps()),

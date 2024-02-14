@@ -49,7 +49,7 @@ function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
     J = mapping_jacobian(cnodes, ctype, fp(ξ))
 
     # Compute vector that will help orient outward normal
-    orient = mapping(cnodes, ctype, fp(ξ)) - center(cnodes, ctype)
+    orient = mapping(cnodes, ctype, fp(ξ)) - center(ctype, cnodes)
 
     # Normal direction
     n = J[:, 1] × J[:, 2] × u
@@ -103,7 +103,7 @@ function cell_normal(
 end
 
 """
-    center(cnodes, ctype::AbstractEntityType)
+    center(ctype::AbstractEntityType, cnodes)
 
 Return the center of the `AbstractEntityType` by mapping the center of the corresponding `Shape`.
 
@@ -111,7 +111,7 @@ Return the center of the `AbstractEntityType` by mapping the center of the corre
 Do not use this function on a face of a cell : since the face is of dimension "n-1", the mapping
 won't be appropriate.
 """
-center(cnodes, ctype::AbstractEntityType) = mapping(cnodes, ctype, center(shape(ctype)))
+center(ctype::AbstractEntityType, cnodes) = mapping(cnodes, ctype, center(shape(ctype)))
 
 """
     grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ::AbstractEntityType, nodes, ξ) where N
@@ -267,9 +267,9 @@ function get_cell_centers(mesh::Mesh)
     c2n = connectivities_indices(mesh, :c2n)
     celltypes = cells(mesh)
     centers = map(1:ncells(mesh)) do icell
-        ct = celltypes[icell]
-        cn = get_nodes(mesh, c2n[icell])
-        center(cn, ct)
+        ctype = celltypes[icell]
+        cnodes = get_nodes(mesh, c2n[icell])
+        center(ctype, cnodes)
     end
     return centers
 end
