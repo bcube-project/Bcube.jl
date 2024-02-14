@@ -542,6 +542,7 @@ Soustraction on an `Integrand` is treated as a multiplication by "(-1)" :
 `-a ≡ ((-1)*a)`
 """
 Base.:-(a::Integrand) = Integrand((-1) * get_function(a))
+Base.:+(a::Integrand) = a
 
 struct Integration{I <: Integrand, M <: Measure}
     integrand::I
@@ -575,6 +576,7 @@ Soustraction on an `Integration` is treated as a multiplication by "(-1)" :
 `-a ≡ ((-1)*a)`
 """
 Base.:-(a::Integration) = (-1) * a
+Base.:+(a::Integration) = a
 
 struct MultiIntegration{N, I <: Tuple{Vararg{Integration, N}}}
     integrations::I
@@ -604,7 +606,9 @@ end
 function MultiIntegration(a::NTuple{N, <:Integration}) where {N}
     MultiIntegration{length(a), typeof(a)}(a)
 end
-MultiIntegration(a::Integration, b::Integration...) = MultiIntegration((a, b...))
+function MultiIntegration(a::Integration, b::Vararg{Integration, N}) where {N}
+    MultiIntegration((a, b...))
+end
 
 Base.getindex(a::MultiIntegration, ::Val{I}) where {I} = a.integrations[I]
 Base.iterate(a::MultiIntegration, i) = iterate(a.integrations, i)
@@ -615,8 +619,9 @@ Base.:+(a::Integration, b::Integration) = MultiIntegration(a, b)
 Base.:+(a::MultiIntegration, b::Integration) = MultiIntegration(a.integrations..., b)
 Base.:+(a::Integration, b::MultiIntegration) = MultiIntegration(a, b.integrations...)
 function Base.:+(a::MultiIntegration, b::MultiIntegration)
-    MultiIntegration(a.integrations, b.integrations...)
+    MultiIntegration((a.integrations..., b.integrations...))
 end
+Base.:+(a::MultiIntegration) = a
 
 Base.:-(a::Integration, b::Integration) = MultiIntegration(a, -b)
 Base.:-(a::MultiIntegration, b::Integration) = MultiIntegration(a.integrations..., -b)
@@ -624,8 +629,9 @@ function Base.:-(a::Integration, b::MultiIntegration)
     MultiIntegration(a, map(-, b.integrations)...)
 end
 function Base.:-(a::MultiIntegration, b::MultiIntegration)
-    MultiIntegration(a.integrations, map(-, b.integrations)...)
+    MultiIntegration((a.integrations..., map(-, b.integrations)...))
 end
+Base.:-(a::MultiIntegration) = MultiIntegration(map(-, a.integrations)...)
 
 # implement AbstractLazy inteface:
 LazyOperators.pretty_name(::MultiIntegration{N}) where {N} = "MultiIntegration: (N=$N)"
