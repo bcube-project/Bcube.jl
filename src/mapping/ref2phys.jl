@@ -275,6 +275,19 @@ function grad_shape_functions(
     error("Line gradient in 3D not implemented yet")
 end
 
+"""
+    grad_function(f, n::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N
+
+Compute the gradient of a function `f` on a point in the reference domain. `N` is the
+size of the codomain of `f`.
+"""
+function grad_function(f, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
+    return transpose(mapping_jacobian_inv(cnodes, ctype, ξ)) * ForwardDiff.gradient(f, ξ)
+end
+function grad_function(f, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where {N}
+    return ForwardDiff.jacobian(f, ξ) * mapping_jacobian_inv(cnodes, ctype, ξ)
+end
+
 """ get mesh cell centers coordinates (assuming perfectly flat cells)"""
 function get_cell_centers(mesh::Mesh)
     c2n = connectivities_indices(mesh, :c2n)

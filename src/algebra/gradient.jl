@@ -106,10 +106,13 @@ TODO:
 * Specialize for a ShapeFunction to use the hardcoded version instead of ForwardDiff
 """
 function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
-    m = mapping_jacobian_inv(get_cellnodes(cPoint), get_celltype(cPoint), get_coord(cPoint))
-    f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
-    valS = _size_codomain(f, get_coord(cPoint))
-    return _gradient(valS, f, get_coord(cPoint), m)
+    f(_ξ) = op(CellPoint(_ξ, get_cellinfo(cPoint), ReferenceDomain()))
+    ξ = get_coord(cPoint)
+    valS = _size_codomain(f, ξ)
+    cInfo = get_cellinfo(cPoint)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    return grad_function(f, valS, ctype, cnodes, ξ)
 
     # ForwarDiff applied in the PhysicalDomain : not viable because
     # the inverse mapping is not always known.
@@ -121,9 +124,6 @@ end
 
 _size_codomain(f, x) = Val(length(f(x)))
 _size_codomain(f::AbstractCellFunction, x) = Val(get_size(f))
-
-_gradient(::Val{1}, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient(f, ξ)
-_gradient(::Val{S}, f, ξ::AbstractArray, m) where {S} = ForwardDiff.jacobian(f, ξ) * m
 
 function Gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
     f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
@@ -140,14 +140,20 @@ function Gradient(
     ξ = get_coord(cPoint)
     fs = get_function_space(cellFunction)
     n = Val(get_size(cellFunction))
-    MapOver(grad_shape_functionsNA(fs, n, ctype, cnodes, ξ))
+    MapOver(grad_shape_functions_reshaped(fs, n, ctype, cnodes, ξ))
 end
 
 # dispatch on codomain size :
 _gradient_or_jacobian(::Val{1}, f, x) = ForwardDiff.gradient(f, x)
 _gradient_or_jacobian(::Val{S}, f, x) where {S} = ForwardDiff.jacobian(f, x)
 
-function grad_shape_functionsNA(fs::AbstractFunctionSpace, n::Val{1}, ctype, cnodes, ξ)
+function grad_shape_functions_reshaped(
+    fs::AbstractFunctionSpace,
+    n::Val{1},
+    ctype,
+    cnodes,
+    ξ,
+)
     grad = grad_shape_functions(fs, n, ctype, cnodes, ξ)
     _reshape_gradient_shape_function_impl(grad, n)
 end
@@ -161,7 +167,7 @@ end
     return :(tuple($(exprs...)))
 end
 
-function grad_shape_functionsNA(
+function grad_shape_functions_reshaped(
     fs::AbstractFunctionSpace,
     n::Val{N},
     ctype,
@@ -177,7 +183,6 @@ end
     ::Val{Ncomp},
 ) where {Ndof_sca, Ndim, T, Ncomp}
     z = zero(T)
-    expr_0 = [:($z) for j in 1:Ndim]
     exprs_tot = []
     exprs = Matrix{Any}(undef, Ncomp, Ndim)
     for icomp in 1:Ncomp
