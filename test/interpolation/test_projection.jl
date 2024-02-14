@@ -41,7 +41,7 @@
         mesh = one_cell_mesh(:line; xmin, xmax)
         cnodes = get_nodes(mesh)
         ctype = cells(mesh)[1]
-        Finv = mapping_inv(cnodes, ctype)
+        Finv = Bcube.mapping_inv(ctype, cnodes)
         xc = center(ctype, cnodes)
         fs = FunctionSpace(:Taylor, 1)
         fes = FESpace(fs, :discontinuous)

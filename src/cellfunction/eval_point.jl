@@ -111,7 +111,7 @@ function change_domain(p::CellPoint{ReferenceDomain}, target_domain::PhysicalDom
 end
 
 function change_domain(p::CellPoint{PhysicalDomain}, target_domain::ReferenceDomain)
-    m(x) = mapping_inv(nodes(p.cellinfo), celltype(p.cellinfo), x)
+    m(x) = mapping_inv(celltype(p.cellinfo), nodes(p.cellinfo), x)
     x_ref = _apply_mapping(m, get_coord(p))
     CellPoint(x_ref, p.cellinfo, target_domain)
 end

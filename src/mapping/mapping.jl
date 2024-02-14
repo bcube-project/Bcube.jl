@@ -47,15 +47,63 @@ end
 mapping(ctype::AbstractEntityType, cnodes) = ξ -> mapping(ctype, cnodes, ξ)
 
 """
-    mapping_inv(nodes, ::AbstractEntityType, x)
+    mapping_inv(::AbstractEntityType, cnodes, x)
 
 Map the local shape on the reference shape.
 
 # Implementation
 This function does not have to be implemented for all shape.
+
+# `::Bar2_t`
+Map the local bar on the reference 2-nodes bar [-1,1]:
+``F^{-1}(x) = \\dfrac{2x - x_r - x_l}{x_r - x_l}``
+
+# `::Tri3_t`
+Map the local triangle on the reference 3-nodes Triangle [0,1] x [0,1].
+
+TODO: check this formulae with SYMPY
+
+```math
+F^{-1} \\begin{pmatrix} x \\\\ y \\end{pmatrix} =
+\\frac{1}{x_1(y_2-y_3) + x_2(y_3-y_1) + x_3(y_1-y_2)}
+\\begin{pmatrix}
+    (y_3-y_1)x + (x_1 - x_3)y + (x_3 y_1 - x_1 y_3) \\\\
+    (y_1-y_2)x + (x_2 - x_1)x + (x_1 y_2 - x_2 y_1)
+\\end{pmatrix}
+```
+
+# ::`Quad4_t`
+Map the  PARALLELOGRAM quadrilateral on the reference 4-nodes square [-1,1] x [-1,1].
+Warning : this mapping is only corrects for parallelogram quadrilateral, not for any quadrilateral.
+
+-----
+TODO: check this formulae with SYMPY
+-----
+
+```math
+F^{-1} \\begin{pmatrix} x \\\\ y \\end{pmatrix} =
+\\begin{pmatrix}
+    a_1 x + b_1 y + c_1 \\\\
+    a_2 x + b_2 y + c_2
+\\end{pmatrix}
+```
+with
+```math
+\\begin{aligned}
+    a_1 & = \\dfrac{-2 (y_3-y_2)}{\\Delta} \\\\
+    b_1 & = \\dfrac{2 (x_3-x_2)}{\\Delta} \\\\
+    c_1 & = -1 - a_1 x_1 - b_1 y_1 \\\\
+    a_2 & = \\dfrac{-2 (y_1-y_2)}{\\Delta} \\\\
+    b_2 & = \\dfrac{2 (x_1 - x_2)}{\\Delta} \\\\
+    c_2 & = -1 - a_2 x_1 - b_2 y_1
+\\end{aligned}
+```
+where
+`` \\Delta = (x_1 - x_2)(y_3 - y_2) - (x_3 - x_2)(y_1 - y_2)``
 """
-mapping_inv(nodes, ::AbstractEntityType, x) = error("Function 'mapping_inv' is not defined")
-mapping_inv(nodes, etype::AbstractEntityType) = x -> mapping_inv(nodes, etype, x)
+mapping_inv(::AbstractEntityType, cnodes, x) =
+    error("Function 'mapping_inv' is not defined")
+mapping_inv(ctype::AbstractEntityType, cnodes) = x -> mapping_inv(ctype, cnodes, x)
 
 """
     mapping_jacobian(nodes, ctype::AbstractEntityType, ξ)
@@ -93,8 +141,8 @@ inverse mapping, F^-1, is not always defined.
 # Implementation
 Default version using LinearAlgebra to inverse the matrix, but can be specified for each shape (if it exists).
 """
-function mapping_inv_jacobian(nodes, etype::AbstractEntityType, x)
-    inv(mapping_jacobian(nodes, etype, mapping_inv(nodes, etype, x)))
+function mapping_inv_jacobian(cnodes, ctype::AbstractEntityType, x)
+    inv(mapping_jacobian(cnodes, ctype, mapping_inv(ctype, cnodes, x)))
 end
 
 """
@@ -170,15 +218,8 @@ function mapping(::Bar2_t, cnodes, ξ)
     (cnodes[2].x - cnodes[1].x) / 2.0 .* ξ + (cnodes[2].x + cnodes[1].x) / 2.0
 end
 
-"""
-    mapping_inv(nodes, ::Bar2_t, x)
-
-Map the local bar on the reference 2-nodes bar [-1,1]:
-
-``F^{-1}(x) = \\dfrac{2x - x_r - x_l}{x_r - x_l}``
-"""
-function mapping_inv(nodes, ::Bar2_t, x)
-    SA[(2 * x[1] - nodes[2].x[1] - nodes[1].x[1]) / (nodes[2].x[1] - nodes[1].x[1])]
+function mapping_inv(::Bar2_t, cnodes, x)
+    SA[(2 * x[1] - cnodes[2].x[1] - cnodes[1].x[1]) / (cnodes[2].x[1] - cnodes[1].x[1])]
 end
 
 """
@@ -255,32 +296,14 @@ function mapping(::Tri3_t, cnodes, ξ)
     return (1 - ξ[1] - ξ[2]) .* cnodes[1].x + ξ[1] .* cnodes[2].x + ξ[2] .* cnodes[3].x
 end
 
-"""
-    mapping_inv(nodes, ::Tri3_t, x)
-
-Map the local triangle on the reference 3-nodes Triangle [0,1] x [0,1].
-
------
-TODO: check this formulae with SYMPY
------
-
-```math
-F^{-1} \\begin{pmatrix} x \\\\ y \\end{pmatrix} =
-\\frac{1}{x_1(y_2-y_3) + x_2(y_3-y_1) + x_3(y_1-y_2)}
-\\begin{pmatrix}
-    (y_3-y_1)x + (x_1 - x_3)y + (x_3 y_1 - x_1 y_3) \\\\
-    (y_1-y_2)x + (x_2 - x_1)x + (x_1 y_2 - x_2 y_1)
-\\end{pmatrix}
-```
-"""
-function mapping_inv(nodes, ::Tri3_t, x)
+function mapping_inv(::Tri3_t, cnodes, x)
     # Alias (should be inlined, but waiting for Ghislain's modification of Node)
-    x1 = nodes[1].x[1]
-    x2 = nodes[2].x[1]
-    x3 = nodes[3].x[1]
-    y1 = nodes[1].x[2]
-    y2 = nodes[2].x[2]
-    y3 = nodes[3].x[2]
+    x1 = cnodes[1].x[1]
+    x2 = cnodes[2].x[1]
+    x3 = cnodes[3].x[1]
+    y1 = cnodes[1].x[2]
+    y2 = cnodes[2].x[2]
+    y3 = cnodes[3].x[2]
 
     return SA[
         (y3 - y1) * x[1] + (x1 - x3) * x[2] + (x3 * y1 - x1 * y3),
@@ -400,45 +423,14 @@ function mapping(::Quad4_t, cnodes, ξ)
     ) ./ 4
 end
 
-"""
-    mapping_inv(nodes, ::Quad4_t, x)
-
-Map the  PARALLELOGRAM quadrilateral on the reference 4-nodes square [-1,1] x [-1,1].
-Warning : this mapping is only corrects for parallelogram quadrilateral, not for any quadrilateral.
-
------
-TODO: check this formulae with SYMPY
------
-
-```math
-F^{-1} \\begin{pmatrix} x \\\\ y \\end{pmatrix} =
-\\begin{pmatrix}
-    a_1 x + b_1 y + c_1 \\\\
-    a_2 x + b_2 y + c_2
-\\end{pmatrix}
-```
-with
-```math
-\\begin{aligned}
-    a_1 & = \\dfrac{-2 (y_3-y_2)}{\\Delta} \\\\
-    b_1 & = \\dfrac{2 (x_3-x_2)}{\\Delta} \\\\
-    c_1 & = -1 - a_1 x_1 - b_1 y_1 \\\\
-    a_2 & = \\dfrac{-2 (y_1-y_2)}{\\Delta} \\\\
-    b_2 & = \\dfrac{2 (x_1 - x_2)}{\\Delta} \\\\
-    c_2 & = -1 - a_2 x_1 - b_2 y_1
-\\end{aligned}
-```
-where
-`` \\Delta = (x_1 - x_2)(y_3 - y_2) - (x_3 - x_2)(y_1 - y_2)``
-"""
-function mapping_inv(nodes, ::Quad4_t, x)
+function mapping_inv(::Quad4_t, cnodes, x)
     # Alias (should be inlined, but waiting for Ghislain's modification of Node)
-    x1 = nodes[1].x[1]
-    x2 = nodes[2].x[1]
-    x3 = nodes[3].x[1]
-    y1 = nodes[1].x[2]
-    y2 = nodes[2].x[2]
-    y3 = nodes[3].x[2]
+    x1 = cnodes[1].x[1]
+    x2 = cnodes[2].x[1]
+    x3 = cnodes[3].x[1]
+    y1 = cnodes[1].x[2]
+    y2 = cnodes[2].x[2]
+    y3 = cnodes[3].x[2]
 
     # Copied from fortran
     delta = (x1 - x2) * (y3 - y2) - (x3 - x2) * (y1 - y2)

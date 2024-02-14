@@ -11,7 +11,7 @@
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
         ctype = cells(mesh)[1]
-        Finv = mapping_inv(cnodes, ctype)
+        Finv = Bcube.mapping_inv(ctype, cnodes)
 
         xc = center(ctype, cnodes)
         @test isapprox_arrays(xc, [(xmin + xmax) / 2])
@@ -130,7 +130,7 @@
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
         ctype = cells(mesh)[1]
-        Finv = mapping_inv(cnodes, ctype)
+        Finv = Bcube.mapping_inv(ctype, cnodes)
 
         xc = center(ctype, cnodes)
         @test all(
