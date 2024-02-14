@@ -64,3 +64,227 @@ end
         @test λphys(a) == _f.((x1_phys, x2_phys))
     end
 end
+
+@testset "CoplanarRotation" begin
+    @testset "Topodim = 1" begin
+        cross_2D(a, b) = a[1] * b[2] - a[2] * b[1]
+
+        #--- 1
+        A = Node([0, 0])
+        B = Node([1, 1])
+        C = Node([2, 0])
+        _nodes = [A, B, C]
+        ctypes = [Bar2_t(), Bar2_t()]
+        cell2nodes = [1, 2, 2, 3]
+        cell2nnodes = [2, 2]
+
+        mesh = Mesh(_nodes, ctypes, Connectivity(cell2nnodes, cell2nodes))
+
+        fInfo = Bcube.FaceInfo(mesh, 2)
+        fPoint = Bcube.FacePoint([0.0], fInfo, Bcube.ReferenceDomain())
+
+        R = Bcube.CoplanarRotation()
+
+        _R = Bcube.materialize(side_n(R), fPoint)
+        u1 = normalize(Bcube.coords(B) - Bcube.coords(A))
+        v2 = normalize(Bcube.coords(C) - Bcube.coords(B)) * 2
+        v2_in_1 = _R * v2
+        @test abs(cross_2D(u1, v2_in_1)) < 1e-15
+        @test norm(v2_in_1) ≈ norm(v2)
+
+        _R = Bcube.materialize(side_p(R), fPoint)
+        u2 = normalize(Bcube.coords(C) - Bcube.coords(B))
+        v1 = normalize(Bcube.coords(B) - Bcube.coords(A)) * 2
+        v1_in_2 = _R * v1
+        @test abs(cross_2D(u2, v1_in_2)) < 1e-15
+        @test norm(v1_in_2) ≈ norm(v1)
+
+        #--- 2
+        A = Node([0, 0])
+        B = Node([1, 1])
+        C = Node([2, 1])
+        _nodes = [A, B, C]
+        ctypes = [Bar2_t(), Bar2_t()]
+        cell2nodes = [1, 2, 2, 3]
+        cell2nnodes = [2, 2]
+
+        mesh = Mesh(_nodes, ctypes, Connectivity(cell2nnodes, cell2nodes))
+
+        fInfo = Bcube.FaceInfo(mesh, 2)
+        fPoint = Bcube.FacePoint([0.0], fInfo, Bcube.ReferenceDomain())
+
+        R = Bcube.CoplanarRotation()
+
+        _R = Bcube.materialize(side_n(R), fPoint)
+        u1 = normalize(Bcube.coords(B) - Bcube.coords(A))
+        v2 = normalize(Bcube.coords(C) - Bcube.coords(B)) * 2
+        v2_in_1 = _R * v2
+        @test abs(cross_2D(u1, v2_in_1)) < 1e-15
+        @test norm(v2_in_1) ≈ norm(v2)
+
+        _R = Bcube.materialize(side_p(R), fPoint)
+        u2 = normalize(Bcube.coords(C) - Bcube.coords(B))
+        v1 = normalize(Bcube.coords(B) - Bcube.coords(A)) * 2
+        v1_in_2 = _R * v1
+        @test abs(cross_2D(u2, v1_in_2)) < 1e-15
+        @test norm(v1_in_2) ≈ norm(v1)
+
+        #--- 3
+        A = Node([0, 0])
+        B = Node([1, 1])
+        C = Node([1, 2])
+        _nodes = [A, B, C]
+        ctypes = [Bar2_t(), Bar2_t()]
+        cell2nodes = [1, 2, 2, 3]
+        cell2nnodes = [2, 2]
+
+        mesh = Mesh(_nodes, ctypes, Connectivity(cell2nnodes, cell2nodes))
+
+        fInfo = Bcube.FaceInfo(mesh, 2)
+        fPoint = Bcube.FacePoint([0.0], fInfo, Bcube.ReferenceDomain())
+
+        R = Bcube.CoplanarRotation()
+
+        _R = Bcube.materialize(side_n(R), fPoint)
+        u1 = normalize(Bcube.coords(B) - Bcube.coords(A))
+        v2 = -normalize(Bcube.coords(C) - Bcube.coords(B)) * 2
+        v2_in_1 = _R * v2
+        @test abs(cross_2D(u1, v2_in_1)) < 1e-15
+        @test norm(v2_in_1) ≈ norm(v2)
+
+        _R = Bcube.materialize(side_p(R), fPoint)
+        u2 = normalize(Bcube.coords(C) - Bcube.coords(B))
+        v1 = -normalize(Bcube.coords(B) - Bcube.coords(A)) * 2
+        v1_in_2 = _R * v1
+        @test abs(cross_2D(u2, v1_in_2)) < 1e-15
+        @test norm(v1_in_2) ≈ norm(v1)
+
+        #--- 4 (full planar)
+        A = Node([0, 1])
+        B = Node([1, 1])
+        C = Node([2, 1])
+        _nodes = [A, B, C]
+        ctypes = [Bar2_t(), Bar2_t()]
+        cell2nodes = [1, 2, 2, 3]
+        cell2nnodes = [2, 2]
+
+        mesh = Mesh(_nodes, ctypes, Connectivity(cell2nnodes, cell2nodes))
+
+        fInfo = Bcube.FaceInfo(mesh, 2)
+        fPoint = Bcube.FacePoint([0.0], fInfo, Bcube.ReferenceDomain())
+
+        R = Bcube.CoplanarRotation()
+
+        _R = Bcube.materialize(side_n(R), fPoint)
+        u1 = normalize(Bcube.coords(B) - Bcube.coords(A))
+        v2 = -normalize(Bcube.coords(C) - Bcube.coords(B)) * 2
+        v2_in_1 = _R * v2
+        @test abs(cross_2D(u1, v2_in_1)) < 1e-15
+        @test norm(v2_in_1) ≈ norm(v2)
+
+        _R = Bcube.materialize(side_p(R), fPoint)
+        u2 = normalize(Bcube.coords(C) - Bcube.coords(B))
+        v1 = -normalize(Bcube.coords(B) - Bcube.coords(A)) * 2
+        v1_in_2 = _R * v1
+        @test abs(cross_2D(u2, v1_in_2)) < 1e-15
+        @test norm(v1_in_2) ≈ norm(v1)
+    end
+
+    @testset "Topodim = 2" begin
+        #--- 1
+        A = Node([0, 0, 0])
+        B = Node([1, 0, 0])
+        C = Node([1, 1, 0])
+        D = Node([0, 1, 0])
+        E = Node([3, 0, 2])
+        F = Node([3, 1, 2])
+
+        _nodes = [A, B, C, D, E, F]
+        ctypes = [Quad4_t(), Quad4_t()]
+        cell2nodes = [1, 2, 3, 4, 2, 5, 6, 3]
+        cell2nnodes = [4, 4]
+
+        mesh = Mesh(_nodes, ctypes, Connectivity(cell2nnodes, cell2nodes))
+
+        fInfo = Bcube.FaceInfo(mesh, 2) # 2 is the good one, cf `Bcube.get_nodes_index(fInfo)`
+        fPoint = Bcube.FacePoint([0.0, 0.0], fInfo, Bcube.ReferenceDomain())
+        cInfo_n = Bcube.get_cellinfo_n(fInfo)
+        cnodes_n = Bcube.nodes(cInfo_n)
+        ctype_n = Bcube.celltype(cInfo_n)
+        ξ_n = Bcube.get_coord(side_n(fPoint))
+        cInfo_p = Bcube.get_cellinfo_p(fInfo)
+        cnodes_p = Bcube.nodes(cInfo_p)
+        ctype_p = Bcube.celltype(cInfo_p)
+        ξ_p = Bcube.get_coord(side_p(fPoint))
+
+        R = Bcube.CoplanarRotation()
+
+        _R = Bcube.materialize(side_n(R), fPoint)
+        v2 = normalize(Bcube.coords(F) - Bcube.coords(E)) * 2
+        u = normalize(Bcube.coords(C) - Bcube.coords(B))
+        v2_in_1 = _R * v2
+        ν1 = Bcube.cell_normal(cnodes_n, ctype_n, ξ_n)
+        @test v2 ⋅ u ≈ v2_in_1 ⋅ u
+        @test abs(ν1 ⋅ v2_in_1) < 1e-16
+
+        _R = Bcube.materialize(side_p(R), fPoint)
+        v1 = normalize(Bcube.coords(D) - Bcube.coords(B)) * 2
+        u = normalize(Bcube.coords(C) - Bcube.coords(B))
+        v1_in_2 = _R * v1
+        ν2 = Bcube.cell_normal(cnodes_p, ctype_p, ξ_p)
+        @test v1 ⋅ u ≈ v1_in_2 ⋅ u
+        @test abs(ν2 ⋅ v1_in_2) < 1e-16
+
+        #--- 2
+        A = Node([0.0, 0.0, 0.0])
+        B = Node([1.0, 0.0, 0.0])
+        C = Node([1.0, 1.0, 0.0])
+        D = Node([0.0, 1.0, 0.0])
+        E = Node([3.0, 0.0, 2.0])
+        F = Node([3.0, 1.0, 2.0])
+
+        _nodes = [A, B, C, D, E, F]
+        ctypes = [Quad4_t(), Quad4_t()]
+        cell2nodes = [1, 2, 3, 4, 2, 5, 6, 3]
+        cell2nnodes = [4, 4]
+
+        mesh = Mesh(_nodes, ctypes, Connectivity(cell2nnodes, cell2nodes))
+        axis = [1, 2, 3]
+        θ = π / 3
+        rot = (
+            cos(θ) * I +
+            sin(θ) * [0 (-axis[3]) axis[2]; axis[3] 0 (-axis[1]); -axis[2] axis[1] 0] +
+            (1 - cos(θ)) * (axis ⊗ axis)
+        )
+        transform!(mesh, x -> rot * x)
+
+        fInfo = Bcube.FaceInfo(mesh, 2) # 2 is the good one, cf `Bcube.get_nodes_index(fInfo)`
+        fPoint = Bcube.FacePoint([0.0, 0.0], fInfo, Bcube.ReferenceDomain())
+        cInfo_n = Bcube.get_cellinfo_n(fInfo)
+        cnodes_n = Bcube.nodes(cInfo_n)
+        ctype_n = Bcube.celltype(cInfo_n)
+        ξ_n = Bcube.get_coord(side_n(fPoint))
+        cInfo_p = Bcube.get_cellinfo_p(fInfo)
+        cnodes_p = Bcube.nodes(cInfo_p)
+        ctype_p = Bcube.celltype(cInfo_p)
+        ξ_p = Bcube.get_coord(side_p(fPoint))
+
+        R = Bcube.CoplanarRotation()
+
+        _R = Bcube.materialize(side_n(R), fPoint)
+        v2 = rot * normalize(Bcube.coords(F) - Bcube.coords(E)) * 2
+        u = rot * normalize(Bcube.coords(C) - Bcube.coords(B))
+        v2_in_1 = _R * v2
+        ν1 = Bcube.cell_normal(cnodes_n, ctype_n, ξ_n)
+        @test v2 ⋅ u ≈ v2_in_1 ⋅ u
+        @test abs(ν1 ⋅ v2_in_1) < 2e-15
+
+        _R = Bcube.materialize(side_p(R), fPoint)
+        v1 = rot * normalize(Bcube.coords(D) - Bcube.coords(B)) * 2
+        u = rot * normalize(Bcube.coords(C) - Bcube.coords(B))
+        v1_in_2 = _R * v1
+        ν2 = Bcube.cell_normal(cnodes_p, ctype_p, ξ_p)
+        @test v1 ⋅ u ≈ v1_in_2 ⋅ u
+        @test abs(ν2 ⋅ v1_in_2) < 1e-16
+    end
+end

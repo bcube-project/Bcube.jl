@@ -107,7 +107,7 @@ end
         Finv = mapping_inv(cnodes, ct)
 
         interp = FunctionSpace(:Lagrange, 1)
-        ∇λ = x -> grad_shape_functions(interp, ct, cnodes, Finv(x))
+        ∇λ = x -> grad_shape_functions(interp, Val(1), ct, cnodes, Finv(x))
         @test ∇λ(0.5) ≈ reshape([-1.0, 1.0], (2, 1))
     end
 
@@ -219,7 +219,7 @@ end
             0.5 * abs((S2[1] - S1[1]) * (S3[2] - S1[2]) - (S3[1] - S1[1]) * (S2[2] - S1[1]))
 
         interp = FunctionSpace(:Lagrange, 1)
-        ∇λ = x -> grad_shape_functions(interp, ct, n, x)
+        ∇λ = x -> grad_shape_functions(interp, Val(1), ct, n, x)
         @test ∇λ([0, 0])[1, :] ≈ (0.5 / vol) * ([S2[2] - S3[2], S3[1] - S2[1]])
         @test ∇λ([0, 0])[2, :] ≈ (0.5 / vol) * ([S3[2] - S1[2], S1[1] - S3[1]])
         @test ∇λ([0, 0])[3, :] ≈ (0.5 / vol) * ([S1[2] - S2[2], S2[1] - S1[1]])
