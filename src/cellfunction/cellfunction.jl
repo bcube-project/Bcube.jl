@@ -366,13 +366,13 @@ side_n(a::Side⁻) = a
 side_p(::NullOperator) = NullOperator()
 side_n(::NullOperator) = NullOperator()
 
+side_p(n) = Side⁺(n)
+side_n(n) = Side⁻(n)
+
 """
 Represent the face normal of a face
 """
 struct FaceNormal <: AbstractLazy end
-
-side_p(n) = Side⁺(n)
-side_n(n) = Side⁻(n)
 
 """
 At the `CellInfo` level, the `FaceNormal` doesn't really have a materialization and stays lazy
@@ -382,7 +382,7 @@ LazyOperators.materialize(n::FaceNormal, ::CellInfo) = n
 
 function LazyOperators.materialize(
     n::FaceNormal,
-    sideFacePoint::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
 )
     n
 end
@@ -417,6 +417,176 @@ function LazyOperators.materialize(
     ctype = celltype(cInfo)
 
     return normal(cnodes, ctype, kside, ξface)
+end
+
+"""
+Represent the tangential projector associated to an hypersurface. Its expression is
+```math
+    P = I - \\nu \\otimes \\nu
+```
+where ``\\nu`` is the cell normal vector.
+"""
+struct TangentialProjector <: AbstractLazy end
+
+LazyOperators.materialize(P::TangentialProjector, ::CellInfo) = P
+
+function LazyOperators.materialize(
+    ::TangentialProjector,
+    cPoint::CellPoint{ReferenceDomain},
+)
+    cnodes = get_cellnodes(cPoint)
+    ctype = get_celltype(cPoint)
+    ξ = get_coord(cPoint)
+    return _tangential_projector(cnodes, ctype, ξ)
+end
+
+function LazyOperators.materialize(
+    P::TangentialProjector,
+    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    P
+end
+
+function LazyOperators.materialize(
+    ::TangentialProjector,
+    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+    cInfo = get_cellinfo_n(fInfo)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    ξcell = get_coord(side_n(fPoint))
+
+    return _tangential_projector(cnodes, ctype, ξcell)
+end
+
+function LazyOperators.materialize(
+    ::TangentialProjector,
+    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+    cInfo = get_cellinfo_p(fInfo)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    ξcell = get_coord(side_p(fPoint))
+
+    return _tangential_projector(cnodes, ctype, ξcell)
+end
+
+"""
+Warning : `cell_normal` is a "cell" operator, not a "face" operator.
+So ξ is expected to be in the reference domain of the cell.
+"""
+function _tangential_projector(cnodes, ctype, ξ)
+    ν = cell_normal(cnodes, ctype, ξ)
+    return I - (ν ⊗ ν)
+end
+
+"""
+Hypersurface "face" operator that rotates around the face-axis to virtually
+bring back the two adjacent cells in the same plane.
+"""
+struct CoplanarRotation <: AbstractLazy end
+
+function LazyOperators.materialize(
+    R::CoplanarRotation,
+    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    R
+end
+
+function _unpack_face_point(sideFacePoint)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+
+    cInfo_n = get_cellinfo_n(fInfo)
+    cnodes_n = nodes(cInfo_n)
+    ctype_n = celltype(cInfo_n)
+    ξ_n = get_coord(side_n(fPoint))
+
+    cInfo_p = get_cellinfo_p(fInfo)
+    cnodes_p = nodes(cInfo_p)
+    ctype_p = celltype(cInfo_p)
+    ξ_p = get_coord(side_p(fPoint))
+
+    return cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p
+end
+
+function LazyOperators.materialize(
+    ::CoplanarRotation,
+    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
+)
+    cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p = _unpack_face_point(sideFacePoint)
+    return _coplanar_rotation(cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p)
+end
+
+function LazyOperators.materialize(
+    ::CoplanarRotation,
+    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
+)
+    cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p = _unpack_face_point(sideFacePoint)
+    return _coplanar_rotation(cnodes_p, cnodes_n, ctype_p, ctype_n, ξ_p, ξ_n)
+end
+
+function _coplanar_rotation(
+    cnodes_n::AbstractArray{Node{2, T}, N},
+    cnodes_p,
+    ctype_n::AbstractEntityType{1},
+    ctype_p,
+    ξ_n,
+    ξ_p,
+) where {T, N}
+
+    # We choose to use `cell_normal` instead of `normal`,
+    # but we could do the same with the latter.
+    ν_n = cell_normal(cnodes_n, ctype_n, ξ_n)
+    ν_p = cell_normal(cnodes_p, ctype_p, ξ_p)
+
+    _cos = ν_p ⋅ ν_n
+    _sin = ν_p[1] * ν_n[2] - ν_p[2] * ν_n[1] # 2D-vector cross-product
+
+    _R = SA[_cos (-_sin); _sin _cos]
+
+    return _R
+end
+
+function _coplanar_rotation(
+    cnodes_n::AbstractArray{Node{3, T}, N},
+    cnodes_p,
+    ctype_n::AbstractEntityType{2},
+    ctype_p,
+    ξ_n,
+    ξ_p,
+) where {T, N}
+
+    # We choose to use `cell_normal` instead of `normal`,
+    # but we could do the same with the latter.
+    ν_n = cell_normal(cnodes_n, ctype_n, ξ_n)
+    ν_p = cell_normal(cnodes_p, ctype_p, ξ_p)
+
+    _cos = ν_p ⋅ ν_n
+    _sin = cross(ν_p, ν_n) # this is not really a 'sinus', it is (sinus x u)
+    u = normalize(_sin) # WARNING, SHOULD CHECK IF NOT ZERO
+
+    _R = _cos * I + _cross_product_matrix(_sin) + (1 - _cos) * (u ⊗ u)
+
+    return _R
+end
+
+"""
+The cross product between two vectors 'a' and 'b', a × b, can be expressed
+as a matrix-vector product between the "cross-product-matrix" of 'a' and the
+vector 'b'.
+"""
+function _cross_product_matrix(a)
+    @assert size(a) == (3,)
+    SA[
+        0 (-a[3]) a[2]
+        a[3] 0 (-a[1])
+        (-a[2]) a[1] 0
+    ]
 end
 
 LazyOperators.materialize(f::Function, ::CellInfo) = f

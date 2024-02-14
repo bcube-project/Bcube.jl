@@ -182,7 +182,7 @@ end
         ct = cells(mesh)[1]
         fs = FunctionSpace(:Lagrange, 1)
         λ = shape_functions(fs, shape(ct))
-        ∇λ = grad_shape_functions(fs, ct, cnodes)
+        ∇λ = ξ -> grad_shape_functions(fs, Val(1), ct, cnodes, ξ)
         degree = Val(2)
         quad = Quadrature(degree)
         @test integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[1], cnodes, ct, quad) ≈ Δx * Δy / 9

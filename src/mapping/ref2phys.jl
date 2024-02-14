@@ -127,31 +127,18 @@ won't be appropriate.
 center(cnodes, ctype::AbstractEntityType) = mapping(cnodes, ctype, center(shape(ctype)))
 
 """
-    shape_functions(fs::AbstractFunctionSpace, etype::AbstractEntityType, nodes, ξ)
+    grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ::AbstractEntityType, nodes, ξ) where N
 
-Shape functions in the local coordinate system.
+Gradient, with respect to the local coordinate system, of the shape functions associated to the `FunctionSpace`.
 
-This function needs `mapping_inv` to be known for the given `AbstractEntityType`. This is
-not always the case. Please not that it's always possible to solve a FE/DG problem without
-using this function (working only in the ref element).
+Depending on the value of `N`, the shape functions are interpreted as associated to a scalar FESpace (N = 1) or
+a vector FESpace. For a vector FESpace, the result gradient is an array of size `(n*Nc, n, d)` where `Nc` is the
+number of dofs of one component (i.e scalar case), `n` is the size of the FESpace, and `d` the number of spatial
+dimensions.
 
-# Warning
-Contrary to `grad_shape_functions`, which is evaluated in the cell-ref-element; `shape_functions`
-is evaluated in the local element.
+Default version : the gradient shape functions are "replicated".
 
-@ghislainb : I find this very dangerous...
-"""
-#function shape_functions(fs::AbstractFunctionSpace, etype::AbstractEntityType, nodes, ξ)
-#    return x -> shape_functions(fs, shape(etype), mapping_inv(nodes, etype, x))
-#end
-
-"""
-    grad_shape_functions(fs::AbstractFunctionSpace, etype::AbstractEntityType, nodes, ξ)
-
-Gradient, with respect to the local coordinate system, of the shape functions. The result function is expressed in the reference
-coordinate system :
-``\\nabla \\lambda = \\frac{\\partial \\lambda_i}{\\partial x_j}(\\xi) = \\left( \\nabla (\\hat{\\lambda}) J^{-1}``
-where ``J^{-1}`` is the inverse of the ref->loc mapping jacobian matrix.
+Specialize with a given FESpace for a custom behaviour.
 
 # Implementation
 We cannot use the `topology_style` to dispatch because this style is too specific to integration methods. For instance for
@@ -161,60 +148,31 @@ a line in 1D, a line in 2D and a line in 3D...
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
     n::Val{1},
-    etype::AbstractEntityType,
-    nodes,
+    ctype::AbstractEntityType,
+    cnodes,
     ξ,
 )
     # Gradient of reference shape functions
-    ∇λ = grad_shape_functions(fs, n, shape(etype), ξ)
-    return ∇λ * mapping_jacobian_inv(nodes, etype, ξ)
-end
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
-    n::Val{1},
-    etype::AbstractEntityType,
-    nodes,
-)
-    ξ -> grad_shape_functions(fs, n, etype, nodes, ξ)
+    ∇λ = grad_shape_functions(fs, n, shape(ctype), ξ)
+    return ∇λ * mapping_jacobian_inv(cnodes, ctype, ξ)
 end
 
-# alias for scalar
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
-    etype::AbstractEntityType,
-    nodes,
+    n::Val{N},
+    ctype::AbstractEntityType,
+    cnodes,
     ξ,
-)
-    grad_shape_functions(fs, Val(1), etype, nodes, ξ)
-end
-function grad_shape_functions(fs::AbstractFunctionSpace, etype::AbstractEntityType, nodes)
-    grad_shape_functions(fs, Val(1), etype, nodes)
-end
-
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
-    n::Val{1},
-    etype::AbstractEntityType,
-    nodes,
-    ξ::AbstractQuadratureNode,
-)
-    # Gradient of reference shape functions
-    ∇λ = grad_shape_functions(fs, n, ξ)
-    return ∇λ * mapping_jacobian_inv(nodes, etype, get_coord(ξ))
+) where {N}
+    ∇λ_sca = grad_shape_functions(fs, Val(1), ctype, cnodes, ξ) # Matrix of size (ndofs_sca, nspa)
+    ndofs_sca, nspa = size(∇λ_sca)
+    a = SArray{Tuple{ndofs_sca, 1, nspa}, eltype(∇λ_sca)}(
+        ∇λ_sca[i, k] for i in 1:ndofs_sca, j in 1:1, k in 1:nspa
+    )
+    ∇λ_vec = _block_diag_cat(a, n)
+    return ∇λ_vec
 end
 
-"""
-    grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ::AbstractEntityType, nodes, ξ) where N
-
-Return the gradient, in the local coordinate system, of shape functions (evaluated at reference position ξ)
-for a vector finite element space. The result is an array of size `(n*Nc, n, d)` where `Nc` is the number of dofs
-of one component (i.e scalar case), `n` is the size of the Finite Element Space, and `d` the number of spatial
-dimensions.
-
-Default version : the gradient shape functions are "replicated".
-
-Specialize with a given FESpace for a custom behaviour.
-"""
 @generated function _block_diag_cat(
     a::SArray{Tuple{N1, N2, N3}},
     ::Val{N},
@@ -238,31 +196,6 @@ Specialize with a given FESpace for a custom behaviour.
     return quote
         SArray{Tuple{$N1_glo, $N2_glo, N3}, $T}(tuple($(mat_exprs...)))
     end
-end
-
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
-    n::Val{N},
-    etype::AbstractEntityType,
-    nodes,
-    ξ,
-) where {N}
-    ∇λ_sca = grad_shape_functions(fs, Val(1), etype, nodes, ξ) # Matrix of size (ndofs_sca, nspa)
-    ndofs_sca, nspa = size(∇λ_sca)
-    a = SArray{Tuple{ndofs_sca, 1, nspa}, eltype(∇λ_sca)}(
-        ∇λ_sca[i, k] for i in 1:ndofs_sca, j in 1:1, k in 1:nspa
-    )
-    ∇λ_vec = _block_diag_cat(a, n)
-    return ∇λ_vec
-end
-
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
-    n::Val{N},
-    etype::AbstractEntityType,
-    nodes,
-) where {N}
-    ξ -> grad_shape_functions(fs, n, etype, nodes, ξ)
 end
 
 @generated function _build_grad_impl(a::SMatrix{N1, N2}, ::Val{N}) where {N1, N2, N}
@@ -292,94 +225,43 @@ end
     end
 end
 
-function grad_shape_functions_NA(
-    fs::AbstractFunctionSpace,
-    n::Val{N},
-    etype::AbstractEntityType,
-    nodes,
-    ξ,
-) where {N}
-    ∇λ_sca = grad_shape_functions(fs, Val(1), etype, nodes, ξ) # Matrix of size (ndofs_sca, nspa)
-    ∇λ_vec = _build_grad_impl(∇λ_sca, n)
-    return ∇λ_vec
-end
-
-function grad_shape_functions_NA(
-    fs::AbstractFunctionSpace,
-    n::Val{N},
-    etype::AbstractEntityType,
-    nodes,
-) where {N}
-    ξ -> grad_shape_functions_NA(fs, n, etype, nodes, ξ)
-end
-
-"""
-    grad_shape_functions(fs::AbstractFunctionSpace, ctype::AbstractEntityType{2}, cnodes::AbstractArray{Node{3,T},N}, ξ) where {T, N}
-
-Gradient computation for a hypersurface : a surface (of topo dim 2) in a 3D space.
-"""
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
+    ::Val{1},
     ctype::AbstractEntityType{2},
-    cnodes::AbstractArray{Node{3, T}, N},
+    cnodes::AbstractArray{<:Node{3}},
     ξ,
-) where {T, N}
-    # Corresponding shape
-    s = shape(ctype)
-
-    # Get reference shape functions
-    λ = shape_functions(fs, s)
-
-    # Mapping jacobian
-    Jref = mapping_jacobian(cnodes, ctype, ξ)
-
-    # Compute cell normal
-    n⃗ = cell_normal(cnodes, ctype, ξ)
-
-    # Form augmented jacobian (if Jref and n⃗ are StaticArrays, the below array is also a SA)
-    J = [Jref n⃗]
-
-    # Compute shape functions gradient : we "add a dimension" to the ref gradient
-    # The original formulae is grad(lambda_i) = transpose(Jinv) * grad(lambda_ref_i)
-    # But given our definition of grad(lambda) (matrix), the formulae becomes the below one
-    ∇λ = hcat(grad_shape_functions(fs, s, ξ), zeros(ndofs(fs, s))) * inv(J)
-
-    return ∇λ
+)
+    return _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
 end
 
-"""
-    grad_shape_functions(fs::AbstractFunctionSpace, ctype::AbstractEntityType{1}, cnodes::AbstractArray{Node{2,T},N}, ξ) where {T, N}
-
-Gradient computation for a hypersurface : a line (of topo dim 1) in a 2D space.
-
-Exact copy of `grad_shape_functions(fs::AbstractFunctionSpace, ctype::AbstractEntityType{2}, cnodes::AbstractArray{Node{3,T},N}, ξ) where {T, N}`,
-but I don't feel fixing it right now cause we will soon improve the whole dispatch on grad_shape_functions`
-"""
 function grad_shape_functions(
     fs::AbstractFunctionSpace,
+    ::Val{1},
     ctype::AbstractEntityType{1},
-    cnodes::AbstractArray{Node{2, T}, N},
+    cnodes::AbstractArray{<:Node{2}},
     ξ,
-) where {T, N}
-    # Corresponding shape
+)
+    return _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
+end
+
+function _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
+    # First, we compute the "augmented" jacobian.
+    #
+    # Rq: we could do this elsewhere, for instance in mapping.jl.
+    # However, since this augmented jacobian already calls `mapping_jacobian`
+    # it would not be as easy as specializing `mapping_jacobian` for the hypersurface
+    # case. As long as this portion of code is not duplicated elsewhere, I prefer to
+    # keep it here.
     s = shape(ctype)
-
-    # Get reference shape functions
-    λ = shape_functions(fs, s)
-
-    # Mapping jacobian
     Jref = mapping_jacobian(cnodes, ctype, ξ)
+    ν = cell_normal(cnodes, ctype, ξ)
+    J = hcat(Jref, ν)
 
-    # Compute cell normal
-    n⃗ = cell_normal(cnodes, ctype, ξ)
-
-    # Form augmented jacobian (if Jref and n⃗ are StaticArrays, the below array is also a SA)
-    J = [Jref n⃗]
-
-    # Compute shape functions gradient : we "add a dimension" to the ref gradient
-    # The original formulae is grad(lambda_i) = transpose(Jinv) * grad(lambda_ref_i)
-    # But given our definition of grad(lambda) (matrix), the formulae becomes the below one
-    ∇λ = hcat(grad_shape_functions(fs, s, ξ), zeros(ndofs(fs, s))) * inv(J)
+    # Compute shape functions gradient : we "add a dimension" to the ref gradient,
+    # and then right-multiply by the inverse of the jacobian
+    z = @SVector zeros(ndofs(fs, s))
+    ∇λ = hcat(grad_shape_functions(fs, s, ξ), z) * inv(J)
 
     return ∇λ
 end
@@ -387,9 +269,9 @@ end
 function grad_shape_functions(
     ::AbstractFunctionSpace,
     ::AbstractEntityType{1},
-    ::AbstractArray{Node{3, T}, N},
+    ::AbstractArray{Node{3}},
     ξ,
-) where {T, N}
+)
     error("Line gradient in 3D not implemented yet")
 end
 
