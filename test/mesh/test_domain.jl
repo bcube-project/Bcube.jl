@@ -1,3 +1,4 @@
+import Bcube: topodim, CellInfo
 @testset "domain" begin
     nx = 10
     ny = 10
