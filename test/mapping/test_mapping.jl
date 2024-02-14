@@ -160,7 +160,7 @@
         c = CellInfo(mesh, 1)
         cnodes = nodes(c)
         ctype = Bcube.celltype(c)
-        @test all(Bcube.mapping_jacobian_inv(cnodes, ctype, SA[0.0, 0.0]) .≈ R(-θ) ./ s)
+        @test all(Bcube.mapping_jacobian_inv(ctype, cnodes, SA[0.0, 0.0]) .≈ R(-θ) ./ s)
 
         # Quad order 2
         xmin, ymin = -rand(2)

@@ -10,11 +10,15 @@ This function must be implemented for all shape.
 
 # `::Bar2_t`
 Map the reference 2-nodes bar [-1,1] on the local bar:
-``F(\\xi) = \\dfrac{x_r - x_l}{2} \\xi + \\dfrac{x_r + x_l}{2}``
+```math
+F(\\xi) = \\dfrac{x_r - x_l}{2} \\xi + \\dfrac{x_r + x_l}{2}
+```
 
 # `::Tri3_t`
 Map the reference 3-nodes Triangle [0,1] x [0,1] on the local triangle.
-``F(\\xi \\\\ \\eta) = (1 - \\xi - \\eta) M_1 + x M_2 + y M_3``
+```math
+F(\\xi \\\\ \\eta) = (1 - \\xi - \\eta) M_1 + x M_2 + y M_3
+```
 
 # `::Quad4_t`
 Map the reference 4-nodes square [-1,1] x [-1,1] on the 4-quadrilateral.
@@ -146,15 +150,43 @@ function mapping_jacobian(ctype::AbstractEntityType, cnodes, ξ)
 end
 
 """
-    mapping_jacobian_inv(nodes, etype::AbstractEntityType, ξ)
+    mapping_jacobian_inv(ctype::AbstractEntityType, cnodes, ξ)
 
 Inverse of the mapping jacobian matrix. This is not exactly equivalent to the `mapping_inv_jacobian` since this function is
 evaluated in the reference element.
 
 # Implementation
 Default version using ForwardDiff, but can be specified for each shape.
+
+# `::Bar2_t`
+Inverse of mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
+```math
+\\dfrac{\\partial F}{\\partial \\xi}^{-1} = \\dfrac{2}{x_r - x_l}
+```
+
+# `::Bar3_t`
+Inverse of mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
+```math
+\\dfrac{\\partial F}{\\partial \\xi}^{-1} = \\frac{2}{(2\\xi - 1) M_1 + (2\\xi + 1)M_2 - 4 \\xi M_3}
+```
+
+# `::Tri3_t`
+Inverse of mapping's jacobian matrix for the reference 3-nodes Triangle [0,1] x [0,1] to the local
+triangle mapping.
+```math
+\\dfrac{\\partial F_i}{\\partial \\xi_j}^{-1} =
+\\frac{1}{(x_1 - x_2)(y_1 - y_3) - (x_1 - x_3)(y_1 - y_2)}
+\\begin{pmatrix}
+    -y_1 + y_3 &  x_1 - x_3 \\\\
+     y_1 - y_2 & -x_1 + x_2
+\\end{pmatrix}
+```
+
+# `::Quad4_t`
+Inverse of mapping's jacobian matrix for the reference square [-1,1] x [-1,1]
+to the 4-quadrilateral
 """
-function mapping_jacobian_inv(cnodes, ctype::AbstractEntityType, ξ)
+function mapping_jacobian_inv(ctype::AbstractEntityType, cnodes, ξ)
     inv(ForwardDiff.jacobian(mapping(ctype, cnodes), ξ))
 end
 
@@ -242,14 +274,9 @@ function mapping_jacobian(::Bar2_t, cnodes, ξ)
     @inbounds (cnodes[2].x .- cnodes[1].x) ./ 2.0
 end
 
-"""
-    mapping_jacobian_inv(nodes, ::Bar2_t, ξ)
-
-Inverse of mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
-
-``\\dfrac{\\partial F}{\\partial \\xi}^{-1} = \\dfrac{2}{x_r - x_l}``
-"""
-mapping_jacobian_inv(nodes, ::Bar2_t, ξ) = @SMatrix[2.0 / (nodes[2].x[1] .- nodes[1].x[1])]
+function mapping_jacobian_inv(::Bar2_t, cnodes, ξ)
+    @SMatrix[2.0 / (cnodes[2].x[1] .- cnodes[1].x[1])]
+end
 
 """
     mapping_inv_jacobian(nodes, ::Bar2_t, x)
@@ -280,15 +307,9 @@ function mapping_jacobian(::Bar3_t, cnodes, ξ)
     2
 end
 
-"""
-    mapping_jacobian_inv(nodes, ::Bar3_t, ξ)
-
-Inverse of mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
-
-``\\dfrac{\\partial F}{\\partial \\xi}^{-1} = \\frac{2}{(2\\xi - 1) M_1 + (2\\xi + 1)M_2 - 4 \\xi M_3}``
-"""
-function mapping_jacobian_inv(nodes, ::Bar3_t, ξ)
-    2.0 / (nodes[1].x .* (2 .* ξ .- 1) + nodes[2].x .* (2 .* ξ .+ 1) - nodes[3].x .* 4 .* ξ)
+function mapping_jacobian_inv(::Bar3_t, cnodes, ξ)
+    2.0 /
+    (cnodes[1].x .* (2 .* ξ .- 1) + cnodes[2].x .* (2 .* ξ .+ 1) - cnodes[3].x .* 4 .* ξ)
 end
 
 # TRIANGLE P1
@@ -317,29 +338,13 @@ function mapping_jacobian(::Tri3_t, cnodes, ξ)
     return hcat(cnodes[2].x - cnodes[1].x, cnodes[3].x - cnodes[1].x)
 end
 
-"""
-    mapping_jacobian_inv(nodes, ::Tri3_t, ξ)
-
-Inverse of mapping's jacobian matrix for the reference 3-nodes Triangle [0,1] x [0,1] to the local
-triangle mapping.
-
-```math
-\\dfrac{\\partial F_i}{\\partial \\xi_j}^{-1} =
-\\frac{1}{(x_1 - x_2)(y_1 - y_3) - (x_1 - x_3)(y_1 - y_2)}
-\\begin{pmatrix}
-    -y_1 + y_3 &  x_1 - x_3 \\\\
-     y_1 - y_2 & -x_1 + x_2
-\\end{pmatrix}
-```
-"""
-function mapping_jacobian_inv(nodes, ::Tri3_t, ξ)
-    # Alias (should be inlined, but waiting for Ghislain's modification of Node)
-    x1 = nodes[1].x[1]
-    x2 = nodes[2].x[1]
-    x3 = nodes[3].x[1]
-    y1 = nodes[1].x[2]
-    y2 = nodes[2].x[2]
-    y3 = nodes[3].x[2]
+function mapping_jacobian_inv(::Tri3_t, cnodes, ξ)
+    x1 = cnodes[1].x[1]
+    x2 = cnodes[2].x[1]
+    x3 = cnodes[3].x[1]
+    y1 = cnodes[1].x[2]
+    y2 = cnodes[2].x[2]
+    y3 = cnodes[3].x[2]
 
     return SA[
         -y1+y3 x1-x3
@@ -441,21 +446,15 @@ function mapping_jacobian(::Quad4_t, cnodes, ξ)
     ) ./ 4
 end
 
-"""
-    mapping_jacobian_inv(nodes, ::Quad4_t, ξ)
-
-Inverse of mapping's jacobian matrix for the reference square [-1,1] x [-1,1]
-to the 4-quadrilateral
-"""
-function mapping_jacobian_inv(nodes::AbstractArray{<:Node{2, T}}, ::Quad4_t, ξη) where {T}
+function mapping_jacobian_inv(::Quad4_t, cnodes::AbstractArray{<:Node{2, T}}, ξη) where {T}
     # Alias
-    axes(nodes) == (Base.OneTo(4),) || error("Invalid number of nodes")
+    axes(cnodes) == (Base.OneTo(4),) || error("Invalid number of nodes")
     axes(ξη) == (Base.OneTo(2),) || error("Invalid number of coordinates")
     @inbounds begin
-        x1, y1 = nodes[1].x
-        x2, y2 = nodes[2].x
-        x3, y3 = nodes[3].x
-        x4, y4 = nodes[4].x
+        x1, y1 = cnodes[1].x
+        x2, y2 = cnodes[2].x
+        x3, y3 = cnodes[3].x
+        x4, y4 = cnodes[4].x
         ξ = ξη[1]
         η = ξη[2]
     end

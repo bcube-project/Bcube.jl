@@ -119,7 +119,7 @@
             ctype = Bcube.celltype(c)
             F = Bcube.mapping(ctype, cnodes)
             # tJinv = transpose(R ./ s) # if we want the analytic one...
-            tJinv(ξ) = transpose(Bcube.mapping_jacobian_inv(cnodes, ctype, ξ))
+            tJinv(ξ) = transpose(Bcube.mapping_jacobian_inv(ctype, cnodes, ξ))
 
             # Test 1
             u1 = PhysicalFunction(x -> x[1])

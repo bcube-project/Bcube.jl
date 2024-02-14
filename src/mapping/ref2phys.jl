@@ -67,7 +67,7 @@ function normal(::isVolumic, ctype::AbstractEntityType, cnodes, iside, ξ)
 
     # Inverse of the Jacobian matrix (but here `y` is in the cell-reference element)
     # Warning : do not use `mapping_inv_jacobian` which requires the knowledge of `mapping_inv` (useless here)
-    Jinv(y) = mapping_jacobian_inv(cnodes, ctype, y)
+    Jinv(y) = mapping_jacobian_inv(ctype, cnodes, y)
 
     return normalize(transpose(Jinv(fp(ξ))) * normal(cshape, iside))
 end
@@ -141,7 +141,7 @@ function grad_shape_functions(
 )
     # Gradient of reference shape functions
     ∇λ = grad_shape_functions(fs, n, shape(ctype), ξ)
-    return ∇λ * mapping_jacobian_inv(cnodes, ctype, ξ)
+    return ∇λ * mapping_jacobian_inv(ctype, cnodes, ξ)
 end
 
 function grad_shape_functions(
@@ -276,6 +276,7 @@ end
 
 """
     interpolate(λ, q)
+    interpolate(λ, q, ncomps)
 
 Create the interpolation function from a set of value on dofs and the shape functions, given by:
 ```math
@@ -283,6 +284,15 @@ Create the interpolation function from a set of value on dofs and the shape func
 ```
 
 So `q` is a vector whose size equals the number of dofs in the cell.
+
+If `ncomps` is present, create the interpolation function for a vector field given by a set of
+value on dofs and the shape functions.
+
+The interpolation formulae is the same than `interpolate(λ, q)` but the result is a vector function. Here
+`q` is a vector whose size equals the total number of dofs in the cell (all components mixed).
+
+Note that the result function is expressed in the same coordinate system as the input shape functions
+(i.e reference or local).
 """
 function interpolate(λ, q)
     #@assert length(λ) === length(q) "Error : length of `q` must equal length of `lambda`"
@@ -291,17 +301,6 @@ end
 
 interpolate(λ, q, ξ) = sum(λᵢ * qᵢ for (λᵢ, qᵢ) in zip(λ(ξ), q))
 
-"""
-    interpolate(λ, q, ncomps)
-
-Create the interpolation function for a vector field given by a set of value on dofs and the shape functions.
-
-The interpolation formulae is the same than `interpolate(λ, q)` but the result is a vector function. Here
-`q` is a vector whose size equals the total number of dofs in the cell (all components mixed).
-
-Note that the result function is expressed in the same coordinate system as the input shape functions (i.e reference
-or local).
-"""
 function interpolate(λ, q::SVector{N}, ::Val{ncomps}) where {N, ncomps}
     return x -> transpose(reshape(q, Size(Int(N / ncomps), ncomps))) * λ(x)
 end

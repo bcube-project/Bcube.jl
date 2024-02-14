@@ -106,7 +106,7 @@ TODO:
 * Specialize for a ShapeFunction to use the hardcoded version instead of ForwardDiff
 """
 function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
-    m = mapping_jacobian_inv(get_cellnodes(cPoint), get_celltype(cPoint), get_coord(cPoint))
+    m = mapping_jacobian_inv(get_celltype(cPoint), get_cellnodes(cPoint), get_coord(cPoint))
     f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
     valS = _size_codomain(f, get_coord(cPoint))
     return _gradient(valS, f, get_coord(cPoint), m)
