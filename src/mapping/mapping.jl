@@ -229,26 +229,38 @@ function mapping_inv_jacobian(ctype::AbstractEntityType, cnodes, x)
 end
 
 """
-    mapping_det_jacobian(cnodes, ctype::AbstractEntityType, ξ)
+    mapping_det_jacobian(ctype::AbstractEntityType, cnodes, ξ)
 
 Absolute value of the determinant of the mapping Jacobian matrix, expressed in the reference element.
 
 # Implementation
 Default version using `mapping_jacobian`, but can be specified for each shape.
+
+# `::Bar2_t`
+Absolute value of the determinant of the mapping Jacobian matrix for the
+reference 2-nodes bar [-1,1] to the local bar mapping.
+``|det(J(\\xi))| = \\dfrac{|x_r - x_l|}{2}``
+
+# `::Tri3_t`
+Absolute value of the determinant of the mapping Jacobian matrix for the
+the reference 3-nodes Triangle [0,1] x [0,1] to the local triangle mapping.
+
+`` |J| = |(x_2 - x_1) (y_3 - y_1) - (x_3 - x_1) (y_2 - y_1)|``
 """
-function mapping_det_jacobian(cnodes, ctype::AbstractEntityType, ξ)
+function mapping_det_jacobian(ctype::AbstractEntityType, cnodes, ξ)
     abs(det(mapping_jacobian(ctype, cnodes, ξ)))
 end
 
 """
     mapping_face(cshape::AbstractShape, side)
+    mapping_face(cshape::AbstractShape, side, permutation)
 
 Build a mapping from the face reference element (corresponding to the `side`-th face of `cshape`)
 to the cell reference element (i.e the `cshape`).
 
-# Implementation
-We could define this function as an alias to `mapping_face(cshape, side, 1:nnodes(face_shapes(cshape, side))`
-but for performance issue, I prefer to keep two independant functions for now.
+Build a mapping from the face reference element (corresponding to the `side`-th face of `cshape`)
+to the cell reference element (i.e the `cshape`). If `permutation` is present, the mapping is built
+using this permutation.
 """
 function mapping_face(cshape::AbstractShape, side)
     f2n = faces2nodes(cshape, side)
@@ -257,12 +269,6 @@ function mapping_face(cshape::AbstractShape, side)
     return MappingFace(mapping(face_shapes(cshape, side), fnodes), nothing)
 end
 
-"""
-    mapping_face(cshape::AbstractShape, side, permutation)
-
-Build a mapping from the face reference element (corresponding to the `side`-th face of `cshape`)
-to the cell reference element (i.e the `cshape`), using a permutation of the face nodes.
-"""
 function mapping_face(cshape::AbstractShape, side, permutation)
     f2n = faces2nodes(cshape, side)[permutation]
     _coords = coords(cshape, f2n)
@@ -303,15 +309,7 @@ end
 
 mapping_inv_jacobian(::Bar2_t, cnodes, x) = 2.0 / (cnodes[2].x[1] - cnodes[1].x[1])
 
-"""
-    mapping_det_jacobian(nodes, ::Bar2_t, ξ)
-
-Absolute value of the determinant of the mapping Jacobian matrix for the
-reference 2-nodes bar [-1,1] to the local bar mapping.
-
-``|det(J(\\xi))| = \\dfrac{|x_r - x_l|}{2}``
-"""
-mapping_det_jacobian(nodes, ::Bar2_t, ξ) = norm(nodes[2].x - nodes[1].x) / 2.0
+mapping_det_jacobian(::Bar2_t, cnodes, ξ) = norm(cnodes[2].x - cnodes[1].x) / 2.0
 
 function mapping(::Bar3_t, cnodes, ξ)
     ξ .* (ξ .- 1) / 2 .* cnodes[1].x .+ ξ .* (ξ .+ 1) / 2 .* cnodes[2].x .+
@@ -382,22 +380,13 @@ function mapping_inv_jacobian(::Tri3_t, cnodes, x)
     ] / (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
 end
 
-"""
-    mapping_det_jacobian(nodes, ::Tri3_t, ξ)
-
-Absolute value of the determinant of the mapping Jacobian matrix for the
-the reference 3-nodes Triangle [0,1] x [0,1] to the local triangle mapping.
-
-`` |J| = |(x_2 - x_1) (y_3 - y_1) - (x_3 - x_1) (y_2 - y_1)|``
-"""
-function mapping_det_jacobian(nodes, ::Tri3_t, ξ)
-    # Alias (should be inlined, but waiting for Ghislain's modification of Node)
-    x1 = nodes[1].x[1]
-    x2 = nodes[2].x[1]
-    x3 = nodes[3].x[1]
-    y1 = nodes[1].x[2]
-    y2 = nodes[2].x[2]
-    y3 = nodes[3].x[2]
+function mapping_det_jacobian(::Tri3_t, cnodes, ξ)
+    x1 = cnodes[1].x[1]
+    x2 = cnodes[2].x[1]
+    x3 = cnodes[3].x[1]
+    y1 = cnodes[1].x[2]
+    y2 = cnodes[2].x[2]
+    y3 = cnodes[3].x[2]
 
     return abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
 end
@@ -464,20 +453,14 @@ function mapping_jacobian_inv(::Quad4_t, cnodes::AbstractArray{<:Node{2, T}}, ξ
     )
 end
 
-"""
-    mapping_det_jacobian(nodes, ::Quad4_t, ξ)
-
-Absolute value of the determinant of the mapping Jacobian matrix for the
-the reference square [-1,1] x [-1,1] to the 4-quadrilateral mapping.
-"""
-function mapping_det_jacobian(nodes::AbstractArray{<:Node{2, T}}, ::Quad4_t, ξη) where {T}
-    axes(nodes) == (Base.OneTo(4),) || error("Invalid number of nodes")
+function mapping_det_jacobian(::Quad4_t, cnodes::AbstractArray{<:Node{2, T}}, ξη) where {T}
+    axes(cnodes) == (Base.OneTo(4),) || error("Invalid number of nodes")
     axes(ξη) == (Base.OneTo(2),) || error("Invalid number of coordinates")
     @inbounds begin
-        x1, y1 = nodes[1].x
-        x2, y2 = nodes[2].x
-        x3, y3 = nodes[3].x
-        x4, y4 = nodes[4].x
+        x1, y1 = cnodes[1].x
+        x2, y2 = cnodes[2].x
+        x3, y3 = cnodes[3].x
+        x4, y4 = cnodes[4].x
         ξ = ξη[1]
         η = ξη[2]
     end
@@ -632,22 +615,7 @@ function mapping_jacobian(::Hexa8_t, cnodes, ξηζ)
     ) ./ 8.0
 end
 
-# Remark : the determinant, obtained with sympy, is big (approx. 3000 caracters)
-# function mapping_det_jacobian(nodes, ::Hexa8_t, ξη)
-#     # Alias (should be inlined, but waiting for Ghislain's modification of Node)
-#     x1 = nodes[1].x[1]; x2 = nodes[2].x[1]; x3 = nodes[3].x[1]; x4 = nodes[4].x[1]
-#     x5 = nodes[5].x[1]; x6 = nodes[6].x[1]; x7 = nodes[7].x[1]; x8 = nodes[8].x[1]
-
-#     y1 = nodes[1].x[2]; y2 = nodes[2].x[2]; y3 = nodes[3].x[2]; y4 = nodes[4].x[2]
-#     y5 = nodes[5].x[2]; y6 = nodes[6].x[2]; y7 = nodes[7].x[2]; y8 = nodes[8].x[2]
-
-#     z1 = nodes[1].x[3]; z2 = nodes[2].x[3]; z3 = nodes[3].x[3]; z4 = nodes[4].x[3]
-#     z5 = nodes[5].x[3]; z6 = nodes[6].x[3]; z7 = nodes[7].x[3]; z8 = nodes[8].x[3]
-
-# end
-
 # Hexa27
-
 function mapping(::Hexa27_t, cnodes, ξηζ)
     ξ = ξηζ[1]
     η = ξηζ[2]

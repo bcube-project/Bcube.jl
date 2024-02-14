@@ -317,7 +317,7 @@ function integrate_ref(
     # of the mapping only once,
     # and multiply all components of `gref(x)`
     f = x -> begin
-        m = mapping_det_jacobian(cnodes, ctype, get_coord(x))
+        m = mapping_det_jacobian(ctype, cnodes, get_coord(x))
         map(gx -> m * gx, g_ref(x))
     end
     int = apply_quadrature(f, shape(ctype), quadrature, mapstyle)
@@ -335,8 +335,8 @@ function getcache_∫(ctype::AbstractEntityType, cnodes, quadrature::AbstractQua
     qnodes = get_nodes(qrule)
     qweight = get_weights(qrule)
 
-    T = typeof(mapping_det_jacobian(cnodes, ctype, qnodes[1]))
-    qmap = SVector{length(qrule), T}(mapping_det_jacobian(cnodes, ctype, ξ) for ξ in qnodes)
+    T = typeof(mapping_det_jacobian(ctype, cnodes, qnodes[1]))
+    qmap = SVector{length(qrule), T}(mapping_det_jacobian(ctype, cnodes, ξ) for ξ in qnodes)
 
     return qmap, qweight, qnodes
 end
@@ -466,7 +466,7 @@ end
 
 function _apply_volume_metric(g_and_c::T, x::T1) where {T, T1}
     g, cellinfo = g_and_c
-    m = mapping_det_jacobian(nodes(cellinfo), celltype(cellinfo), get_coord(x))
+    m = mapping_det_jacobian(celltype(cellinfo), nodes(cellinfo), get_coord(x))
     cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
     m * g(cellpoint)
 end
