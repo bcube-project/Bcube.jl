@@ -28,7 +28,7 @@
 
         # Scalar test : gradient of scalar `f` in physical coordinates is [1, 2]
         function f1(ξ)
-            x, y = mapping(cnodes, ctype, ξ)
+            x, y = mapping(ctype, cnodes, ξ)
             return x + 2y
         end
         g = ReferenceFunction(f1)
@@ -39,7 +39,7 @@
 
         # Vector test : gradient of vector `f` in physical coordinates is [[1,2],[3,4]]
         function f2(ξ)
-            x, y = mapping(cnodes, ctype, ξ)
+            x, y = mapping(ctype, cnodes, ξ)
             return [x + 2y, 3x + 4y]
         end
         g = ReferenceFunction(f2)
@@ -117,7 +117,7 @@
             c = CellInfo(mesh, 1)
             cnodes = nodes(c)
             ctype = Bcube.celltype(c)
-            F = mapping(cnodes, ctype)
+            F = mapping(ctype, cnodes)
             # tJinv = transpose(R ./ s) # if we want the analytic one...
             tJinv(ξ) = transpose(mapping_jacobian_inv(cnodes, ctype, ξ))
 

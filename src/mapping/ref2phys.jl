@@ -49,7 +49,7 @@ function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
     J = mapping_jacobian(cnodes, ctype, fp(ξ))
 
     # Compute vector that will help orient outward normal
-    orient = mapping(cnodes, ctype, fp(ξ)) - center(ctype, cnodes)
+    orient = mapping(ctype, cnodes, fp(ξ)) - center(ctype, cnodes)
 
     # Normal direction
     n = J[:, 1] × J[:, 2] × u
@@ -111,7 +111,7 @@ Return the center of the `AbstractEntityType` by mapping the center of the corre
 Do not use this function on a face of a cell : since the face is of dimension "n-1", the mapping
 won't be appropriate.
 """
-center(ctype::AbstractEntityType, cnodes) = mapping(cnodes, ctype, center(shape(ctype)))
+center(ctype::AbstractEntityType, cnodes) = mapping(ctype, cnodes, center(shape(ctype)))
 
 """
     grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N

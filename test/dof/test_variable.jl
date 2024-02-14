@@ -21,11 +21,11 @@ function test_setvalues!_with_function(
     c2n = connectivities_indices(mesh, :c2n)
 
     for i in 1:ncells(mesh)
-        ct = cellTypes[i]
-        cn = get_nodes(mesh, c2n[i])
+        ctype = cellTypes[i]
+        cnodes = get_nodes(mesh, c2n[i])
         uᵢ = u[i, Val(:unstable)]
-        a = [f(mapping(cn, ct, x)) for x in coords(shape(ct))]
-        b = [uᵢ(ξ) for ξ in coords(shape(ct))]
+        a = [f(mapping(ctype, cnodes, x)) for x in coords(shape(ctype))]
+        b = [uᵢ(ξ) for ξ in coords(shape(ctype))]
 
         @test all(isapprox.(a, b, rtol = 1000eps()))
     end

@@ -81,13 +81,13 @@ function integrate(g_ref, shape::AbstractShape, quadrature::AbstractQuadrature)
 end
 
 """
-    integrate(g, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature)
+    integrate(g, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
 
 Integrate function `g` expressed in local element. Depending on the cell type and the space
 dimension, a volumic or a 'surfacic' integration is performed.
 """
 function integrate(g, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature)
-    return integrate_ref(x -> g(mapping(cnodes, ctype, x)), cnodes, ctype, quadrature)
+    return integrate_ref(x -> g(mapping(ctype, cnodes, x)), cnodes, ctype, quadrature)
 end
 
 """
@@ -174,7 +174,7 @@ function integrate(
     # we need to send x, from face-ref-element to cell-ref-element to local-element.
     # @ghislainb : need better solution to index with tuple
     return integrate_ref(
-        x -> g(mapping(cnodes, ctype, fp(x))),
+        x -> g(mapping(ctype, cnodes, fp(x))),
         [cnodes[i] for i in faces2nodes(ctype)[iside]],
         ftype,
         quadrature,
@@ -248,7 +248,7 @@ function integrate_n(
     # so it doesn't need to be mapped. However for the second argument of `g` we need to send ξ from
     # the face-reference-element to the cell-reference-element to the cell-local-element.
     return integrate_ref(
-        ξ -> g(normal(ctype, cnodes, iside, ξ), mapping(cnodes, ctype, fp(ξ))),
+        ξ -> g(normal(ctype, cnodes, iside, ξ), mapping(ctype, cnodes, fp(ξ))),
         fnodes,
         ftype,
         quadrature,

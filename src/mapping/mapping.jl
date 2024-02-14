@@ -1,16 +1,50 @@
 # COMMON
 """
-    mapping(nodes, ::AbstractEntityType, ξ)
+    mapping(ctype::AbstractEntityType, cnodes, ξ)
+    mapping(cshape::AbstractShape, cnodes, ξ)
 
 Map the reference shape on the local shape.
 
 # Implementation
 This function must be implemented for all shape.
+
+# `::Bar2_t`
+Map the reference 2-nodes bar [-1,1] on the local bar:
+``F(\\xi) = \\dfrac{x_r - x_l}{2} \\xi + \\dfrac{x_r + x_l}{2}``
+
+# `::Tri3_t`
+Map the reference 3-nodes Triangle [0,1] x [0,1] on the local triangle.
+``F(\\xi \\\\ \\eta) = (1 - \\xi - \\eta) M_1 + x M_2 + y M_3``
+
+# `::Quad4_t`
+Map the reference 4-nodes square [-1,1] x [-1,1] on the 4-quadrilateral.
+
+# `::Tri6_t`
+Map the reference 6-nodes triangle [0,1] x [0,1] on the P2 curved-triangle.
+`` F(\\xi) = \\sum \\lambda_i(\\xi) x_i ``
+where ``\\lambda_i`` are the Lagrange P2 shape functions and ``x_i`` are the local
+curved-triangle vertices' coordinates.
+
+# `::Quad9_t`
+Map the reference 4-nodes square [-1,1] x [-1,1] on the P2 curved-quadrilateral.
+`` F(\\xi) = \\sum \\lambda_i(\\xi) x_i ``
+where ``\\lambda_i`` are the Lagrange P2 shape functions and ``x_i`` are the local
+curved-quadrilateral vertices' coordinates.
+
+# `::Hexa8_t`
+Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 8-hexa.
+
+# `::Hexa27_t`
+Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 27-hexa.
+
+# `::Penta6_t`
+Map the reference 6-nodes prism [0,1] x [0,1] x [-1,1] on the 6-penta (prism).
+
 """
-function mapping(nodes, ::AbstractEntityType, ξ)
+function mapping(::AbstractEntityType, cnodes, ξ)
     error("Function 'mapping' is not defined for this AbstractEntityType")
 end
-mapping(nodes, etype::AbstractEntityType) = ξ -> mapping(nodes, etype, ξ)
+mapping(ctype::AbstractEntityType, cnodes) = ξ -> mapping(ctype, cnodes, ξ)
 
 """
     mapping_inv(nodes, ::AbstractEntityType, x)
@@ -24,15 +58,15 @@ mapping_inv(nodes, ::AbstractEntityType, x) = error("Function 'mapping_inv' is n
 mapping_inv(nodes, etype::AbstractEntityType) = x -> mapping_inv(nodes, etype, x)
 
 """
-    mapping_jacobian(nodes, etype::AbstractEntityType, ξ)
+    mapping_jacobian(nodes, ctype::AbstractEntityType, ξ)
 
 Jacobian matrix of the mapping : ``\\dfrac{\\partial F_i}{\\partial \\xi_j}``.
 
 # Implementation
 Default version using ForwardDiff, but can be specified for each shape.
 """
-function mapping_jacobian(nodes, etype::AbstractEntityType, ξ)
-    ForwardDiff.jacobian(η -> mapping(nodes, etype, η), ξ)
+function mapping_jacobian(cnodes, ctype::AbstractEntityType, ξ)
+    ForwardDiff.jacobian(η -> mapping(ctype, cnodes, η), ξ)
 end
 
 """
@@ -44,8 +78,8 @@ evaluated in the reference element.
 # Implementation
 Default version using ForwardDiff, but can be specified for each shape.
 """
-function mapping_jacobian_inv(nodes, etype::AbstractEntityType, ξ)
-    inv(ForwardDiff.jacobian(mapping(nodes, etype), ξ))
+function mapping_jacobian_inv(cnodes, ctype::AbstractEntityType, ξ)
+    inv(ForwardDiff.jacobian(mapping(ctype, cnodes), ξ))
 end
 
 """
@@ -76,17 +110,17 @@ function mapping_det_jacobian(nodes, etype::AbstractEntityType, ξ)
 end
 
 """
-    mapping(nodes, cshape::AbstractShape, ξ)
+    mapping(cshape::AbstractShape, cnodes, ξ)
 
 Returns the mapping of the an abstract shape (=ref element) to a target element defined by its `nodes`.
 
 For instance, if `cshape == Line`, then the mapping is the same wether the input is the Shape or a `Bar2_t`.
 However if the cell is of type `Bar3_t`, it is still the `Bar2_t` mapping that is returned.
 """
-function mapping(nodes, cshape::AbstractShape, ξ)
+function mapping(cshape::AbstractShape, cnodes, ξ)
     error("Function 'mapping' is not defined for this shape")
 end
-mapping(nodes, cshape::AbstractShape) = ξ -> mapping(nodes, cshape, ξ)
+mapping(cshape::AbstractShape, cnodes) = ξ -> mapping(cshape, cnodes, ξ)
 
 """
     mapping_face(cshape::AbstractShape, side)
@@ -102,7 +136,7 @@ function mapping_face(cshape::AbstractShape, side)
     f2n = faces2nodes(cshape, side)
     _coords = coords(cshape, f2n)
     fnodes = map(Node, _coords)
-    return MappingFace(mapping(fnodes, face_shapes(cshape, side)), nothing)
+    return MappingFace(mapping(face_shapes(cshape, side), fnodes), nothing)
 end
 
 """
@@ -115,7 +149,7 @@ function mapping_face(cshape::AbstractShape, side, permutation)
     f2n = faces2nodes(cshape, side)[permutation]
     _coords = coords(cshape, f2n)
     fnodes = Node.(_coords)
-    return MappingFace(mapping(fnodes, face_shapes(cshape, side)), nothing)
+    return MappingFace(mapping(face_shapes(cshape, side), fnodes), nothing)
 end
 
 struct MappingFace{F1, F2}
@@ -126,21 +160,14 @@ end
 CallableStyle(::Type{<:MappingFace}) = IsCallableStyle()
 
 # POINT : this may seem stupid, but it is usefull for coherence
-mapping(nodes, ::Node_t, ξ) = nodes[1].x
-mapping(nodes, ::Point, ξ) = mapping(nodes, Node_t(), ξ)
+mapping(::Node_t, cnodes, ξ) = cnodes[1].x
+mapping(::Point, cnodes, ξ) = mapping(Node_t(), cnodes, ξ)
 
 # LINE
-mapping(nodes, ::Line, ξ) = mapping(nodes, Bar2_t(), ξ)
+mapping(::Line, cnodes, ξ) = mapping(Bar2_t(), cnodes, ξ)
 
-"""
-    mapping(nodes, ::Bar2_t, ξ)
-
-Map the reference 2-nodes bar [-1,1] on the local bar:
-
-``F(\\xi) = \\dfrac{x_r - x_l}{2} \\xi + \\dfrac{x_r + x_l}{2}``
-"""
-function mapping(nodes, ::Bar2_t, ξ)
-    (nodes[2].x - nodes[1].x) / 2.0 .* ξ + (nodes[2].x + nodes[1].x) / 2.0
+function mapping(::Bar2_t, cnodes, ξ)
+    (cnodes[2].x - cnodes[1].x) / 2.0 .* ξ + (cnodes[2].x + cnodes[1].x) / 2.0
 end
 
 """
@@ -194,14 +221,9 @@ reference 2-nodes bar [-1,1] to the local bar mapping.
 """
 mapping_det_jacobian(nodes, ::Bar2_t, ξ) = norm(nodes[2].x - nodes[1].x) / 2.0
 
-"""
-    mapping(nodes, ::Bar3_t, ξ)
-
-Map the reference 3-nodes bar on the local bar (using Lagrange)
-"""
-function mapping(nodes, ::Bar3_t, ξ)
-    ξ .* (ξ .- 1) / 2 .* nodes[1].x .+ ξ .* (ξ .+ 1) / 2 .* nodes[2].x .+
-    (1 .- ξ) .* (1 .+ ξ) .* nodes[3].x
+function mapping(::Bar3_t, cnodes, ξ)
+    ξ .* (ξ .- 1) / 2 .* cnodes[1].x .+ ξ .* (ξ .+ 1) / 2 .* cnodes[2].x .+
+    (1 .- ξ) .* (1 .+ ξ) .* cnodes[3].x
 end
 
 """
@@ -227,19 +249,10 @@ function mapping_jacobian_inv(nodes, ::Bar3_t, ξ)
 end
 
 # TRIANGLE P1
-mapping(nodes, ::Triangle, ξ) = mapping(nodes, Tri3_t(), ξ)
+mapping(::Triangle, cnodes, ξ) = mapping(Tri3_t(), cnodes, ξ)
 
-"""
-    mapping(nodes, ::Tri3_t, ξ)
-
-Map the reference 3-nodes Triangle [0,1] x [0,1] on the local triangle.
-
-```math
-F(\\xi \\\\ \\eta) = (1 - \\xi - \\eta) M_1 + x M_2 + y M_3
-```
-"""
-function mapping(nodes, ::Tri3_t, ξ)
-    return (1 - ξ[1] - ξ[2]) .* nodes[1].x + ξ[1] .* nodes[2].x + ξ[2] .* nodes[3].x
+function mapping(::Tri3_t, cnodes, ξ)
+    return (1 - ξ[1] - ξ[2]) .* cnodes[1].x + ξ[1] .* cnodes[2].x + ξ[2] .* cnodes[3].x
 end
 
 """
@@ -378,17 +391,12 @@ function mapping_det_jacobian(nodes, ::Tri3_t, ξ)
 end
 
 # Quad P1
-mapping(nodes, ::Square, ξ) = mapping(nodes, Quad4_t(), ξ)
+mapping(::Square, cnodes, ξ) = mapping(Quad4_t(), cnodes, ξ)
 
-"""
-    mapping(nodes, ::Quad4_t, ξ)
-
-Map the reference 4-nodes square [-1,1] x [-1,1] on the 4-quadrilateral.
-"""
-function mapping(nodes, ::Quad4_t, ξ)
+function mapping(::Quad4_t, cnodes, ξ)
     return (
-        (ξ[1] - 1) * (ξ[2] - 1) .* nodes[1].x - (ξ[1] + 1) * (ξ[2] - 1) .* nodes[2].x +
-        (ξ[1] + 1) * (ξ[2] + 1) .* nodes[3].x - (ξ[1] - 1) * (ξ[2] + 1) .* nodes[4].x
+        (ξ[1] - 1) * (ξ[2] - 1) .* cnodes[1].x - (ξ[1] + 1) * (ξ[2] - 1) .* cnodes[2].x +
+        (ξ[1] + 1) * (ξ[2] + 1) .* cnodes[3].x - (ξ[1] - 1) * (ξ[2] + 1) .* cnodes[4].x
     ) ./ 4
 end
 
@@ -548,16 +556,7 @@ function mapping_det_jacobian(nodes::AbstractArray{<:Node{2, T}}, ::Quad4_t, ξ�
 end
 
 # TRIANGLE P2
-"""
-    mapping(nodes, ::Tri6_t, ξ)
-
-Map the reference 6-nodes triangle [0,1] x [0,1] on the P2 curved-triangle.
-
-`` F(\\xi) = \\sum \\lambda_i(\\xi) x_i ``
-where ``\\lambda_i`` are the Lagrange P2 shape functions and ``x_i`` are the local
-curved-triangle vertices' coordinates.
-"""
-function mapping(nodes, ::Tri6_t, ξ)
+function mapping(::Tri6_t, cnodes, ξ)
     # Shape functions
     λ₁  = (1 - ξ[1] - ξ[2]) * (1 - 2 * ξ[1] - 2 * ξ[2])  # = (1 - x - y)(1 - 2x - 2y)
     λ₂  = ξ[1] * (2 * ξ[1] - 1) # = x (2x - 1)
@@ -570,26 +569,17 @@ function mapping(nodes, ::Tri6_t, ξ)
     # something like sum( (lambda, n) -> lambda * n, zip(lambda, nodes))
     # Note that the use of parenthesis is mandatory here otherwise only the first line is returned
     return (
-        λ₁ .* nodes[1].x +
-        λ₂ .* nodes[2].x +
-        λ₃ .* nodes[3].x +
-        λ₁₂ .* nodes[4].x +
-        λ₂₃ .* nodes[5].x +
-        λ₃₁ .* nodes[6].x
+        λ₁ .* cnodes[1].x +
+        λ₂ .* cnodes[2].x +
+        λ₃ .* cnodes[3].x +
+        λ₁₂ .* cnodes[4].x +
+        λ₂₃ .* cnodes[5].x +
+        λ₃₁ .* cnodes[6].x
     )
 end
 
 # PARAQUAD P2
-"""
-    mapping(nodes, ::Quad9_t, ξ)
-
-Map the reference 4-nodes square [-1,1] x [-1,1] on the P2 curved-quadrilateral.
-
-`` F(\\xi) = \\sum \\lambda_i(\\xi) x_i ``
-where ``\\lambda_i`` are the Lagrange P2 shape functions and ``x_i`` are the local
-curved-quadrilateral vertices' coordinates.
-"""
-function mapping(nodes, ::Quad9_t, ξ)
+function mapping(::Quad9_t, cnodes, ξ)
     # Shape functions
     λ₁ = ξ[1] * ξ[2] * (1 - ξ[1]) * (1 - ξ[2]) / 4 # =   xy (1 - x)(1 - y) / 4
     λ₂ = -ξ[1] * ξ[2] * (1 + ξ[1]) * (1 - ξ[2]) / 4 # = - xy (1 + x)(1 - y) / 4
@@ -605,15 +595,15 @@ function mapping(nodes, ::Quad9_t, ξ)
     # something like sum( (lambda, n) -> lambda * n, zip(lambda, nodes))
     # Note that the use of parenthesis is mandatory here otherwise only the first line is returned
     return (
-        λ₁ .* nodes[1].x +
-        λ₂ .* nodes[2].x +
-        λ₃ .* nodes[3].x +
-        λ₄ .* nodes[4].x +
-        λ₁₂ .* nodes[5].x +
-        λ₂₃ .* nodes[6].x +
-        λ₃₄ .* nodes[7].x +
-        λ₄₁ .* nodes[8].x +
-        λ₁₂₃₄ .* nodes[9].x
+        λ₁ .* cnodes[1].x +
+        λ₂ .* cnodes[2].x +
+        λ₃ .* cnodes[3].x +
+        λ₄ .* cnodes[4].x +
+        λ₁₂ .* cnodes[5].x +
+        λ₂₃ .* cnodes[6].x +
+        λ₃₄ .* cnodes[7].x +
+        λ₄₁ .* cnodes[8].x +
+        λ₁₂₃₄ .* cnodes[9].x
     )
 end
 
@@ -655,39 +645,34 @@ end
 end
 
 # Warning : only valid for "tensor" "Lagrange" entities
-function mapping(nodes, entity::Union{Quad16_t}, ξ)
-    λs = _ordered_lagrange_shape_fns(entity, ξ)
-    return sum(((λ, node),) -> λ .* coords(node), zip(λs, nodes))
+function mapping(ctype::Union{Quad16_t}, cnodes, ξ)
+    λs = _ordered_lagrange_shape_fns(ctype, ξ)
+    return sum(((λ, node),) -> λ .* coords(node), zip(λs, cnodes))
 end
 
 # Hexa8
-mapping(nodes, ::Cube, ξ) = mapping(nodes, Hexa8_t(), ξ)
+mapping(::Cube, cnodes, ξ) = mapping(Hexa8_t(), cnodes, ξ)
 
-"""
-    mapping(nodes, ::Hexa8_t, ξ)
-
-Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 8-hexa.
-"""
-function mapping(nodes, ::Hexa8_t, ξηζ)
+function mapping(::Hexa8_t, cnodes, ξηζ)
     ξ = ξηζ[1]
     η = ξηζ[2]
     ζ = ξηζ[3]
     return (
-        (1 - ξ) * (1 - η) * (1 - ζ) .* nodes[1].x  # = (1 - x) * (1 - y) * (1 - z) / 8
+        (1 - ξ) * (1 - η) * (1 - ζ) .* cnodes[1].x  # = (1 - x) * (1 - y) * (1 - z) / 8
         +
-        (1 + ξ) * (1 - η) * (1 - ζ) .* nodes[2].x  # = (1 + x) * (1 - y) * (1 - z) / 8
+        (1 + ξ) * (1 - η) * (1 - ζ) .* cnodes[2].x  # = (1 + x) * (1 - y) * (1 - z) / 8
         +
-        (1 + ξ) * (1 + η) * (1 - ζ) .* nodes[3].x  # = (1 + x) * (1 + y) * (1 - z) / 8
+        (1 + ξ) * (1 + η) * (1 - ζ) .* cnodes[3].x  # = (1 + x) * (1 + y) * (1 - z) / 8
         +
-        (1 - ξ) * (1 + η) * (1 - ζ) .* nodes[4].x  # = (1 - x) * (1 + y) * (1 - z) / 8
+        (1 - ξ) * (1 + η) * (1 - ζ) .* cnodes[4].x  # = (1 - x) * (1 + y) * (1 - z) / 8
         +
-        (1 - ξ) * (1 - η) * (1 + ζ) .* nodes[5].x  # = (1 - x) * (1 - y) * (1 + z) / 8
+        (1 - ξ) * (1 - η) * (1 + ζ) .* cnodes[5].x  # = (1 - x) * (1 - y) * (1 + z) / 8
         +
-        (1 + ξ) * (1 - η) * (1 + ζ) .* nodes[6].x  # = (1 + x) * (1 - y) * (1 + z) / 8
+        (1 + ξ) * (1 - η) * (1 + ζ) .* cnodes[6].x  # = (1 + x) * (1 - y) * (1 + z) / 8
         +
-        (1 + ξ) * (1 + η) * (1 + ζ) .* nodes[7].x  # = (1 + x) * (1 + y) * (1 + z) / 8
+        (1 + ξ) * (1 + η) * (1 + ζ) .* cnodes[7].x  # = (1 + x) * (1 + y) * (1 + z) / 8
         +
-        (1 - ξ) * (1 + η) * (1 + ζ) .* nodes[8].x  # = (1 - x) * (1 + y) * (1 + z) / 8
+        (1 - ξ) * (1 + η) * (1 + ζ) .* cnodes[8].x  # = (1 - x) * (1 + y) * (1 + z) / 8
     ) ./ 8
 end
 
@@ -729,65 +714,55 @@ end
 
 # Hexa27
 
-"""
-    mapping(nodes, ::Hexa27_t, ξ)
-
-Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 27-hexa.
-"""
-function mapping(nodes, ::Hexa27_t, ξηζ)
+function mapping(::Hexa27_t, cnodes, ξηζ)
     ξ = ξηζ[1]
     η = ξηζ[2]
     ζ = ξηζ[3]
     return (
-        ξ * η * ζ * (ξ - 1) * (η - 1) * (ζ - 1) / 8.0 .* nodes[1].x +
-        ξ * η * ζ * (ξ + 1) * (η - 1) * (ζ - 1) / 8.0 .* nodes[2].x +
-        ξ * η * ζ * (ξ + 1) * (η + 1) * (ζ - 1) / 8.0 .* nodes[3].x +
-        ξ * η * ζ * (ξ - 1) * (η + 1) * (ζ - 1) / 8.0 .* nodes[4].x +
-        ξ * η * ζ * (ξ - 1) * (η - 1) * (ζ + 1) / 8.0 .* nodes[5].x +
-        ξ * η * ζ * (ξ + 1) * (η - 1) * (ζ + 1) / 8.0 .* nodes[6].x +
-        ξ * η * ζ * (ξ + 1) * (η + 1) * (ζ + 1) / 8.0 .* nodes[7].x +
-        ξ * η * ζ * (ξ - 1) * (η + 1) * (ζ + 1) / 8.0 .* nodes[8].x +
-        -η * ζ * (ξ^2 - 1) * (η - 1) * (ζ - 1) / 4.0 .* nodes[9].x +
-        -ξ * ζ * (ξ + 1) * (η^2 - 1) * (ζ - 1) / 4.0 .* nodes[10].x +
-        -η * ζ * (ξ^2 - 1) * (η + 1) * (ζ - 1) / 4.0 .* nodes[11].x +
-        -ξ * ζ * (ξ - 1) * (η^2 - 1) * (ζ - 1) / 4.0 .* nodes[12].x +
-        -ξ * η * (ξ - 1) * (η - 1) * (ζ^2 - 1) / 4.0 .* nodes[13].x +
-        -ξ * η * (ξ + 1) * (η - 1) * (ζ^2 - 1) / 4.0 .* nodes[14].x +
-        -ξ * η * (ξ + 1) * (η + 1) * (ζ^2 - 1) / 4.0 .* nodes[15].x +
-        -ξ * η * (ξ - 1) * (η + 1) * (ζ^2 - 1) / 4.0 .* nodes[16].x +
-        -η * ζ * (ξ^2 - 1) * (η - 1) * (ζ + 1) / 4.0 .* nodes[17].x +
-        -ξ * ζ * (ξ + 1) * (η^2 - 1) * (ζ + 1) / 4.0 .* nodes[18].x +
-        -η * ζ * (ξ^2 - 1) * (η + 1) * (ζ + 1) / 4.0 .* nodes[19].x +
-        -ξ * ζ * (ξ - 1) * (η^2 - 1) * (ζ + 1) / 4.0 .* nodes[20].x +
-        ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ - 1) / 2.0 .* nodes[21].x +
-        η * (ξ^2 - 1) * (η - 1) * (ζ^2 - 1) / 2.0 .* nodes[22].x +
-        ξ * (ξ + 1) * (η^2 - 1) * (ζ^2 - 1) / 2.0 .* nodes[23].x +
-        η * (ξ^2 - 1) * (η + 1) * (ζ^2 - 1) / 2.0 .* nodes[24].x +
-        ξ * (ξ - 1) * (η^2 - 1) * (ζ^2 - 1) / 2.0 .* nodes[25].x +
-        ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ + 1) / 2.0 .* nodes[26].x +
-        -(ξ^2 - 1) * (η^2 - 1) * (ζ^2 - 1) .* nodes[27].x
+        ξ * η * ζ * (ξ - 1) * (η - 1) * (ζ - 1) / 8.0 .* cnodes[1].x +
+        ξ * η * ζ * (ξ + 1) * (η - 1) * (ζ - 1) / 8.0 .* cnodes[2].x +
+        ξ * η * ζ * (ξ + 1) * (η + 1) * (ζ - 1) / 8.0 .* cnodes[3].x +
+        ξ * η * ζ * (ξ - 1) * (η + 1) * (ζ - 1) / 8.0 .* cnodes[4].x +
+        ξ * η * ζ * (ξ - 1) * (η - 1) * (ζ + 1) / 8.0 .* cnodes[5].x +
+        ξ * η * ζ * (ξ + 1) * (η - 1) * (ζ + 1) / 8.0 .* cnodes[6].x +
+        ξ * η * ζ * (ξ + 1) * (η + 1) * (ζ + 1) / 8.0 .* cnodes[7].x +
+        ξ * η * ζ * (ξ - 1) * (η + 1) * (ζ + 1) / 8.0 .* cnodes[8].x +
+        -η * ζ * (ξ^2 - 1) * (η - 1) * (ζ - 1) / 4.0 .* cnodes[9].x +
+        -ξ * ζ * (ξ + 1) * (η^2 - 1) * (ζ - 1) / 4.0 .* cnodes[10].x +
+        -η * ζ * (ξ^2 - 1) * (η + 1) * (ζ - 1) / 4.0 .* cnodes[11].x +
+        -ξ * ζ * (ξ - 1) * (η^2 - 1) * (ζ - 1) / 4.0 .* cnodes[12].x +
+        -ξ * η * (ξ - 1) * (η - 1) * (ζ^2 - 1) / 4.0 .* cnodes[13].x +
+        -ξ * η * (ξ + 1) * (η - 1) * (ζ^2 - 1) / 4.0 .* cnodes[14].x +
+        -ξ * η * (ξ + 1) * (η + 1) * (ζ^2 - 1) / 4.0 .* cnodes[15].x +
+        -ξ * η * (ξ - 1) * (η + 1) * (ζ^2 - 1) / 4.0 .* cnodes[16].x +
+        -η * ζ * (ξ^2 - 1) * (η - 1) * (ζ + 1) / 4.0 .* cnodes[17].x +
+        -ξ * ζ * (ξ + 1) * (η^2 - 1) * (ζ + 1) / 4.0 .* cnodes[18].x +
+        -η * ζ * (ξ^2 - 1) * (η + 1) * (ζ + 1) / 4.0 .* cnodes[19].x +
+        -ξ * ζ * (ξ - 1) * (η^2 - 1) * (ζ + 1) / 4.0 .* cnodes[20].x +
+        ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ - 1) / 2.0 .* cnodes[21].x +
+        η * (ξ^2 - 1) * (η - 1) * (ζ^2 - 1) / 2.0 .* cnodes[22].x +
+        ξ * (ξ + 1) * (η^2 - 1) * (ζ^2 - 1) / 2.0 .* cnodes[23].x +
+        η * (ξ^2 - 1) * (η + 1) * (ζ^2 - 1) / 2.0 .* cnodes[24].x +
+        ξ * (ξ - 1) * (η^2 - 1) * (ζ^2 - 1) / 2.0 .* cnodes[25].x +
+        ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ + 1) / 2.0 .* cnodes[26].x +
+        -(ξ^2 - 1) * (η^2 - 1) * (ζ^2 - 1) .* cnodes[27].x
     )
 end
 
 # Penta6
-mapping(nodes, ::Prism, ξ) = mapping(nodes, Penta6_t(), ξ)
+mapping(::Prism, cnodes, ξ) = mapping(Penta6_t(), cnodes, ξ)
 
-"""
-    mapping(nodes, ::Penta6_t, ξ)
-
-Map the reference 6-nodes prism [0,1] x [0,1] x [-1,1] on the 6-penta (prism).
-"""
-function mapping(nodes, ::Penta6_t, ξηζ)
+function mapping(::Penta6_t, cnodes, ξηζ)
     ξ = ξηζ[1]
     η = ξηζ[2]
     ζ = ξηζ[3]
     return (
-        (1 - ξ - η) * (1 - ζ) .* nodes[1].x +
-        ξ * (1 - ζ) .* nodes[2].x +
-        η * (1 - ζ) .* nodes[3].x +
-        (1 - ξ - η) * (1 + ζ) .* nodes[4].x +
-        ξ * (1 + ζ) .* nodes[5].x +
-        η * (1 + ζ) .* nodes[6].x
+        (1 - ξ - η) * (1 - ζ) .* cnodes[1].x +
+        ξ * (1 - ζ) .* cnodes[2].x +
+        η * (1 - ζ) .* cnodes[3].x +
+        (1 - ξ - η) * (1 + ζ) .* cnodes[4].x +
+        ξ * (1 + ζ) .* cnodes[5].x +
+        η * (1 + ζ) .* cnodes[6].x
     ) ./ 2.0
 end
 
