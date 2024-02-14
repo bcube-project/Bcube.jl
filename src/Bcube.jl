@@ -44,8 +44,7 @@ export nnodes,
     f2n_from_c2n,
     coords,
     cell_side,
-    oriented_cell_side,
-    topology_style
+    oriented_cell_side
 
 include("./mesh/shape.jl")
 export Line,
@@ -169,13 +168,6 @@ include("./function_space/lagrange.jl")
 include("./function_space/taylor.jl")
 
 include("./mapping/mapping.jl")
-export mapping,
-    mapping_jacobian,
-    mapping_det_jacobian,
-    mapping_inv,
-    mapping_inv_jacobian,
-    mapping_jacobian_inv,
-    mapping_face
 
 include("./mapping/ref2phys.jl")
 export normal, center, grad_shape_functions, interpolate, cell_normal, get_cell_centers
@@ -203,17 +195,7 @@ include("./integration/measure.jl")
 export AbstractMeasure, Measure, get_domain
 
 include("./integration/integration.jl")
-export ∫,
-    integrate,
-    integrate_ref,
-    integrate_n_ref,
-    integrate_n,
-    getcache_∫,
-    InvMassMatrix,
-    sparse,
-    IntegralResult,
-    assemble,
-    result
+export ∫, getcache_∫, InvMassMatrix, sparse, IntegralResult, assemble, result
 
 include("./algebra/gradient.jl")
 export ∇

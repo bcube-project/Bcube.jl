@@ -40,9 +40,9 @@
         xmax = 7.0
         mesh = one_cell_mesh(:line; xmin, xmax)
         cnodes = get_nodes(mesh)
-        ct = cells(mesh)[1]
-        Finv = mapping_inv(cnodes, ct)
-        xc = center(cnodes, ct)
+        ctype = cells(mesh)[1]
+        Finv = Bcube.mapping_inv(ctype, cnodes)
+        xc = center(ctype, cnodes)
         fs = FunctionSpace(:Taylor, 1)
         fes = FESpace(fs, :discontinuous)
         u2 = CellVariable(:u, mesh, fes)
@@ -52,7 +52,7 @@
         q = projection(f, L2_projector(u2))
         #- compare the result vector + the resulting interpolation function
         @test all(q .≈ [f(xc), ForwardDiff.gradient(f, xc)[1] * (xmax - xmin)]) # q = [f(x0), f'(x0) dx]
-        λ = x -> shape_functions(fs, shape(ct), Finv(x))
+        λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         uᵢ = interpolate(λ, q)
         @test all(uᵢ([x]) .≈ f([x]) for x in range(xmin, xmax; length = 5))
     end
@@ -73,7 +73,7 @@
 
         for icell in 1:ncells(mesh)
             # Alias for cell type
-            ct = cellTypes[icell]
+            ctype = cellTypes[icell]
 
             # Alias for nodes
             n = get_nodes(mesh, c2n[icell])
@@ -84,7 +84,7 @@
             S = [S1, S2, S3]
 
             # Corresponding shape
-            s = shape(ct)
+            s = shape(ctype)
 
             λ = x -> shape_functions(fSpace, s, x)
 

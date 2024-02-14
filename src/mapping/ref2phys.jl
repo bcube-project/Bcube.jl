@@ -1,6 +1,7 @@
 
 """
-normal(cnodes, ctype::AbstractEntityType, iside, ξ)
+    normal(ctype::AbstractEntityType, cnodes, iside, ξ)
+    normal(::TopologyStyle, ctype::AbstractEntityType, cnodes, iside, ξ)
 
 Normal vector of the `iside`th face of a cell, evaluated at position `ξ` in the face reference element.
 So for the normal vector of the face of triangle living in a 3D space, `ξ` will be 1D (because the face
@@ -10,48 +11,27 @@ Beware this function needs the nodes `cnodes` and the type `ctype` of the cell (
 
 TODO: If `iside` is positive, then the outward normal (with respect to the cell) is returned, otherwise
 the inward normal is returned.
+
+# `::isCurvilinear`
+Note that the "face" normal vector of a curve is the "direction" vector at the given extremity.
+
+# `::isVolumic`
+``n^{loc} = J^{-\\intercal} n^{ref}``
+
 """
-function normal(cnodes, ctype::AbstractEntityType, iside, ξ)
-    normal(topology_style(cnodes, ctype), cnodes, ctype, iside, ξ)
+function normal(ctype::AbstractEntityType, cnodes, iside, ξ)
+    normal(topology_style(ctype, cnodes), ctype, cnodes, iside, ξ)
 end
 
-"""
-    normal(::isCurvilinear, cnodes, ctype::AbstractEntityType, iside, ξ)
-
-Compute the "face" normal vector of a curve at its `iside`-th side.
-
-Note that the "face" normal vector of a curve is the "direction" vector at the given extremity.
-"""
-function normal(::isCurvilinear, cnodes, ctype::AbstractEntityType, iside, ξ)
+function normal(::isCurvilinear, ctype::AbstractEntityType, cnodes, iside, ξ)
     # mapping face-reference-element (here, a node) to cell-reference-element (here, a Line)
     # Since a Line has always only two nodes, the node is necessary the `iside`-th
     ξ_cell = coords(Line())[iside]
 
-    return normalize(mapping_jacobian(cnodes, ctype, ξ_cell) .* normal(shape(ctype), iside))
+    return normalize(mapping_jacobian(ctype, cnodes, ξ_cell) .* normal(shape(ctype), iside))
 end
 
-"""
-    normal(::isVolumic, cnodes, ctype::AbstractEntityType, iside, ξ)
-
-Compute the normal of the `iside`-th side of a cell (same topology dim. as the space).
-
-``n^{loc} = J^{-\\intercal} n^{ref}``
-"""
-function normal(::isVolumic, cnodes, ctype::AbstractEntityType, iside, ξ)
-    # Cell shape
-    cshape = shape(ctype)
-
-    # Face parametrization to send ξ from ref-face-element to the ref-cell-element
-    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
-
-    # Inverse of the Jacobian matrix (but here `y` is in the cell-reference element)
-    # Warning : do not use `mapping_inv_jacobian` which requires the knowledge of `mapping_inv` (useless here)
-    Jinv(y) = mapping_jacobian_inv(cnodes, ctype, y)
-
-    return normalize(transpose(Jinv(fp(ξ))) * normal(cshape, iside))
-end
-
-function normal(::isSurfacic, cnodes, ctype::AbstractEntityType, iside, ξ)
+function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
     # Get cell shape and face type and shape
     cshape = shape(ctype)
     ftype = facetypes(ctype)[iside]
@@ -60,16 +40,16 @@ function normal(::isSurfacic, cnodes, ctype::AbstractEntityType, iside, ξ)
     fnodes = [cnodes[i] for i in faces2nodes(ctype)[iside]] # @ghislainb : need better solution to index
 
     # Get face direction vector (face Jacobian)
-    u = mapping_jacobian(fnodes, ftype, ξ)
+    u = mapping_jacobian(ftype, fnodes, ξ)
 
     # Get face parametrization function
     fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
 
     # Compute surface jacobian
-    J = mapping_jacobian(cnodes, ctype, fp(ξ))
+    J = mapping_jacobian(ctype, cnodes, fp(ξ))
 
     # Compute vector that will help orient outward normal
-    orient = mapping(cnodes, ctype, fp(ξ)) - center(cnodes, ctype)
+    orient = mapping(ctype, cnodes, fp(ξ)) - center(ctype, cnodes)
 
     # Normal direction
     n = J[:, 1] × J[:, 2] × u
@@ -78,45 +58,52 @@ function normal(::isSurfacic, cnodes, ctype::AbstractEntityType, iside, ξ)
     return normalize(orient ⋅ n .* n)
 end
 
-"""
-    cell_normal(cnodes::AbstractArray{Node{2,T},N}, ctype::AbstractEntityType{1}, ξ) where {T, N}
+function normal(::isVolumic, ctype::AbstractEntityType, cnodes, iside, ξ)
+    # Cell shape
+    cshape = shape(ctype)
 
-Compute the cell normal vector of an entity of topology dimension equals to 1 in a 2D space,
-i.e a curve in a 2D space. This vector is expressed in the cell-reference coordinate system.
+    # Face parametrization to send ξ from ref-face-element to the ref-cell-element
+    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
 
-Do not confuse the cell normal vector with the cell-side (i.e face) normal vector.
+    # Inverse of the Jacobian matrix (but here `y` is in the cell-reference element)
+    # Warning : do not use `mapping_inv_jacobian` which requires the knowledge of `mapping_inv` (useless here)
+    Jinv(y) = mapping_jacobian_inv(ctype, cnodes, y)
 
-Method : the curve direction vector, u, is J/||J||. Then n = [-u.y, u.x].
-"""
-function cell_normal(
-    cnodes::AbstractArray{Node{2, T}, N},
-    ctype::AbstractEntityType{1},
-    ξ,
-) where {T, N}
-    Jref = mapping_jacobian(cnodes, ctype, ξ)
-    return normalize(SA[-Jref[2], Jref[1]])
+    return normalize(transpose(Jinv(fp(ξ))) * normal(cshape, iside))
 end
 
 """
-    cell_normal(cnodes::AbstractArray{Node{3,T},N}, ctype::AbstractEntityType{2}, ξ) where {T, N}
+    cell_normal(ctype::AbstractEntityType, cnodes, ξ) where {T, N}
 
-Compute the cell normal vector of an entity of topology dimension equals to 2 (a surface) in a 3D space.
-This vector is expressed in the cell-reference coordinate system.
+Compute the cell normal vector of an entity of topology dimension equals to (d-1) in a n-D space,
+for instance a curve in a 2D space. This vector is expressed in the cell-reference coordinate system.
 
 Do not confuse the cell normal vector with the cell-side (i.e face) normal vector.
 
+# Topology dimension 1
+the curve direction vector, u, is J/||J||. Then n = [-u.y, u.x].
+
 """
 function cell_normal(
-    cnodes::AbstractArray{Node{3, T}, N},
-    ctype::AbstractEntityType{2},
+    ctype::AbstractEntityType{1},
+    cnodes::AbstractArray{Node{2, T}, N},
     ξ,
 ) where {T, N}
-    J = mapping_jacobian(cnodes, ctype, ξ)
+    Jref = mapping_jacobian(ctype, cnodes, ξ)
+    return normalize(SA[-Jref[2], Jref[1]])
+end
+
+function cell_normal(
+    ctype::AbstractEntityType{2},
+    cnodes::AbstractArray{Node{3, T}, N},
+    ξ,
+) where {T, N}
+    J = mapping_jacobian(ctype, cnodes, ξ)
     return normalize(J[:, 1] × J[:, 2])
 end
 
 """
-    center(cnodes, ctype::AbstractEntityType)
+    center(ctype::AbstractEntityType, cnodes)
 
 Return the center of the `AbstractEntityType` by mapping the center of the corresponding `Shape`.
 
@@ -124,10 +111,10 @@ Return the center of the `AbstractEntityType` by mapping the center of the corre
 Do not use this function on a face of a cell : since the face is of dimension "n-1", the mapping
 won't be appropriate.
 """
-center(cnodes, ctype::AbstractEntityType) = mapping(cnodes, ctype, center(shape(ctype)))
+center(ctype::AbstractEntityType, cnodes) = mapping(ctype, cnodes, center(shape(ctype)))
 
 """
-    grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ::AbstractEntityType, nodes, ξ) where N
+    grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N
 
 Gradient, with respect to the local coordinate system, of the shape functions associated to the `FunctionSpace`.
 
@@ -154,7 +141,7 @@ function grad_shape_functions(
 )
     # Gradient of reference shape functions
     ∇λ = grad_shape_functions(fs, n, shape(ctype), ξ)
-    return ∇λ * mapping_jacobian_inv(cnodes, ctype, ξ)
+    return ∇λ * mapping_jacobian_inv(ctype, cnodes, ξ)
 end
 
 function grad_shape_functions(
@@ -254,8 +241,8 @@ function _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
     # case. As long as this portion of code is not duplicated elsewhere, I prefer to
     # keep it here.
     s = shape(ctype)
-    Jref = mapping_jacobian(cnodes, ctype, ξ)
-    ν = cell_normal(cnodes, ctype, ξ)
+    Jref = mapping_jacobian(ctype, cnodes, ξ)
+    ν = cell_normal(ctype, cnodes, ξ)
     J = hcat(Jref, ν)
 
     # Compute shape functions gradient : we "add a dimension" to the ref gradient,
@@ -293,15 +280,16 @@ function get_cell_centers(mesh::Mesh)
     c2n = connectivities_indices(mesh, :c2n)
     celltypes = cells(mesh)
     centers = map(1:ncells(mesh)) do icell
-        ct = celltypes[icell]
-        cn = get_nodes(mesh, c2n[icell])
-        center(cn, ct)
+        ctype = celltypes[icell]
+        cnodes = get_nodes(mesh, c2n[icell])
+        center(ctype, cnodes)
     end
     return centers
 end
 
 """
     interpolate(λ, q)
+    interpolate(λ, q, ncomps)
 
 Create the interpolation function from a set of value on dofs and the shape functions, given by:
 ```math
@@ -309,6 +297,15 @@ Create the interpolation function from a set of value on dofs and the shape func
 ```
 
 So `q` is a vector whose size equals the number of dofs in the cell.
+
+If `ncomps` is present, create the interpolation function for a vector field given by a set of
+value on dofs and the shape functions.
+
+The interpolation formulae is the same than `interpolate(λ, q)` but the result is a vector function. Here
+`q` is a vector whose size equals the total number of dofs in the cell (all components mixed).
+
+Note that the result function is expressed in the same coordinate system as the input shape functions
+(i.e reference or local).
 """
 function interpolate(λ, q)
     #@assert length(λ) === length(q) "Error : length of `q` must equal length of `lambda`"
@@ -317,17 +314,6 @@ end
 
 interpolate(λ, q, ξ) = sum(λᵢ * qᵢ for (λᵢ, qᵢ) in zip(λ(ξ), q))
 
-"""
-    interpolate(λ, q, ncomps)
-
-Create the interpolation function for a vector field given by a set of value on dofs and the shape functions.
-
-The interpolation formulae is the same than `interpolate(λ, q)` but the result is a vector function. Here
-`q` is a vector whose size equals the total number of dofs in the cell (all components mixed).
-
-Note that the result function is expressed in the same coordinate system as the input shape functions (i.e reference
-or local).
-"""
 function interpolate(λ, q::SVector{N}, ::Val{ncomps}) where {N, ncomps}
     return x -> transpose(reshape(q, Size(Int(N / ncomps), ncomps))) * λ(x)
 end
