@@ -191,7 +191,7 @@ function mapping_jacobian_inv(ctype::AbstractEntityType, cnodes, ξ)
 end
 
 """
-    mapping_inv_jacobian(nodes, etype::AbstractEntityType, x)
+    mapping_inv_jacobian(ctype::AbstractEntityType, cnodes, x)
 
 Jacobian matrix of the inverse mapping : ``\\dfrac{\\partial F_i^{-1}}{\\partial x_j}``
 
@@ -200,8 +200,31 @@ inverse mapping, F^-1, is not always defined.
 
 # Implementation
 Default version using LinearAlgebra to inverse the matrix, but can be specified for each shape (if it exists).
+
+# `::Bar2_t`
+Mapping's jacobian matrix for the local bar to the reference 2-nodes bar [-1, 1].
+```math
+\\dfrac{\\partial F^{-1}}{\\partial x} = \\dfrac{2}{x_r - x_l}
+```
+
+# `::Tri3_t`
+Mapping's jacobian matrix for the local triangle to the reference 3-nodes
+Triangle [0,1] x [0,1] mapping.
+
+-----
+TODO: check this formulae with SYMPY
+-----
+
+```math
+\\frac{\\partial F_i^{-1}}{\\partial x_j} =
+\\frac{1}{x_1 (y_2 - y_3) + x_2 (y_3 - y_1) + x_3 (y_1 - y_2)}
+\\begin{pmatrix}
+    y_3 - y_1 & x_1 - x_3 \\\\
+    y_1 - y_2 & x_2 - x_1
+\\end{pmatrix}
+```
 """
-function mapping_inv_jacobian(cnodes, ctype::AbstractEntityType, x)
+function mapping_inv_jacobian(ctype::AbstractEntityType, cnodes, x)
     inv(mapping_jacobian(ctype, cnodes, mapping_inv(ctype, cnodes, x)))
 end
 
@@ -278,14 +301,7 @@ function mapping_jacobian_inv(::Bar2_t, cnodes, ξ)
     @SMatrix[2.0 / (cnodes[2].x[1] .- cnodes[1].x[1])]
 end
 
-"""
-    mapping_inv_jacobian(nodes, ::Bar2_t, x)
-
-Mapping's jacobian matrix for the local bar to the reference 2-nodes bar [-1, 1].
-
-``\\dfrac{\\partial F^{-1}}{\\partial x} = \\dfrac{2}{x_r - x_l}``
-"""
-mapping_inv_jacobian(nodes, ::Bar2_t, x) = 2.0 / (nodes[2].x[1] - nodes[1].x[1])
+mapping_inv_jacobian(::Bar2_t, cnodes, x) = 2.0 / (cnodes[2].x[1] - cnodes[1].x[1])
 
 """
     mapping_det_jacobian(nodes, ::Bar2_t, ξ)
@@ -352,34 +368,13 @@ function mapping_jacobian_inv(::Tri3_t, cnodes, ξ)
     ] ./ ((x1 - x2) * (y1 - y3) - (x1 - x3) * (y1 - y2))
 end
 
-"""
-    mapping_inv_jacobian(nodes, ::Tri3_t, x)
-
-Mapping's jacobian matrix for the local triangle to the reference 3-nodes
-Triangle [0,1] x [0,1] mapping.
-
------
-TODO: check this formulae with SYMPY
------
-
-
-```math
-\\frac{\\partial F_i^{-1}}{\\partial x_j} =
-\\frac{1}{x_1 (y_2 - y_3) + x_2 (y_3 - y_1) + x_3 (y_1 - y_2)}
-\\begin{pmatrix}
-    y_3 - y_1 & x_1 - x_3 \\\\
-    y_1 - y_2 & x_2 - x_1
-\\end{pmatrix}
-```
-"""
-function mapping_inv_jacobian(nodes, ::Tri3_t, x)
-    # Alias (should be inlined, but waiting for Ghislain's modification of Node)
-    x1 = nodes[1].x[1]
-    x2 = nodes[2].x[1]
-    x3 = nodes[3].x[1]
-    y1 = nodes[1].x[2]
-    y2 = nodes[2].x[2]
-    y3 = nodes[3].x[2]
+function mapping_inv_jacobian(::Tri3_t, cnodes, x)
+    x1 = cnodes[1].x[1]
+    x2 = cnodes[2].x[1]
+    x3 = cnodes[3].x[1]
+    y1 = cnodes[1].x[2]
+    y2 = cnodes[2].x[2]
+    y3 = cnodes[3].x[2]
 
     return SA[
         (y3-y1) (x1-x3)
@@ -468,36 +463,6 @@ function mapping_jacobian_inv(::Quad4_t, cnodes::AbstractArray{<:Node{2, T}}, ξ
         ((1 - ξ) * (y4 - y1) + (1 + ξ) * (y3 - y2))
     )
 end
-
-"""
-    mapping_inv_jacobian(nodes, ::Quad4_t, x)
-
-Mapping's jacobian matrix for the PARALLELOGRAM quadrilateral to the
-reference 4-nodes square [-1,1] x [-1,1].
-
------
-TODO: check this formulae with SYMPY + need formulae for general quad, not paraquad
------
-
-```math
-F^{-1} \\begin{pmatrix} x \\\\ y \\end{pmatrix} =
-\\frac{2}{(x_1-x_2) (y_3-y_2) - (x_3-x_2) (y_1-y_2)}
-\\begin{pmatrix}
-    (y_2 - y_3) & (x_3 - x_2) \\\\
-    (y_2 - y_1) & (x_1 - x_2)
-\\end{pmatrix}
-```
-"""
-# function mapping_inv_jacobian(nodes, ::Quad4_t, x)
-#     # Alias (should be inlined, but waiting for Ghislain's modification of Node)
-#     x1 = nodes[1].x[1]; x2 = nodes[2].x[1]; x3 = nodes[3].x[1]
-#     y1 = nodes[1].x[2]; y2 = nodes[2].x[2]; y3 = nodes[3].x[2]
-
-#     return SA[
-#             (y2 - y3)    (x3 - x2);
-#             (y2 - y1)    (x1 - x2)
-#     ] .* 2. ./ ((x1-x2) * (y3-y2) - (x3-x2)*(y1-y2))
-# end
 
 """
     mapping_det_jacobian(nodes, ::Quad4_t, ξ)
