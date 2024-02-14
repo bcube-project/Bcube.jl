@@ -223,7 +223,7 @@ end
         v2 = normalize(Bcube.coords(F) - Bcube.coords(E)) * 2
         u = normalize(Bcube.coords(C) - Bcube.coords(B))
         v2_in_1 = _R * v2
-        ν1 = Bcube.cell_normal(cnodes_n, ctype_n, ξ_n)
+        ν1 = Bcube.cell_normal(ctype_n, cnodes_n, ξ_n)
         @test v2 ⋅ u ≈ v2_in_1 ⋅ u
         @test abs(ν1 ⋅ v2_in_1) < 1e-16
 
@@ -231,7 +231,7 @@ end
         v1 = normalize(Bcube.coords(D) - Bcube.coords(B)) * 2
         u = normalize(Bcube.coords(C) - Bcube.coords(B))
         v1_in_2 = _R * v1
-        ν2 = Bcube.cell_normal(cnodes_p, ctype_p, ξ_p)
+        ν2 = Bcube.cell_normal(ctype_p, cnodes_p, ξ_p)
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u
         @test abs(ν2 ⋅ v1_in_2) < 1e-16
 
@@ -275,7 +275,7 @@ end
         v2 = rot * normalize(Bcube.coords(F) - Bcube.coords(E)) * 2
         u = rot * normalize(Bcube.coords(C) - Bcube.coords(B))
         v2_in_1 = _R * v2
-        ν1 = Bcube.cell_normal(cnodes_n, ctype_n, ξ_n)
+        ν1 = Bcube.cell_normal(ctype_n, cnodes_n, ξ_n)
         @test v2 ⋅ u ≈ v2_in_1 ⋅ u
         @test abs(ν1 ⋅ v2_in_1) < 2e-15
 
@@ -283,7 +283,7 @@ end
         v1 = rot * normalize(Bcube.coords(D) - Bcube.coords(B)) * 2
         u = rot * normalize(Bcube.coords(C) - Bcube.coords(B))
         v1_in_2 = _R * v1
-        ν2 = Bcube.cell_normal(cnodes_p, ctype_p, ξ_p)
+        ν2 = Bcube.cell_normal(ctype_p, cnodes_p, ξ_p)
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u
         @test abs(ν2 ⋅ v1_in_2) < 1e-16
     end

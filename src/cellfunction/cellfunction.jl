@@ -480,7 +480,7 @@ Warning : `cell_normal` is a "cell" operator, not a "face" operator.
 So ξ is expected to be in the reference domain of the cell.
 """
 function _tangential_projector(cnodes, ctype, ξ)
-    ν = cell_normal(cnodes, ctype, ξ)
+    ν = cell_normal(ctype, cnodes, ξ)
     return I - (ν ⊗ ν)
 end
 
@@ -541,8 +541,8 @@ function _coplanar_rotation(
 
     # We choose to use `cell_normal` instead of `normal`,
     # but we could do the same with the latter.
-    ν_n = cell_normal(cnodes_n, ctype_n, ξ_n)
-    ν_p = cell_normal(cnodes_p, ctype_p, ξ_p)
+    ν_n = cell_normal(ctype_n, cnodes_n, ξ_n)
+    ν_p = cell_normal(ctype_p, cnodes_p, ξ_p)
 
     _cos = ν_p ⋅ ν_n
     _sin = ν_p[1] * ν_n[2] - ν_p[2] * ν_n[1] # 2D-vector cross-product
@@ -563,8 +563,8 @@ function _coplanar_rotation(
 
     # We choose to use `cell_normal` instead of `normal`,
     # but we could do the same with the latter.
-    ν_n = cell_normal(cnodes_n, ctype_n, ξ_n)
-    ν_p = cell_normal(cnodes_p, ctype_p, ξ_p)
+    ν_n = cell_normal(ctype_n, cnodes_n, ξ_n)
+    ν_p = cell_normal(ctype_p, cnodes_p, ξ_p)
 
     _cos = ν_p ⋅ ν_n
     _sin = cross(ν_p, ν_n) # this is not really a 'sinus', it is (sinus x u)

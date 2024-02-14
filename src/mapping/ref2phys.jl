@@ -73,36 +73,29 @@ function normal(::isVolumic, ctype::AbstractEntityType, cnodes, iside, ξ)
 end
 
 """
-    cell_normal(cnodes::AbstractArray{Node{2,T},N}, ctype::AbstractEntityType{1}, ξ) where {T, N}
+    cell_normal(ctype::AbstractEntityType, cnodes, ξ) where {T, N}
 
-Compute the cell normal vector of an entity of topology dimension equals to 1 in a 2D space,
-i.e a curve in a 2D space. This vector is expressed in the cell-reference coordinate system.
+Compute the cell normal vector of an entity of topology dimension equals to (d-1) in a n-D space,
+for instance a curve in a 2D space. This vector is expressed in the cell-reference coordinate system.
 
 Do not confuse the cell normal vector with the cell-side (i.e face) normal vector.
 
-Method : the curve direction vector, u, is J/||J||. Then n = [-u.y, u.x].
+# Topology dimension 1
+the curve direction vector, u, is J/||J||. Then n = [-u.y, u.x].
+
 """
 function cell_normal(
-    cnodes::AbstractArray{Node{2, T}, N},
     ctype::AbstractEntityType{1},
+    cnodes::AbstractArray{Node{2, T}, N},
     ξ,
 ) where {T, N}
     Jref = mapping_jacobian(cnodes, ctype, ξ)
     return normalize(SA[-Jref[2], Jref[1]])
 end
 
-"""
-    cell_normal(cnodes::AbstractArray{Node{3,T},N}, ctype::AbstractEntityType{2}, ξ) where {T, N}
-
-Compute the cell normal vector of an entity of topology dimension equals to 2 (a surface) in a 3D space.
-This vector is expressed in the cell-reference coordinate system.
-
-Do not confuse the cell normal vector with the cell-side (i.e face) normal vector.
-
-"""
 function cell_normal(
-    cnodes::AbstractArray{Node{3, T}, N},
     ctype::AbstractEntityType{2},
+    cnodes::AbstractArray{Node{3, T}, N},
     ξ,
 ) where {T, N}
     J = mapping_jacobian(cnodes, ctype, ξ)
@@ -249,7 +242,7 @@ function _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
     # keep it here.
     s = shape(ctype)
     Jref = mapping_jacobian(cnodes, ctype, ξ)
-    ν = cell_normal(cnodes, ctype, ξ)
+    ν = cell_normal(ctype, cnodes, ξ)
     J = hcat(Jref, ν)
 
     # Compute shape functions gradient : we "add a dimension" to the ref gradient,
