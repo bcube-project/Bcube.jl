@@ -424,9 +424,37 @@ end
 _update_b!(b::AbstractVector, dofs, vals::NullOperator) = nothing
 
 """
+    _count_n_elts(
+        U::TrialFESpace,
+        V::TestFESpace,
+        domain::CellDomain{M, IND},
+    ) where {M, IND}
+    function _count_n_elts(
+        U::AbstractMultiFESpace{N, Tu},
+        V::AbstractMultiFESpace{N, Tv},
+        domain::AbstractDomain,
+    ) where {N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}    
+    function _count_n_elts(
+        U::TrialFESpace,
+        V::TestFESpace,
+        domain::BoundaryFaceDomain{M, BC, L, C},
+    ) where {M, BC, L, C}
+
+
 Count the (maximum) number of elements in the matrix corresponding to the bilinear assembly of U, V
-on a cell domain, where `U` and `V` are `TrialFESpace` and `TestFESpace`
+on a domain.
+
+# Arguments
+- `U::TrialFESpace` : TrialFESpace associated to the first argument of the bilinear form.
+- `V::TestFESpace` : TestFESpace associated to the second argument of the bilinear form.
+- `domain`::AbstractDomain : domain of integration of the bilinear form.
+
+# Warning
+TO DO: for the moment this function is not really implemented for a BoundaryFaceDomain. 
+This requires to be able to distinguish between the usual TrialsFESpace and MultiplierFESpace.
+
 """
+
 function _count_n_elts(
     U::TrialFESpace,
     V::TestFESpace,
@@ -438,10 +466,6 @@ function _count_n_elts(
     )
 end
 
-"""
-Count the (maximum) number of elements in the matrix corresponding to the bilinear assembly of U, V
-on a cell domain, where `U` and `V` are `AbstractMultiFESpace`
-"""
 function _count_n_elts(
     U::AbstractMultiFESpace{N, Tu},
     V::AbstractMultiFESpace{N, Tv},
@@ -456,12 +480,6 @@ function _count_n_elts(
     return n
 end
 
-"""
-Count the (maximum) number of elements in the matrix corresponding to the bilinear assembly of U, V
-on a boundary face domain, where `U` and `V` are `TrialFESpace` and `TestFESpace`
-TO DO: for the moment this function is not really implemented. It requires to be able to distinguish between
-the usual TrialsFESpace and MultiplierFESpace.
-"""
 function _count_n_elts(
     U::TrialFESpace,
     V::TestFESpace,

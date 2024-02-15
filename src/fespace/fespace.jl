@@ -308,7 +308,7 @@ function MultiplierFESpace(mesh::AbstractMesh, size::Int = 1, kwargs...)
     for i in 1:size
         offset[:, i] .= i - 1
     end
-    ndofs = ones(ncells(mesh), size) # Temporary allocation for development purposes
+    ndofs = ones(ncells(mesh), size)
     dhl = DofHandler(iglob, offset, ndofs)
 
     feSpace = SingleFESpace{size, typeof(fSpace)}(fSpace, dhl, true, Int[])
