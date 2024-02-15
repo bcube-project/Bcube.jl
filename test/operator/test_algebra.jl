@@ -1,3 +1,6 @@
+import Bcube:
+    Connectivity, connectivities_indices, cells, CellInfo, get_nodes, spacedim, nodes
+
 @testset "Algebra" begin
     @testset "Gradient" begin
         # We test the mapping of a gradient. The idea is to compute the integral of a function `f` whose
