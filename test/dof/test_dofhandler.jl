@@ -137,6 +137,17 @@
             @test m1[Bcube.get_dofs(U1, 1)] == collect(1:9)
             @test m2[Bcube.get_dofs(U2, 1)] == collect(10:13)
 
+            # Lagrange multiplier space
+            U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+            Λᵤ = MultiplierFESpace(mesh, 1)
+            P = MultiFESpace(U, Λᵤ)
+
+            m1 = Bcube.get_mapping(P, 1)
+            m2 = Bcube.get_mapping(P, 2)
+
+            @test m1[Bcube.get_dofs(U, 1)] == collect(1:4)
+            @test m2[Bcube.get_dofs(Λᵤ, 1)] == [5]
+
             #---- Rectangle mesh
             # (from corrected bug -> checked graphically, by hand!)
             mesh = rectangle_mesh(3, 2; type = :quad)
@@ -167,6 +178,29 @@
             @test m2[Bcube.get_dofs(U_sca, 2)] == [13, 14, 15, 16]
             @test m1[Bcube.get_dofs(U_sca, 3)] == [17, 18, 19]
             @test m2[Bcube.get_dofs(U_sca, 3)] == [20, 21, 22]
+
+            # Lagrange multiplier space
+            U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+            Λᵤ = MultiplierFESpace(mesh, 1)
+            P = MultiFESpace(U, Λᵤ)
+
+            m1 = Bcube.get_mapping(P, 1)
+            m2 = Bcube.get_mapping(P, 2)
+
+            @test m1[Bcube.get_dofs(U, 1)] == [1, 2, 3, 4]
+            @test m1[Bcube.get_dofs(U, 2)] == [2, 6, 4, 7]
+            @test m1[Bcube.get_dofs(U, 3)] == [6, 8, 7]
+            @test m2[Bcube.get_dofs(Λᵤ, 1)] == [5]
+
+            P = MultiFESpace(U, Λᵤ; arrayOfStruct = false)
+
+            m1 = Bcube.get_mapping(P, 1)
+            m2 = Bcube.get_mapping(P, 2)
+
+            @test m1[Bcube.get_dofs(U, 1)] == [1, 2, 3, 4]
+            @test m1[Bcube.get_dofs(U, 2)] == [2, 5, 4, 6]
+            @test m1[Bcube.get_dofs(U, 3)] == [5, 7, 6]
+            @test m2[Bcube.get_dofs(Λᵤ, 1)] == [8]
 
             #  One scalar variable of order 2 on second order quads
             mesh = rectangle_mesh(3, 2; order = 2)
