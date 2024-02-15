@@ -1,3 +1,5 @@
+import Bcube: densify, densify!, rawcat
+
 @testset "utils" begin
     @testset "densify" begin
         a = [i for i in 1:5]

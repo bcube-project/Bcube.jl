@@ -1,3 +1,5 @@
+import Bcube: Mesh, shape
+
 function test_divergence2d(mesh, u, degree)
 
     # Connectivity
