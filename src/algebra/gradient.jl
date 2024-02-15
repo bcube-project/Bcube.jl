@@ -1,16 +1,26 @@
-struct Gradient{O, A} <: AbstractLazyOperator{O, A}
+abstract type AbstractGradientStyle end
+struct VolumicStyle <: AbstractGradientStyle end
+struct TangentialStyle <: AbstractGradientStyle end
+
+"""
+`GS` is the `AbstractGradientStyle`
+"""
+struct Gradient{O, A, GS} <: AbstractLazyOperator{O, A}
     args::A # `args` represent a Tuple containing the function whom gradient is computed
 end
 LazyOperators.get_args(lOp::Gradient) = lOp.args
 LazyOperators.get_operator(lOp::Gradient) = lOp
-Gradient(args::Tuple) = Gradient{Nothing, typeof(args)}(args)
+Gradient(args::Tuple, gs = VolumicStyle()) = Gradient{Nothing, typeof(args), gs}(args)
 Gradient(f) = Gradient((f,))
+
+@inline gradient_style(::Gradient{O, A, GS}) where {O, A, GS} = GS
+
 const ∇ = Gradient
 ∇(::NullOperator) = NullOperator()
 
 """ Materialization of a Gradient on a cellinfo is itself a Gradient, but with its function materialized """
 function LazyOperators.materialize(lOp::Gradient, cInfo::CellInfo)
-    Gradient(LazyOperators.materialize_args(get_args(lOp), cInfo))
+    Gradient(LazyOperators.materialize_args(get_args(lOp), cInfo), gradient_style(lOp))
 end
 
 function LazyOperators.materialize(
@@ -34,7 +44,7 @@ function LazyOperators.materialize(
     sideInfo::AbstractSide,
 ) where {O}
     arg = LazyOperators.materialize_args(get_args(lOp), sideInfo)
-    return Gradient(arg)
+    return Gradient(arg, gradient_style(lOp))
 end
 
 """
@@ -206,14 +216,19 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     cPoint::CellPoint,
 ) where {O}
-    return MapOver(materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...))
+    return MapOver(
+        materialize(
+            Base.Fix2(materialize, cPoint) ∘ Base.Fix2(Gradient, gradient_style(lOp)),
+            get_args(lOp)...,
+        ),
+    )
 end
 
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver{<:CellShapeFunctions}}},
     cPoint::CellPoint,
 ) where {O}
-    return materialize(Gradient(get_args(get_args(lOp)...)), cPoint)
+    return materialize(Gradient(get_args(get_args(lOp)...), gradient_style(lOp)), cPoint)
 end
 
 function LazyOperators.materialize(
@@ -222,14 +237,17 @@ function LazyOperators.materialize(
 ) where {O}
     op_side = get_operator(sidePoint)
     cellPoint = op_side(get_args(sidePoint)...)
-    return materialize(Gradient(get_args(get_args(lOp)...)), cellPoint)
+    return materialize(Gradient(get_args(get_args(lOp)...), gradient_style(lOp)), cellPoint)
 end
 
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
 ) where {O}
-    ∇x = tuplemap(x -> materialize(∇(x), sidePoint), get_args(get_args(lOp)...))
+    ∇x = tuplemap(
+        x -> materialize(Gradient(x, gradient_style(lOp)), sidePoint),
+        get_args(get_args(lOp)...),
+    )
     return MapOver(∇x)
 end
 

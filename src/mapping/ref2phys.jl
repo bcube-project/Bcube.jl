@@ -269,10 +269,10 @@ Compute the gradient of a function `f` on a point in the reference domain. `N` i
 size of the codomain of `f`.
 """
 function grad_function(f, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
-    return transpose(mapping_jacobian_inv(cnodes, ctype, ξ)) * ForwardDiff.gradient(f, ξ)
+    return transpose(mapping_jacobian_inv(ctype, cnodes, ξ)) * ForwardDiff.gradient(f, ξ)
 end
 function grad_function(f, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where {N}
-    return ForwardDiff.jacobian(f, ξ) * mapping_jacobian_inv(cnodes, ctype, ξ)
+    return ForwardDiff.jacobian(f, ξ) * mapping_jacobian_inv(ctype, cnodes, ξ)
 end
 
 """ get mesh cell centers coordinates (assuming perfectly flat cells)"""
