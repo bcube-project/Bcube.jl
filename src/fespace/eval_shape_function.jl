@@ -47,7 +47,7 @@ function shape_functions(fs::AbstractFunctionSpace, quadrule::AbstractQuadrature
 end
 
 """
-    grad_shape_functions(::AbstractFunctionSpace, n::Val{N}, quadnode::QuadratureNode) where N
+    ∂λξ_∂ξ(::AbstractFunctionSpace, n::Val{N}, quadnode::QuadratureNode) where N
 
 Gradient of shape functions for any function space. The result is an array whose values
 are the gradient of each shape functions evaluated at `quadnode` position.
@@ -57,23 +57,19 @@ are the gradient of each shape functions evaluated at `quadnode` position.
 
 Default version using automatic differentiation. Specialize to increase performance.
 """
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
-    n::Val{N},
-    quadnode::QuadratureNode,
-) where {N}
+function ∂λξ_∂ξ(fs::AbstractFunctionSpace, n::Val{N}, quadnode::QuadratureNode) where {N}
     quadrule = get_quadrature_rule(quadnode)
-    grad_shape_functions(fs, n, quadrule)[get_index(quadnode)]
+    ∂λξ_∂ξ(fs, n, quadrule)[get_index(quadnode)]
 end
 
-function _grad_shape_functions_gen(
+function _∂λξ_∂ξ_gen(
     fs::AbstractFunctionSpace,
     ::Val{N},
     quadrule::AbstractQuadratureRule,
 ) where {N}
     shape = get_shape(quadrule)()
     ξ = get_nodes(quadrule)
-    ∇λ = map(x -> grad_shape_functions(fs, Val(N), shape, x), ξ)
+    ∇λ = map(_ξ -> ∂λξ_∂ξ(fs, Val(N), shape, _ξ), ξ)
     if isa(∇λ[1], SArray)
         expr_∇λ = [:($(typeof(_∇λ))($(_∇λ...))) for _∇λ in ∇λ]
     else
@@ -82,36 +78,36 @@ function _grad_shape_functions_gen(
     return :(SA[$(expr_∇λ...)])
 end
 
-@generated function _grad_shape_functions(
+@generated function _∂λξ_∂ξ(
     fs::AbstractFunctionSpace,
     ::Val{N},
     ::AbstractQuadratureRule{S, Q},
 ) where {N, S, Q}
     _quadrule = QuadratureRule(S(), Q())
-    _grad_shape_functions_gen(fs(), Val(N), _quadrule)
+    _∂λξ_∂ξ_gen(fs(), Val(N), _quadrule)
 end
 
-function grad_shape_functions(
+function ∂λξ_∂ξ(
     fs::AbstractFunctionSpace,
     n::Val{N},
     quadrule::AbstractQuadratureRule{S, Q},
 ) where {N, S, Q}
-    _grad_shape_functions(fs, n, quadrule)
+    _∂λξ_∂ξ(fs, n, quadrule)
 end
 
 # fix ambiguity
-function grad_shape_functions(
+function ∂λξ_∂ξ(
     fs::AbstractFunctionSpace,
     n::Val{1},
     quadrule::AbstractQuadratureRule{S, Q},
 ) where {S, Q}
-    _grad_shape_functions(fs, n, quadrule)
+    _∂λξ_∂ξ(fs, n, quadrule)
 end
 
 # alias for scalar case
-function grad_shape_functions(
+function ∂λξ_∂ξ(
     fs::AbstractFunctionSpace,
     quadrule::AbstractQuadratureRule{S, Q},
 ) where {S, Q}
-    grad_shape_functions(fs, Val(1), quadrule)
+    ∂λξ_∂ξ(fs, Val(1), quadrule)
 end

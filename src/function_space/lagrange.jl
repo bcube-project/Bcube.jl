@@ -48,8 +48,121 @@ end
 basis_functions_style(::FunctionSpace{<:Lagrange}) = NodalBasisFunctionsStyle()
 
 """
+    shape_functions(::FunctionSpace{<:Lagrange}, :: Val{N}, ::AbstractShape, ξ) where {N}
+
+# Implementation
+For N > 1, the default version consists in "replicating" the shape functions.
+If `shape_functions` returns the vector `[λ₁; λ₂; λ₃]`, and if the `FESpace` is of size `2`,
+then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0; λ₃ 0; 0 λ₁; 0 λ₂; 0 λ₃]`.
+
+# Triangle
+## Order 1
+```math
+\\hat{\\lambda}_1(\\xi, \\eta) = 1 - \\xi - \\eta \\hspace{1cm}
+\\hat{\\lambda}_2(\\xi, \\eta) = \\xi                \\hspace{1cm}
+\\hat{\\lambda}_3(\\xi, \\eta) = \\eta
+```
+
+## Order 2
+```math
+\\begin{aligned}
+    & \\hat{\\lambda}_1(\\xi, \\eta) = (1 - \\xi - \\eta)(1 - 2 \\xi - 2 \\eta) \\\\
+    & \\hat{\\lambda}_2(\\xi, \\eta) = \\xi (2\\xi - 1) \\\\
+    & \\hat{\\lambda}_3(\\xi, \\eta) = \\eta (2\\eta - 1) \\\\
+    & \\hat{\\lambda}_{12}(\\xi, \\eta) = 4 \\xi (1 - \\xi - \\eta) \\\\
+    & \\hat{\\lambda}_{23}(\\xi, \\eta) = 4 \\xi \\eta \\\\
+    & \\hat{\\lambda}_{31}(\\xi, \\eta) = 4 \\eta (1 - \\xi - \\eta)
+\\end{aligned}
+```
+
+# Prism
+## Order 1
+```math
+\\hat{\\lambda}_1(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta)(1 - \\zeta)/2 \\hspace{1cm}
+\\hat{\\lambda}_2(\\xi, \\eta, \\zeta) = \\xi (1 - \\zeta)/2          \\hspace{1cm}
+\\hat{\\lambda}_3(\\xi, \\eta, \\zeta) = \\eta (1 - \\zeta)/2  \\hspace{1cm}
+\\hat{\\lambda}_5(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta)(1 + \\zeta)/2 \\hspace{1cm}
+\\hat{\\lambda}_6(\\xi, \\eta, \\zeta) = \\xi (1 + \\zeta)/2          \\hspace{1cm}
+\\hat{\\lambda}_7(\\xi, \\eta, \\zeta) = \\eta (1 + \\zeta)/2  \\hspace{1cm}
+```
+"""
+function _doc_shape_functions end
+
+"""
+    ∂λξ_∂ξ(::FunctionSpace{<:Lagrange}, ::Val{1}, ::AbstractShape, ξ)
+
+# Triangle
+## Order 0
+```math
+\\nabla \\hat{\\lambda}(\\xi, \\eta) =
+\\begin{pmatrix}
+    0 \\\\ 0
+\\end{pmatrix}
+```
+
+## Order 1
+```math
+\\begin{aligned}
+    & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) =
+        \\begin{pmatrix}
+            -1 \\\\ -1
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_2(\\xi, \\eta) =
+        \\begin{pmatrix}
+            1 \\\\ 0
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_3(\\xi, \\eta) =
+        \\begin{pmatrix}
+            0 \\\\ 1
+        \\end{pmatrix} \\\\
+\\end{aligned}
+```
+
+## Order 2
+```math
+\\begin{aligned}
+    & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) =
+        \\begin{pmatrix}
+            -3 + 4 (\\xi + \\eta) \\\\ -3 + 4 (\\xi + \\eta)
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_2(\\xi, \\eta) =
+        \\begin{pmatrix}
+            -1 + 4 \\xi \\\\ 0
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_3(\\xi, \\eta) =
+        \\begin{pmatrix}
+            0 \\\\ -1 + 4 \\eta
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_{12}(\\xi, \\eta) =
+        4 \\begin{pmatrix}
+            1 - 2 \\xi - \\eta \\\\ - \\xi
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_{23}(\\xi, \\eta) =
+        4 \\begin{pmatrix}
+            \\eta \\\\ \\xi
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_{31}(\\xi, \\eta) =
+        4 \\begin{pmatrix}
+            - \\eta \\\\ 1 - 2 \\eta - \\xi
+        \\end{pmatrix} \\\\
+\\end{aligned}
+```
+
+# Square
+## Order 0
+```math
+\\nabla \\hat{\\lambda}(\\xi, \\eta) =
+\\begin{pmatrix}
+    0 \\\\ 0
+\\end{pmatrix}
+```
+
+"""
+function _doc_∂λξ_∂ξ end
+
+"""
     shape_functions_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}
-    grad_shape_functions_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}
+    ∂λξ_∂ξ_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}
 
 # Implementation
 Based on `Symbolic.jl`. First tests show that this version is slower than the implementation based on `meta`
@@ -126,7 +239,7 @@ function shape_functions_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Cube, ξ) 
 end
 
 # ######### NOT USED ##########
-function __grad_shape_functions_symbolic(
+function __∂λξ_∂ξ_symbolic(
     ::Line,
     ::Val{D},
     qt::AbstractQuadratureType,
@@ -142,22 +255,18 @@ function __grad_shape_functions_symbolic(
     return :(SA[$(expr_l...)])
 end
 
-@generated function _grad_shape_functions_symbolic(
+@generated function _∂λξ_∂ξ_symbolic(
     ::Line,
     ::Val{D},
     qt::AbstractQuadratureType,
     ξ::T,
 ) where {D, T}
-    __grad_shape_functions_symbolic(Line(), Val(D), qt, T)
+    __∂λξ_∂ξ_symbolic(Line(), Val(D), qt, T)
 end
 
-function grad_shape_functions_symbolic(
-    fs::FunctionSpace{<:Lagrange, D},
-    ::Line,
-    ξ,
-) where {D}
+function ∂λξ_∂ξ_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Line, ξ) where {D}
     quadtype = lagrange_quadrature_type(fs)
-    _grad_shape_functions_symbolic(Line(), Val(D), quadtype, ξ)
+    _∂λξ_∂ξ_symbolic(Line(), Val(D), quadtype, ξ)
 end
 # #############################
 
@@ -175,10 +284,6 @@ function _scalar_shape_functions(
     shape_functions_symbolic(fs, shape, ξ)
 end
 
-"""
-Default version : the shape functions are "replicated". If `shape_functions` returns the vector `[λ₁; λ₂; λ₃]`, and if the `FESpace`
-is of size `2`, then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0; λ₃ 0; 0 λ₁; 0 λ₂; 0 λ₃]`.
-"""
 function shape_functions(
     fs::FunctionSpace{<:Lagrange, D},
     ::Val{N},
@@ -204,39 +309,18 @@ end
 # Lagrange function for degree = 0
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Line, ξ) = SA[1.0]
 ndofs(::FunctionSpace{<:Lagrange, 0}, ::Line) = 1
-grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Line, ξ::Number) = SA[0.0]
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Line, ξ::Number)
+    SA[0.0]
+end
 
 # Functions for Triangle shape
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Triangle, ξ) = SA[1.0]
 ndofs(::FunctionSpace{<:Lagrange, 0}, ::Triangle) = 1
 
-"""
-    grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Triangle, ξ)
-
-Gradient of shape functions for Triangle Lagrange element of degree 0 in a 2D space.
-
-```math
-\\nabla \\hat{\\lambda}(\\xi, \\eta) =
-\\begin{pmatrix}
-    0 \\\\ 0
-\\end{pmatrix}
-```
-"""
-function grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Triangle, ξ)
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Triangle, ξ)
     return SA[0.0 0.0]
 end
 
-"""
-    shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Triangle, ξ)
-
-Shape functions for Triangle Lagrange element of degree 1 in a 2D space.
-
-```math
-\\hat{\\lambda}_1(\\xi, \\eta) = 1 - \\xi - \\eta \\hspace{1cm}
-\\hat{\\lambda}_2(\\xi, \\eta) = \\xi                \\hspace{1cm}
-\\hat{\\lambda}_3(\\xi, \\eta) = \\eta
-```
-"""
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Triangle, ξ)
     return SA[
         1 - ξ[1] - ξ[2]
@@ -245,29 +329,7 @@ function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Triangle, ξ)
     ]
 end
 
-"""
-    grad_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Triangle, ξ)
-
-Gradient of shape functions for Triangle Lagrange element of degree 1 in a 2D space.
-
-```math
-\\begin{aligned}
-    & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) =
-        \\begin{pmatrix}
-            -1 \\\\ -1
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_2(\\xi, \\eta) =
-        \\begin{pmatrix}
-            1 \\\\ 0
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_3(\\xi, \\eta) =
-        \\begin{pmatrix}
-            0 \\\\ 1
-        \\end{pmatrix} \\\\
-\\end{aligned}
-```
-"""
-function grad_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Triangle, ξ)
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Triangle, ξ)
     return SA[
         -1.0 -1.0
         1.0 0.0
@@ -277,22 +339,6 @@ end
 
 ndofs(::FunctionSpace{<:Lagrange, 1}, ::Triangle) = 3
 
-"""
-    shape_functions(::FunctionSpace{<:Lagrange, 2}, ::Triangle, ξ)
-
-Shape functions for Triangle Lagrange element of degree 2 in a 2D space.
-
-```math
-\\begin{aligned}
-    & \\hat{\\lambda}_1(\\xi, \\eta) = (1 - \\xi - \\eta)(1 - 2 \\xi - 2 \\eta) \\\\
-    & \\hat{\\lambda}_2(\\xi, \\eta) = \\xi (2\\xi - 1) \\\\
-    & \\hat{\\lambda}_3(\\xi, \\eta) = \\eta (2\\eta - 1) \\\\
-    & \\hat{\\lambda}_{12}(\\xi, \\eta) = 4 \\xi (1 - \\xi - \\eta) \\\\
-    & \\hat{\\lambda}_{23}(\\xi, \\eta) = 4 \\xi \\eta \\\\
-    & \\hat{\\lambda}_{31}(\\xi, \\eta) = 4 \\eta (1 - \\xi - \\eta)
-\\end{aligned}
-```
-"""
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 2}, ::Triangle, ξ)
     return SA[
         (1 - ξ[1] - ξ[2]) * (1 - 2ξ[1] - 2ξ[2])  # = (1 - x - y)(1 - 2x - 2y)
@@ -304,41 +350,7 @@ function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 2}, ::Triangle, ξ)
     ]
 end
 
-"""
-    grad_shape_functions(::FunctionSpace{<:Lagrange, 2}, ::Val{1}, ::Triangle, ξ)
-
-Gradient of shape functions for Triangle Lagrange element of degree 2 in a 2D space.
-
-```math
-\\begin{aligned}
-    & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) =
-        \\begin{pmatrix}
-            -3 + 4 (\\xi + \\eta) \\\\ -3 + 4 (\\xi + \\eta)
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_2(\\xi, \\eta) =
-        \\begin{pmatrix}
-            -1 + 4 \\xi \\\\ 0
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_3(\\xi, \\eta) =
-        \\begin{pmatrix}
-            0 \\\\ -1 + 4 \\eta
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_{12}(\\xi, \\eta) =
-        4 \\begin{pmatrix}
-            1 - 2 \\xi - \\eta \\\\ - \\xi
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_{23}(\\xi, \\eta) =
-        4 \\begin{pmatrix}
-            \\eta \\\\ \\xi
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_{31}(\\xi, \\eta) =
-        4 \\begin{pmatrix}
-            - \\eta \\\\ 1 - 2 \\eta - \\xi
-        \\end{pmatrix} \\\\
-\\end{aligned}
-```
-"""
-function grad_shape_functions(::FunctionSpace{<:Lagrange, 2}, ::Val{1}, ::Triangle, ξ)
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 2}, ::Val{1}, ::Triangle, ξ)
     return SA[
         -3+4(ξ[1] + ξ[2]) -3+4(ξ[1] + ξ[2])
         -1+4ξ[1] 0.0
@@ -351,11 +363,6 @@ end
 
 ndofs(::FunctionSpace{<:Lagrange, 2}, ::Triangle) = 6
 
-"""
-    shape_functions(::FunctionSpace{<:Lagrange, 3}, ::Triangle, ξ)
-
-Shape functions for Triangle Lagrange element of degree 3 in a 2D space.
-"""
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 3}, ::Triangle, ξ)
     λ1 = 1 - ξ[1] - ξ[2]
     λ2 = ξ[1]
@@ -374,63 +381,30 @@ function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 3}, ::Triangle, ξ)
     ]
 end
 
-"""
-    grad_shape_functions(::FunctionSpace{<:Lagrange, 3}, ::Val{1}, ::Triangle, ξ)
-
-Gradient of shape functions for Triangle Lagrange element of degree 3 in a 2D space.
-
-"""
-# function grad_shape_functions(::FunctionSpace{<:Lagrange, 3}, ::Triangle, ξ)
-#     return SA[ ...
-#              ]
-# end
-
 ndofs(::FunctionSpace{<:Lagrange, 3}, ::Triangle) = 10
 
 # Functions for Square shape
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Square, ξ) = SA[1.0]
 ndofs(::FunctionSpace{<:Lagrange, 0}, ::Square) = 1
 
-"""
-    grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Square, x)
-
-Gradient of shape functions for Square Lagrange element of degree 0 in a 2D space.
-
-```math
-\\nabla \\hat{\\lambda}(\\xi, \\eta) =
-\\begin{pmatrix}
-    0 \\\\ 0
-\\end{pmatrix}
-```
-"""
-function grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Square, ξ)
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Square, ξ)
     return SA[0.0 0.0]
 end
 
 # Functions for Cube shape
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Cube, ξ) = SA[1.0]
 ndofs(::FunctionSpace{<:Lagrange, 0}, ::Cube) = 1
-grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Cube, ξ) = SA[0.0 0.0 0.0]
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Cube, ξ)
+    SA[0.0 0.0 0.0]
+end
 
 # Prism
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Prism, ξ) = SA[1.0]
-grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Prism, ξ) = SA[0.0 0.0 0.0]
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Prism, ξ)
+    SA[0.0 0.0 0.0]
+end
 ndofs(::FunctionSpace{<:Lagrange, 0}, ::Prism) = 1
 
-"""
-    shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Prism, ξ)
-
-Shape functions for Prism Lagrange element of degree 1 in a 3D space.
-
-```math
-\\hat{\\lambda}_1(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta)(1 - \\zeta)/2 \\hspace{1cm}
-\\hat{\\lambda}_2(\\xi, \\eta, \\zeta) = \\xi (1 - \\zeta)/2          \\hspace{1cm}
-\\hat{\\lambda}_3(\\xi, \\eta, \\zeta) = \\eta (1 - \\zeta)/2  \\hspace{1cm}
-\\hat{\\lambda}_5(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta)(1 + \\zeta)/2 \\hspace{1cm}
-\\hat{\\lambda}_6(\\xi, \\eta, \\zeta) = \\xi (1 + \\zeta)/2          \\hspace{1cm}
-\\hat{\\lambda}_7(\\xi, \\eta, \\zeta) = \\eta (1 + \\zeta)/2  \\hspace{1cm}
-```
-"""
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Prism, ξηζ)
     ξ, η, ζ = ξηζ
     return SA[
@@ -443,7 +417,7 @@ function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Prism, ξηζ
     ] ./ 2.0
 end
 
-function grad_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Prism, ξηζ)
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Prism, ξηζ)
     ξ, η, ζ = ξηζ
     return SA[
         (-(1 - ζ)) (-(1 - ζ)) (-(1 - ξ - η))

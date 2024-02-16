@@ -114,9 +114,9 @@ won't be appropriate.
 center(ctype::AbstractEntityType, cnodes) = mapping(ctype, cnodes, center(shape(ctype)))
 
 """
-    grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N
+    ∂λξ_∂x(::AbstractFunctionSpace, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N
 
-Gradient, with respect to the local coordinate system, of the shape functions associated to the `FunctionSpace`.
+Gradient, with respect to the physical coordinate system, of the shape functions associated to the `FunctionSpace`.
 
 Depending on the value of `N`, the shape functions are interpreted as associated to a scalar FESpace (N = 1) or
 a vector FESpace. For a vector FESpace, the result gradient is an array of size `(n*Nc, n, d)` where `Nc` is the
@@ -132,26 +132,22 @@ We cannot use the `topology_style` to dispatch because this style is too specifi
 the integration it is important the consider any line as `isCurvilinear`. However for the gradient computation we must distinguish
 a line in 1D, a line in 2D and a line in 3D...
 # """
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
-    n::Val{1},
-    ctype::AbstractEntityType,
-    cnodes,
-    ξ,
-)
+function ∂λξ_∂x end
+
+function ∂λξ_∂x(fs::AbstractFunctionSpace, n::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
     # Gradient of reference shape functions
-    ∇λ = grad_shape_functions(fs, n, shape(ctype), ξ)
+    ∇λ = ∂λξ_∂ξ(fs, n, shape(ctype), ξ)
     return ∇λ * mapping_jacobian_inv(ctype, cnodes, ξ)
 end
 
-function grad_shape_functions(
+function ∂λξ_∂x(
     fs::AbstractFunctionSpace,
     n::Val{N},
     ctype::AbstractEntityType,
     cnodes,
     ξ,
 ) where {N}
-    ∇λ_sca = grad_shape_functions(fs, Val(1), ctype, cnodes, ξ) # Matrix of size (ndofs_sca, nspa)
+    ∇λ_sca = ∂λξ_∂x(fs, Val(1), ctype, cnodes, ξ) # Matrix of size (ndofs_sca, nspa)
     ndofs_sca, nspa = size(∇λ_sca)
     a = SArray{Tuple{ndofs_sca, 1, nspa}, eltype(∇λ_sca)}(
         ∇λ_sca[i, k] for i in 1:ndofs_sca, j in 1:1, k in 1:nspa
@@ -212,27 +208,27 @@ end
     end
 end
 
-function grad_shape_functions(
+function ∂λξ_∂x(
     fs::AbstractFunctionSpace,
     ::Val{1},
     ctype::AbstractEntityType{2},
     cnodes::AbstractArray{<:Node{3}},
     ξ,
 )
-    return _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
+    return _∂λξ_∂x_hypersurface(fs, ctype, cnodes, ξ)
 end
 
-function grad_shape_functions(
+function ∂λξ_∂x(
     fs::AbstractFunctionSpace,
     ::Val{1},
     ctype::AbstractEntityType{1},
     cnodes::AbstractArray{<:Node{2}},
     ξ,
 )
-    return _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
+    return _∂λξ_∂x_hypersurface(fs, ctype, cnodes, ξ)
 end
 
-function _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
+function _∂λξ_∂x_hypersurface(fs, ctype, cnodes, ξ)
     # First, we compute the "augmented" jacobian.
     #
     # Rq: we could do this elsewhere, for instance in mapping.jl.
@@ -248,12 +244,12 @@ function _grad_shape_functions_hypersurface(fs, ctype, cnodes, ξ)
     # Compute shape functions gradient : we "add a dimension" to the ref gradient,
     # and then right-multiply by the inverse of the jacobian
     z = @SVector zeros(ndofs(fs, s))
-    ∇λ = hcat(grad_shape_functions(fs, s, ξ), z) * inv(J)
+    ∇λ = hcat(∂λξ_∂ξ(fs, s, ξ), z) * inv(J)
 
     return ∇λ
 end
 
-function grad_shape_functions(
+function ∂λξ_∂x(
     ::AbstractFunctionSpace,
     ::AbstractEntityType{1},
     ::AbstractArray{Node{3}},

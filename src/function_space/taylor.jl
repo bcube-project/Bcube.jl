@@ -6,10 +6,6 @@ FunctionSpace(::Val{:Taylor}, degree::Integer) = FunctionSpace(Taylor(), degree)
 
 basis_functions_style(::FunctionSpace{<:Taylor}) = ModalBasisFunctionsStyle()
 
-"""
-Default version : the shape functions are "replicated". If `shape_functions` returns the vector `[λ₁; λ₂; λ₃]`, and if the `FESpace`
-is of size `2`, then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0; λ₃ 0; 0 λ₁; 0 λ₂; 0 λ₃]`.
-"""
 function shape_functions(
     fs::FunctionSpace{<:Taylor},
     ::Val{N},
@@ -32,82 +28,25 @@ function shape_functions(
     ξ -> shape_functions(fs, n, shape, ξ)
 end
 
-# Shared functions for all Taylor elements of some kind
 """
-    shape_functions(::FunctionSpace{<:Taylor, 0}, ::AbstractShape, x)
+    shape_functions(::FunctionSpace{<:Taylor}, ::AbstractShape, ξ)
 
-Shape functions for any Taylor element of degree 0 :  ``\\hat{\\lambda}(\\xi) = 1``
-"""
-function _scalar_shape_functions(::FunctionSpace{<:Taylor, 0}, ::AbstractShape, ξ)
-    return SA[1.0]
-end
+# Implementation
+For N > 1, the default version consists in "replicating" the shape functions.
+If `shape_functions` returns the vector `[λ₁; λ₂; λ₃]`, and if the `FESpace` is of size `2`,
+then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0; λ₃ 0; 0 λ₁; 0 λ₂; 0 λ₃]`.
 
-# Functions for Line shape
-"""
-    grad_shape_functions(::FunctionSpace{<:Taylor, 0}, ::Line, x)
+# Any shape, order 0
+``\\hat{\\lambda}(\\xi) = 1``
 
-Gradient (=derivative) of shape functions for Line Taylor element of degree 0 in a 1D space : ``\\nabla \\hat{\\lambda}(\\xi) = 0``
-"""
-function grad_shape_functions(::FunctionSpace{<:Taylor, 0}, ::Val{1}, ::Line, ξ)
-    return SA[0.0]
-end
-
-"""
-    shape_functions(::FunctionSpace{<:Taylor, 1}, ::Line, ξ)
-
-Shape functions for Line Taylor element of degree 1 in a 1D space.
-
+# Line
+## Order 1
 ```math
 \\hat{\\lambda}_1(\\xi) = 1 \\hspace{1cm} \\hat{\\lambda}_1(\\xi) = \\frac{\\xi}{2}
 ```
-"""
-function _scalar_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Line, ξ)
-    return SA[
-        1.0
-        ξ[1] / 2
-    ]
-end
 
-"""
-    grad_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Line, ξ)
-
-Gradient (=derivative) of shape functions for Line Taylor element of degree 1 in a 1D space.
-
-```math
-\\nabla \\hat{\\lambda}_1(\\xi) = 0 \\hspace{1cm} \\nabla \\hat{\\lambda}_1(\\xi) = \\frac{1}{2}
-```
-"""
-function grad_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Val{1}, ::Line, ξ)
-    return SA[
-        0.0
-        1.0 / 2.0
-    ]
-end
-
-# Functions for Square shape
-"""
-    grad_shape_functions(::FunctionSpace{<:Taylor, 0}, ::Union{Square,Triangle}, ξ)
-
-Gradient of shape functions for Square or Triangle Taylor element of degree 0 in a 2D space.
-
-```math
-\\hat{\\lambda}_1(\\xi, \\eta) = \\begin{pmatrix} 0 \\\\ 0 \\end{pmatrix}
-```
-"""
-function grad_shape_functions(
-    ::FunctionSpace{<:Taylor, 0},
-    ::Val{1},
-    ::Union{Square, Triangle},
-    ξ,
-)
-    return SA[0.0 0.0]
-end
-
-"""
-    shape_functions(::FunctionSpace{<:Taylor, 1}, ::Square, ξ)
-
-Shape functions for Square Taylor element of degree 1 in a 2D space.
-
+# Square
+## Order 1
 ```math
 \\begin{aligned}
     & \\hat{\\lambda}_1(\\xi, \\eta) = 0 \\\\
@@ -116,19 +55,27 @@ Shape functions for Square Taylor element of degree 1 in a 2D space.
 \\end{aligned}
 ```
 """
-function _scalar_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Square, ξ)
-    return SA[
-        1.0
-        ξ[1] / 2
-        ξ[2] / 2
-    ]
-end
+function _doc_shape_functions end
 
 """
-    grad_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Square, ξ)
+    ∂λξ_∂ξ(::FunctionSpace{<:Taylor}, ::Val{1}, ::AbstractShape, ξ)
 
-Gradient of shape functions for Square Taylor element of degree 1 in a 2D space.
+# Line
+## Order 0
+``\\nabla \\hat{\\lambda}(\\xi) = 0``
 
+## Order 1
+```math
+\\nabla \\hat{\\lambda}_1(\\xi) = 0 \\hspace{1cm} \\nabla \\hat{\\lambda}_1(\\xi) = \\frac{1}{2}
+```
+
+# Square
+## Order 0
+```math
+\\hat{\\lambda}_1(\\xi, \\eta) = \\begin{pmatrix} 0 \\\\ 0 \\end{pmatrix}
+```
+
+## Order 1
 ```math
 \\begin{aligned}
     & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) = \\begin{pmatrix} 0 \\\\ 0 \\end{pmatrix} \\\\
@@ -137,7 +84,46 @@ Gradient of shape functions for Square Taylor element of degree 1 in a 2D space.
 \\end{aligned}
 ```
 """
-function grad_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Val{1}, ::Square, ξ)
+function _doc_∂λξ_∂ξ end
+
+# Shared functions for all Taylor elements of some kind
+function _scalar_shape_functions(::FunctionSpace{<:Taylor, 0}, ::AbstractShape, ξ)
+    return SA[1.0]
+end
+
+# Functions for Line shape
+function ∂λξ_∂ξ(::FunctionSpace{<:Taylor, 0}, ::Val{1}, ::Line, ξ)
+    return SA[0.0]
+end
+
+function _scalar_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Line, ξ)
+    return SA[
+        1.0
+        ξ[1] / 2
+    ]
+end
+
+function ∂λξ_∂ξ(::FunctionSpace{<:Taylor, 1}, ::Val{1}, ::Line, ξ)
+    return SA[
+        0.0
+        1.0 / 2.0
+    ]
+end
+
+# Functions for Square shape
+function ∂λξ_∂ξ(::FunctionSpace{<:Taylor, 0}, ::Val{1}, ::Union{Square, Triangle}, ξ)
+    return SA[0.0 0.0]
+end
+
+function _scalar_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Square, ξ)
+    return SA[
+        1.0
+        ξ[1] / 2
+        ξ[2] / 2
+    ]
+end
+
+function ∂λξ_∂ξ(::FunctionSpace{<:Taylor, 1}, ::Val{1}, ::Square, ξ)
     return SA[
         0.0 0.0
         1.0/2 0.0
