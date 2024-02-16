@@ -91,7 +91,7 @@ TODO:
 * improve formulae with a reshape
 * Specialize for a ShapeFunction to use the hardcoded version instead of ForwardDiff
 """
-function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
+function gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
     f(_ξ) = op(CellPoint(_ξ, get_cellinfo(cPoint), ReferenceDomain()))
     ξ = get_coord(cPoint)
     valS = _size_codomain(f, ξ)
@@ -111,13 +111,13 @@ end
 _size_codomain(f, x) = Val(length(f(x)))
 _size_codomain(f::AbstractCellFunction, x) = Val(get_size(f))
 
-function Gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
+function gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
     f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
     valS = _size_codomain(f, get_coord(cPoint))
     return _gradient_or_jacobian(valS, f, get_coord(cPoint))
 end
 
-function Gradient(
+function gradient(
     cellFunction::AbstractCellShapeFunctions{<:ReferenceDomain},
     cPoint::CellPoint{ReferenceDomain},
 )
@@ -186,7 +186,7 @@ end
 
 """ Materialization of a Gradient on a cellinfo is itself a Gradient, but with its function materialized """
 function LazyOperators.materialize(lOp::Gradient, cInfo::CellInfo)
-    Gradient(LazyOperators.materialize_args(get_args(lOp), cInfo), gradient_style(lOp))
+    Gradient(LazyOperators.materialize_args(get_args(lOp), cInfo))
 end
 
 function LazyOperators.materialize(
@@ -194,7 +194,7 @@ function LazyOperators.materialize(
     cPoint::CellPoint,
 ) where {O}
     f, = get_args(lOp)
-    Gradient(f, cPoint)
+    gradient(f, cPoint)
 end
 
 function LazyOperators.materialize(
@@ -202,7 +202,7 @@ function LazyOperators.materialize(
     cPoint::CellPoint,
 ) where {O}
     f, = get_args(lOp)
-    Gradient(f, cPoint)
+    gradient(f, cPoint)
 end
 
 function LazyOperators.materialize(
@@ -210,7 +210,7 @@ function LazyOperators.materialize(
     sideInfo::AbstractSide,
 ) where {O}
     arg = LazyOperators.materialize_args(get_args(lOp), sideInfo)
-    return Gradient(arg, gradient_style(lOp))
+    return Gradient(arg)
 end
 
 """
@@ -221,19 +221,14 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     cPoint::CellPoint,
 ) where {O}
-    return MapOver(
-        materialize(
-            Base.Fix2(materialize, cPoint) ∘ Base.Fix2(Gradient, gradient_style(lOp)),
-            get_args(lOp)...,
-        ),
-    )
+    return MapOver(materialize(Base.Fix2(materialize, cPoint) ∘ Gradient, get_args(lOp)...))
 end
 
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver{<:CellShapeFunctions}}},
     cPoint::CellPoint,
 ) where {O}
-    return materialize(Gradient(get_args(get_args(lOp)...), gradient_style(lOp)), cPoint)
+    return materialize(Gradient(get_args(get_args(lOp)...)), cPoint)
 end
 
 function LazyOperators.materialize(
@@ -242,17 +237,14 @@ function LazyOperators.materialize(
 ) where {O}
     op_side = get_operator(sidePoint)
     cellPoint = op_side(get_args(sidePoint)...)
-    return materialize(Gradient(get_args(get_args(lOp)...), gradient_style(lOp)), cellPoint)
+    return materialize(Gradient(get_args(get_args(lOp)...)), cellPoint)
 end
 
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
 ) where {O}
-    ∇x = tuplemap(
-        x -> materialize(Gradient(x, gradient_style(lOp)), sidePoint),
-        get_args(get_args(lOp)...),
-    )
+    ∇x = tuplemap(x -> materialize(Gradient(x), sidePoint), get_args(get_args(lOp)...))
     return MapOver(∇x)
 end
 
