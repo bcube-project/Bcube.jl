@@ -298,7 +298,7 @@ function ∂fξ_∂x_hypersurface(f, ::Val{1}, ctype::AbstractEntityType, cnodes
     # First, we compute the "augmented" jacobian.
     J = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
 
-    return transpose(J) * ∇f
+    return transpose(inv(J)) * ∇f
 end
 
 """ get mesh cell centers coordinates (assuming perfectly flat cells)"""
