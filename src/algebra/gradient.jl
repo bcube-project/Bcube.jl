@@ -1,5 +1,10 @@
 """
 The `GradientStyle` helps distinguishing between "classic" gradient and a tangentiel gradient.
+
+# Implementation
+Note that the whole point of the `GradientStyle` is to allow two distinct symbols (∇ and ∇ₛ) for
+the classic and tangential gradient. Otherwise, the dispatch between classic / tangential could
+be done only in `ref2phys.jl`.
 """
 abstract type AbstractGradientStyle end
 struct VolumicStyle <: AbstractGradientStyle end
@@ -100,7 +105,7 @@ function gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain}, ::Volumi
     cInfo = get_cellinfo(cPoint)
     cnodes = nodes(cInfo)
     ctype = celltype(cInfo)
-    return grad_function(f, valS, ctype, cnodes, ξ)
+    return ∂fξ_∂x(f, valS, ctype, cnodes, ξ)
 
     # ForwarDiff applied in the PhysicalDomain : not viable because
     # the inverse mapping is not always known.
@@ -110,10 +115,22 @@ function gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain}, ::Volumi
     # return _gradient_or_jacobian(Val(length(fx)), f, get_coord(cPoint_phys))
 end
 
+function gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain}, ::TangentialStyle)
+    f(_ξ) = op(CellPoint(_ξ, get_cellinfo(cPoint), ReferenceDomain()))
+    ξ = get_coord(cPoint)
+    valS = _size_codomain(f, ξ)
+    cInfo = get_cellinfo(cPoint)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    return ∂fξ_∂x_hypersurface(f, valS, ctype, cnodes, ξ)
+end
+
 _size_codomain(f, x) = Val(length(f(x)))
 _size_codomain(f::AbstractCellFunction, x) = Val(get_size(f))
 
 function gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain}, ::VolumicStyle)
+    # Fow now this version is "almost" never used because we never evaluate functions
+    # in the physical domain (at least in (bi)linear forms).
     f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
     valS = _size_codomain(f, get_coord(cPoint))
     return _gradient_or_jacobian(valS, f, get_coord(cPoint))
@@ -129,21 +146,29 @@ function gradient(
     ξ = get_coord(cPoint)
     fs = get_function_space(cellFunction)
     n = Val(get_size(cellFunction))
-    MapOver(grad_shape_functions_reshaped(fs, n, ctype, cnodes, ξ))
+    grad = ∂λξ_∂x(fs, Val(1), ctype, cnodes, ξ)
+    MapOver(grad_shape_functions_reshaped(grad, n))
 end
 
-# dispatch on codomain size :
+function gradient(
+    cellFunction::AbstractCellShapeFunctions{<:ReferenceDomain},
+    cPoint::CellPoint{ReferenceDomain},
+    ::TangentialStyle,
+)
+    cnodes = get_cellnodes(cPoint)
+    ctype = get_celltype(cPoint)
+    ξ = get_coord(cPoint)
+    fs = get_function_space(cellFunction)
+    n = Val(get_size(cellFunction))
+    grad = ∂λξ_∂x_hypersurface(fs, Val(1), ctype, cnodes, ξ)
+    MapOver(grad_shape_functions_reshaped(grad, n))
+end
+
+# dispatch on codomain size (this is only used for functions evaluated on the physical domain)
 _gradient_or_jacobian(::Val{1}, f, x) = ForwardDiff.gradient(f, x)
 _gradient_or_jacobian(::Val{S}, f, x) where {S} = ForwardDiff.jacobian(f, x)
 
-function grad_shape_functions_reshaped(
-    fs::AbstractFunctionSpace,
-    n::Val{1},
-    ctype,
-    cnodes,
-    ξ,
-)
-    grad = ∂λξ_∂x(fs, n, ctype, cnodes, ξ)
+function grad_shape_functions_reshaped(grad, n::Val{N}) where {N}
     _reshape_gradient_shape_function_impl(grad, n)
 end
 
@@ -154,17 +179,6 @@ end
     _exprs = [[:(a[$i, $j]) for j in 1:Ndim] for i in 1:Ndof]
     exprs = [:(SA[$(_expr...)]) for _expr in _exprs]
     return :(tuple($(exprs...)))
-end
-
-function grad_shape_functions_reshaped(
-    fs::AbstractFunctionSpace,
-    n::Val{N},
-    ctype,
-    cnodes,
-    ξ,
-) where {N}
-    grad = ∂λξ_∂x(fs, Val(1), ctype, cnodes, ξ)
-    _reshape_gradient_shape_function_impl(grad, n)
 end
 
 @generated function _reshape_gradient_shape_function_impl(

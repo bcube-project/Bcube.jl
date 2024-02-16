@@ -86,7 +86,7 @@ then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0;
 \\hat{\\lambda}_7(\\xi, \\eta, \\zeta) = \\eta (1 + \\zeta)/2  \\hspace{1cm}
 ```
 """
-function _doc_shape_functions end
+function _doc_shape_functions_lagrange end
 
 """
     ∂λξ_∂ξ(::FunctionSpace{<:Lagrange}, ::Val{1}, ::AbstractShape, ξ)
@@ -158,7 +158,7 @@ function _doc_shape_functions end
 ```
 
 """
-function _doc_∂λξ_∂ξ end
+function _doc_∂λξ_∂ξ_lagrange end
 
 """
     shape_functions_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}

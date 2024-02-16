@@ -55,7 +55,7 @@ then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0;
 \\end{aligned}
 ```
 """
-function _doc_shape_functions end
+function _doc_shape_functions_taylor end
 
 """
     ∂λξ_∂ξ(::FunctionSpace{<:Taylor}, ::Val{1}, ::AbstractShape, ξ)
@@ -84,7 +84,7 @@ function _doc_shape_functions end
 \\end{aligned}
 ```
 """
-function _doc_∂λξ_∂ξ end
+function _doc_∂λξ_∂ξ_taylor end
 
 # Shared functions for all Taylor elements of some kind
 function _scalar_shape_functions(::FunctionSpace{<:Taylor, 0}, ::AbstractShape, ξ)

@@ -208,7 +208,7 @@ end
     end
 end
 
-function ∂λξ_∂x(
+function ∂λξ_∂x_hypersurface(
     fs::AbstractFunctionSpace,
     ::Val{1},
     ctype::AbstractEntityType{2},
@@ -218,7 +218,7 @@ function ∂λξ_∂x(
     return _∂λξ_∂x_hypersurface(fs, ctype, cnodes, ξ)
 end
 
-function ∂λξ_∂x(
+function ∂λξ_∂x_hypersurface(
     fs::AbstractFunctionSpace,
     ::Val{1},
     ctype::AbstractEntityType{1},
@@ -230,26 +230,43 @@ end
 
 function _∂λξ_∂x_hypersurface(fs, ctype, cnodes, ξ)
     # First, we compute the "augmented" jacobian.
-    #
-    # Rq: we could do this elsewhere, for instance in mapping.jl.
-    # However, since this augmented jacobian already calls `mapping_jacobian`
-    # it would not be as easy as specializing `mapping_jacobian` for the hypersurface
-    # case. As long as this portion of code is not duplicated elsewhere, I prefer to
-    # keep it here.
-    s = shape(ctype)
-    Jref = mapping_jacobian(ctype, cnodes, ξ)
-    ν = cell_normal(ctype, cnodes, ξ)
-    J = hcat(Jref, ν)
+    J = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
 
     # Compute shape functions gradient : we "add a dimension" to the ref gradient,
     # and then right-multiply by the inverse of the jacobian
+    s = shape(ctype)
     z = @SVector zeros(ndofs(fs, s))
     ∇λ = hcat(∂λξ_∂ξ(fs, s, ξ), z) * inv(J)
 
     return ∇λ
 end
 
-function ∂λξ_∂x(
+"""
+    mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+
+"Augmented" jacobian matrix of the mapping.
+
+Let's consider a ``\\mathbb{R}^2`` surface in ``\\mathbb{R}^3``. The mapping
+``F_\\Gamma(\\xi, \\eta)`` maps the reference coordinate system to the physical coordinate
+system. It's jacobian ``J_\\Gamma`` is not squared. We can 'extend' this mapping to reach any point in
+``\\mathbb{R}^3`` (and not only the surface) using
+```math
+F(\\xi, \\eta, \\zeta) = F_\\Gamma(\\xi, \\eta) + \\zeta \\nu
+```
+where ``\\nu`` is the conormal. Then the restriction of the squared jacobian of ``F``
+to the surface is simply
+```math
+J|_\\Gamma = (J_\\Gamma~~\\nu)
+```
+"""
+function mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+    Jref = mapping_jacobian(ctype, cnodes, ξ)
+    ν = cell_normal(ctype, cnodes, ξ)
+    J = hcat(Jref, ν)
+    return J
+end
+
+function ∂λξ_∂x_hypersurface(
     ::AbstractFunctionSpace,
     ::AbstractEntityType{1},
     ::AbstractArray{Node{3}},
@@ -259,16 +276,29 @@ function ∂λξ_∂x(
 end
 
 """
-    grad_function(f, n::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N
+    ∂fξ_∂x(f, n::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N
 
-Compute the gradient of a function `f` on a point in the reference domain. `N` is the
-size of the codomain of `f`.
+Compute the gradient, with respect to the physical coordinates, of a function `f` on a point
+in the reference domain. `N` is the size of the codomain of `f`.
 """
-function grad_function(f, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
+function ∂fξ_∂x(f, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
     return transpose(mapping_jacobian_inv(ctype, cnodes, ξ)) * ForwardDiff.gradient(f, ξ)
 end
-function grad_function(f, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where {N}
+function ∂fξ_∂x(f, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where {N}
     return ForwardDiff.jacobian(f, ξ) * mapping_jacobian_inv(ctype, cnodes, ξ)
+end
+
+function ∂fξ_∂x_hypersurface(f, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
+    # Gradient in the reference domain. Add missing dimensions. Warning : we always
+    # consider a hypersurface (topodim = spacedim - 1) and not a line in R^3 for instance.
+    # Hence we always add only one 0.
+    ∇f = ForwardDiff.gradient(f, ξ)
+    ∇f = vcat(∇f, 0)
+
+    # First, we compute the "augmented" jacobian.
+    J = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+
+    return transpose(J) * ∇f
 end
 
 """ get mesh cell centers coordinates (assuming perfectly flat cells)"""

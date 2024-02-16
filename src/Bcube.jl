@@ -109,7 +109,7 @@ include("./integration/integration.jl")
 export ∫
 
 include("./algebra/gradient.jl")
-export ∇
+export ∇, ∇ₛ
 
 include("./algebra/algebra.jl")
 export FaceNormal, otimes, ⊗, dcontract, ⊡
