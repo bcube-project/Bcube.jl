@@ -107,7 +107,7 @@ TODO:
 """
 function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
     m = mapping_jacobian_inv(get_cellnodes(cPoint), get_celltype(cPoint), get_coord(cPoint))
-    f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
+    f = Base.Fix2(_op_cpoint, (op, cPoint))
     valS = _size_codomain(f, get_coord(cPoint))
     return _gradient(valS, f, get_coord(cPoint), m)
 
@@ -119,11 +119,36 @@ function Gradient(op::AbstractLazy, cPoint::CellPoint{ReferenceDomain})
     # return _gradient_or_jacobian(Val(length(fx)), f, get_coord(cPoint_phys))
 end
 
+function _op_cpoint(ξ, (op, cPoint))
+    op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
+end
+
+# Hack to fix type inference in julia 1.10
+function ForwardDiffExt.static_dual_eval(
+    ::Type{T},
+    f::Base.Fix2{typeof(_op_cpoint)},
+    x::StaticArray,
+) where {T}
+    @noinline f(@noinline ForwardDiffExt.dualize(T, x))
+end
+# Hack to fix type inference in julia 1.10
+@noinline function ForwardDiff.jacobian(f::Base.Fix2{typeof(_op_cpoint)}, x::StaticArray)
+    @noinline ForwardDiff.vector_mode_jacobian(f, x)
+end
+# Hack to fix type inference in julia 1.10
+function ForwardDiff.vector_mode_jacobian(f::Base.Fix2{typeof(_op_cpoint)}, x::StaticArray)
+    T = typeof(ForwardDiff.Tag(f, eltype(x)))
+    return ForwardDiffExt.extract_jacobian(T, ForwardDiffExt.static_dual_eval(T, f, x), x)
+end
+
 _size_codomain(f, x) = Val(length(f(x)))
 _size_codomain(f::AbstractCellFunction, x) = Val(get_size(f))
 
 _gradient(::Val{1}, f, ξ::AbstractArray, m) = transpose(m) * ForwardDiff.gradient(f, ξ)
-_gradient(::Val{S}, f, ξ::AbstractArray, m) where {S} = ForwardDiff.jacobian(f, ξ) * m
+function _gradient(::Val{S}, f, ξ::AbstractArray, m) where {S}
+    jac = @noinline ForwardDiff.jacobian(f, ξ)
+    jac * m
+end
 
 function Gradient(op::AbstractLazy, cPoint::CellPoint{PhysicalDomain})
     f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
