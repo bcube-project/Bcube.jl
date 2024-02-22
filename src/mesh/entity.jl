@@ -252,7 +252,7 @@ end
 end
 @inline nfaces(t::Type{Tetra4_t}) = 4
 @inline faces2nodes(::Type{Tetra4_t}) = ((1, 3, 2), (1, 2, 4), (2, 3, 4), (3, 1, 4))
-@inline facetypes(::Type{Tetra4_t}) = (Tri3_t(), Tri3_t(), Tri3_t())
+@inline facetypes(::Type{Tetra4_t}) = (Tri3_t(), Tri3_t(), Tri3_t(), Tri3_t())
 
 #---- Tetra10 ----
 @inline nnodes(::Type{Tetra10_t}) = 10
