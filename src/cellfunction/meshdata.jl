@@ -13,9 +13,9 @@ function MeshData(location::AbstractMeshDataLocation, values::AbstractVector)
 end
 get_values(data::MeshData) = data.values
 set_values!(data::MeshData, values::Union{Number, AbstractVector}) = data.values .= values
-get_location(data::MeshData{L}) where {L} = L()
+get_location(::MeshData{L}) where {L} = L()
 
-function LazyOperators.materialize(data::MeshData, cInfo::CellInfo)
+function LazyOperators.materialize(data::MeshData{CellData}, cInfo::CellInfo)
     PhysicalFunction(x -> get_values(data)[cellindex(cInfo)])
 end
 

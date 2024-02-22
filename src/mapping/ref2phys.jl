@@ -295,10 +295,24 @@ function ∂fξ_∂x_hypersurface(f, ::Val{1}, ctype::AbstractEntityType, cnodes
     ∇f = ForwardDiff.gradient(f, ξ)
     ∇f = vcat(∇f, 0)
 
-    # First, we compute the "augmented" jacobian.
+    # Then, we compute the "augmented" jacobian.
     J = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
 
     return transpose(inv(J)) * ∇f
+end
+
+function ∂fξ_∂x_hypersurface(f, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where {N}
+    # Gradient in the reference domain. Add missing dimensions. Warning : we always
+    # consider a hypersurface (topodim = spacedim - 1) and not a line in R^3 for instance.
+    # Hence we always add only one 0.
+    ∇f = ForwardDiff.jacobian(f, ξ)
+    z = @SVector zeros(N)
+    ∇f = hcat(∇f, z)
+
+    # Then, we compute the "augmented" jacobian.
+    J = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+
+    return ∇f * inv(J)
 end
 
 """ get mesh cell centers coordinates (assuming perfectly flat cells)"""
