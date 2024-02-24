@@ -1,3 +1,5 @@
+import Bcube: Line, Triangle, Square, face_area, normals, face_shapes
+
 @testset "Shape" begin
     @testset "Line" begin
         line = Line()

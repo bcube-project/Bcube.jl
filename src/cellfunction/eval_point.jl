@@ -105,13 +105,13 @@ get_cellnodes(p::CellPoint) = nodes(get_cellinfo(p))
 get_celltype(p::CellPoint) = celltype(get_cellinfo(p))
 
 function change_domain(p::CellPoint{ReferenceDomain}, target_domain::PhysicalDomain)
-    m(x) = mapping(nodes(p.cellinfo), celltype(p.cellinfo), x)
+    m(x) = mapping(celltype(p.cellinfo), nodes(p.cellinfo), x)
     x_phy = _apply_mapping(m, get_coord(p))
     CellPoint(x_phy, p.cellinfo, target_domain)
 end
 
 function change_domain(p::CellPoint{PhysicalDomain}, target_domain::ReferenceDomain)
-    m(x) = mapping_inv(nodes(p.cellinfo), celltype(p.cellinfo), x)
+    m(x) = mapping_inv(celltype(p.cellinfo), nodes(p.cellinfo), x)
     x_ref = _apply_mapping(m, get_coord(p))
     CellPoint(x_ref, p.cellinfo, target_domain)
 end
@@ -212,7 +212,7 @@ end
 """ @ghislainb : I feel like you could write only on common function for both CellPoint and FacePoint """
 function change_domain(p::FacePoint{ReferenceDomain}, ::PhysicalDomain)
     faceInfo = get_faceinfo(p)
-    m(x) = mapping(nodes(faceInfo), facetype(faceInfo), x)
+    m(x) = mapping(facetype(faceInfo), nodes(faceInfo), x)
     x_phy = _apply_mapping(m, get_coord(p))
     FacePoint(x_phy, faceInfo, PhysicalDomain())
 end

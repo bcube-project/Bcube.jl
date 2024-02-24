@@ -7,6 +7,7 @@ const GMSHTYPE = Dict(
     1 => Bar2_t(),
     2 => Tri3_t(),
     3 => Quad4_t(),
+    4 => Tetra4_t(),
     5 => Hexa8_t(),
     6 => Penta6_t(),
     9 => Tri6_t(),

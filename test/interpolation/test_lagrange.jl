@@ -1,3 +1,4 @@
+import Bcube: ndofs, shape_functions, grad_shape_functions, Mesh, Cube, Prism
 Σ = sum
 
 """
@@ -101,13 +102,13 @@ end
         # TODO: the part below should be moved to test_ref2loc
         mesh = Mesh([Node([0.0]), Node([1.0])], [Bar2_t()], Connectivity([2], [1, 2]))
         cellTypes = cells(mesh)
-        ct = cellTypes[1]
+        ctype = cellTypes[1]
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
-        Finv = mapping_inv(cnodes, ct)
+        Finv = Bcube.mapping_inv(ctype, cnodes)
 
         interp = FunctionSpace(:Lagrange, 1)
-        ∇λ = x -> grad_shape_functions(interp, ct, cnodes, Finv(x))
+        ∇λ = x -> grad_shape_functions(interp, Val(1), ctype, cnodes, Finv(x))
         @test ∇λ(0.5) ≈ reshape([-1.0, 1.0], (2, 1))
     end
 
@@ -211,7 +212,7 @@ end
         mesh =
             Mesh([Node(S1), Node(S2), Node(S3)], [Tri3_t()], Connectivity([3], [1, 2, 3]))
         cellTypes = cells(mesh)
-        ct = cellTypes[1]
+        ctype = cellTypes[1]
         c2n = connectivities_indices(mesh, :c2n)
         n = get_nodes(mesh, c2n[1])
 
@@ -219,7 +220,7 @@ end
             0.5 * abs((S2[1] - S1[1]) * (S3[2] - S1[2]) - (S3[1] - S1[1]) * (S2[2] - S1[1]))
 
         interp = FunctionSpace(:Lagrange, 1)
-        ∇λ = x -> grad_shape_functions(interp, ct, n, x)
+        ∇λ = x -> grad_shape_functions(interp, Val(1), ctype, n, x)
         @test ∇λ([0, 0])[1, :] ≈ (0.5 / vol) * ([S2[2] - S3[2], S3[1] - S2[1]])
         @test ∇λ([0, 0])[2, :] ≈ (0.5 / vol) * ([S3[2] - S1[2], S1[1] - S3[1]])
         @test ∇λ([0, 0])[3, :] ≈ (0.5 / vol) * ([S1[2] - S2[2], S2[1] - S1[1]])

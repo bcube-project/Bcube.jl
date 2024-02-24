@@ -231,10 +231,11 @@ function _assemble_linear!(b, l, V, integration::Integration)
 end
 
 function _assemble_linear!(b, l, V, integration::MultiIntegration{N}) where {N}
-    for i in 1:N
-        ival = Val(i)
-        lᵢ(v) = l(v)[ival]
-        _assemble_linear!(b, lᵢ, V, integration[ival])
+    ival = Val(N)
+    lᵢ(v) = l(v)[ival]
+    _assemble_linear!(b, lᵢ, V, integration[ival])
+    if N > 1 # recursive calls
+        _assemble_linear!(b, l, V, MultiIntegration(Base.front(integration.integrations)))
     end
     return nothing
 end

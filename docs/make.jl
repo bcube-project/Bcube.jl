@@ -19,6 +19,7 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Manual" => Any[
+            "manual/conventions.md",
             "manual/geometry.md",
             "manual/integration.md",
             "manual/cellfunction.md",

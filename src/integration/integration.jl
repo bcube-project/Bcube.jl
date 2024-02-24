@@ -81,17 +81,17 @@ function integrate(g_ref, shape::AbstractShape, quadrature::AbstractQuadrature)
 end
 
 """
-    integrate(g, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature)
+    integrate(g, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
 
 Integrate function `g` expressed in local element. Depending on the cell type and the space
 dimension, a volumic or a 'surfacic' integration is performed.
 """
-function integrate(g, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature)
-    return integrate_ref(x -> g(mapping(cnodes, ctype, x)), cnodes, ctype, quadrature)
+function integrate(g, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
+    return integrate_ref(x -> g(mapping(ctype, cnodes, x)), ctype, cnodes, quadrature)
 end
 
 """
-    integrate_ref(g_ref, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature, [::T]) where {[T<:AbstractComputeQuadratureStyle]}
+    integrate_ref(g_ref, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature, [::T]) where {[T<:AbstractComputeQuadratureStyle]}
 
 Integrate function `g_ref` expressed in reference element. A variable substitution (involving Jacobian & Cie) is still
 applied, but the function is considered to be already mapped.
@@ -103,20 +103,20 @@ If the last argument is given, computation is optimized according to the given c
 """
 function integrate_ref(
     g_ref,
-    cnodes,
     ctype::AbstractEntityType,
+    cnodes,
     quadrature::AbstractQuadrature,
 )
-    integrate_ref(g_ref, cnodes, ctype, quadrature, ComputeQuadratureStyle(g_ref))
+    integrate_ref(g_ref, ctype, cnodes, quadrature, ComputeQuadratureStyle(g_ref))
 end
 function integrate_ref(
     g_ref,
-    cnodes,
     ctype::AbstractEntityType,
+    cnodes,
     quadrature::AbstractQuadrature,
     cqStyle::AbstractComputeQuadratureStyle,
 )
-    integrate_ref(topology_style(cnodes, ctype), g_ref, cnodes, ctype, quadrature, cqStyle)
+    integrate_ref(topology_style(ctype, cnodes), g_ref, ctype, cnodes, quadrature, cqStyle)
 end
 
 """
@@ -140,7 +140,7 @@ function integrate_on_ref(
     cqStyle::AbstractComputeQuadratureStyle,
 )
     integrate_on_ref(
-        topology_style(nodes(cellinfo), celltype(cellinfo)),
+        topology_style(celltype(cellinfo), nodes(cellinfo)),
         g,
         cellinfo,
         quadrature,
@@ -149,7 +149,7 @@ function integrate_on_ref(
 end
 
 """
-    integrate(g, iside::Int, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature)
+    integrate(g, iside::Int, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
 
 Integrate function `g` on the `iside`-th side of the cell defined by its nodes `cnodes` and its
 type `ctype`. Function `g(x)` is expressed in the local element.
@@ -157,8 +157,8 @@ type `ctype`. Function `g(x)` is expressed in the local element.
 function integrate(
     g,
     iside::Int,
-    cnodes,
     ctype::AbstractEntityType,
+    cnodes,
     quadrature::AbstractQuadrature,
 )
     # Get cell shape
@@ -174,15 +174,15 @@ function integrate(
     # we need to send x, from face-ref-element to cell-ref-element to local-element.
     # @ghislainb : need better solution to index with tuple
     return integrate_ref(
-        x -> g(mapping(cnodes, ctype, fp(x))),
-        [cnodes[i] for i in faces2nodes(ctype)[iside]],
+        x -> g(mapping(ctype, cnodes, fp(x))),
         ftype,
+        [cnodes[i] for i in faces2nodes(ctype)[iside]],
         quadrature,
     )
 end
 
 """
-    integrate_ref(g_ref, iside::Int, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature)
+    integrate_ref(g_ref, iside::Int, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
 
 Integrate function `g_ref` on the `iside`-th side of the cell defined by its nodes `cnodes` and its
 type `ctype`. Function `g_ref(x)` is expressed in the cell-reference element (not the face reference).
@@ -193,8 +193,8 @@ This function is helpfull to integrate shape functions (for instance ``\\int \\l
 function integrate_ref(
     g_ref,
     iside::Int,
-    cnodes,
     ctype::AbstractEntityType,
+    cnodes,
     quadrature::AbstractQuadrature,
 )
     # Get cell shape
@@ -210,14 +210,14 @@ function integrate_ref(
     # the cell-ref-element
     return integrate_ref(
         x -> g_ref(fp(x)),
-        [cnodes[i] for i in faces2nodes(ctype)[iside]],
         ftype,
+        [cnodes[i] for i in faces2nodes(ctype)[iside]],
         quadrature,
     )
 end
 
 """
-    integrate_n(g, iside::Int, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature)
+    integrate_n(g, iside::Int, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
 
 Perform an integration over the `iside`th face of an element (defined by `cnodes` and `ctype`).
 
@@ -230,8 +230,8 @@ This method is DEPRECATED : never used, except in the unit tests...
 function integrate_n(
     g,
     iside::Int,
-    cnodes,
     ctype::AbstractEntityType,
+    cnodes,
     quadrature::AbstractQuadrature,
 )
     # Get cell shape
@@ -248,15 +248,15 @@ function integrate_n(
     # so it doesn't need to be mapped. However for the second argument of `g` we need to send ξ from
     # the face-reference-element to the cell-reference-element to the cell-local-element.
     return integrate_ref(
-        ξ -> g(normal(cnodes, ctype, iside, ξ), mapping(cnodes, ctype, fp(ξ))),
-        fnodes,
+        ξ -> g(normal(ctype, cnodes, iside, ξ), mapping(ctype, cnodes, fp(ξ))),
         ftype,
+        fnodes,
         quadrature,
     )
 end
 
 """
-    integrate_n_ref(g_ref, iside::Int, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature)
+    integrate_n_ref(g_ref, iside::Int, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
 
 Perform an integration over the `iside`th face of an element (defined by `cnodes` and `ctype`).
 
@@ -265,8 +265,8 @@ Here `g_ref` is expressed in the cell-reference element but `n` is the normal ve
 function integrate_n_ref(
     g_ref,
     iside::Int,
-    cnodes,
     ctype::AbstractEntityType,
+    cnodes,
     quadrature::AbstractQuadrature,
 )
     # Get cell shape
@@ -283,15 +283,15 @@ function integrate_n_ref(
     # so it doesn't need to be mapped. However for the second argument of `gref` we need to send x from
     # the face-reference-element to the cell-reference-element
     return integrate_ref(
-        ξ -> g_ref(normal(cnodes, ctype, iside, ξ), fp(ξ)),
-        fnodes,
+        ξ -> g_ref(normal(ctype, cnodes, iside, ξ), fp(ξ)),
         ftype,
+        fnodes,
         quadrature,
     )
 end
 
 """
-    integrate_ref(::isVolumic, g_ref, cnodes, ctype::AbstractEntityType, quadrature::AbstractQuadrature, ::T) where{N, T<:AbstractComputeQuadratureStyle}
+    integrate_ref(::isVolumic, g_ref, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature, ::T) where{N, T<:AbstractComputeQuadratureStyle}
 
 Integrate function `g_ref` (expressed in reference element) on mesh element of type `ctype` defined by
 its `cnodes` at the `quadrature`.
@@ -307,8 +307,8 @@ decrease performance nor allocation.
 function integrate_ref(
     ::isVolumic,
     g_ref,
-    cnodes,
     ctype::AbstractEntityType,
+    cnodes,
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
 )
@@ -317,7 +317,7 @@ function integrate_ref(
     # of the mapping only once,
     # and multiply all components of `gref(x)`
     f = x -> begin
-        m = mapping_det_jacobian(cnodes, ctype, get_coord(x))
+        m = mapping_det_jacobian(ctype, cnodes, get_coord(x))
         map(gx -> m * gx, g_ref(x))
     end
     int = apply_quadrature(f, shape(ctype), quadrature, mapstyle)
@@ -325,18 +325,18 @@ function integrate_ref(
 end
 
 """
-    getcache_∫(etype::AbstractEntityType, nodes, quadrature::AbstractQuadrature)
+    getcache_∫(ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
 
 Return the data cache for function `∫`
 """
-function getcache_∫(etype::AbstractEntityType, nodes, quadrature::AbstractQuadrature)
-    qrule = QuadratureRule(shape(etype), quadrature)
+function getcache_∫(ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
+    qrule = QuadratureRule(shape(ctype), quadrature)
 
     qnodes = get_nodes(qrule)
     qweight = get_weights(qrule)
 
-    T = typeof(mapping_det_jacobian(nodes, etype, qnodes[1]))
-    qmap = SVector{length(qrule), T}(mapping_det_jacobian(nodes, etype, ξ) for ξ in qnodes)
+    T = typeof(mapping_det_jacobian(ctype, cnodes, qnodes[1]))
+    qmap = SVector{length(qrule), T}(mapping_det_jacobian(ctype, cnodes, ξ) for ξ in qnodes)
 
     return qmap, qweight, qnodes
 end
@@ -377,7 +377,7 @@ end
 integrate(g, cache) = ∫v(g, cache)
 
 """
-    integrate_ref(g_ref, cnodes, ctype, quadrature::AbstractQuadrature)
+    integrate_ref(g_ref, ctype, cnodes, quadrature::AbstractQuadrature)
 
 Integration on a node in a ``\\mathbb{R}^n`` space. This trivial function is only to simplify the 'side integral' expression.
 
@@ -389,8 +389,8 @@ see, `g_ref` doesnt actually depend on `ξ`
 function integrate_ref(
     ::isNodal,
     g_ref,
-    cnodes,
     ctype,
+    cnodes,
     quadrature::AbstractQuadrature,
     ::AbstractComputeQuadratureStyle,
 )
@@ -398,7 +398,7 @@ function integrate_ref(
 end
 
 """
-    integrate_ref(::isCurvilinear, g_ref, cnodes, ctype::AbstractEntityType{1}, quadrature::AbstractQuadrature, ::T) where {T<:AbstractComputeQuadratureStyle}
+    integrate_ref(::isCurvilinear, g_ref, ctype::AbstractEntityType{1}, cnodes, quadrature::AbstractQuadrature, ::T) where {T<:AbstractComputeQuadratureStyle}
 
 Perform an integration of the function `g_ref` (expressed in local element) over a line in a ``\\matbb{R}^n`` space.
 
@@ -410,8 +410,8 @@ Computation is optimized according to the given concrete type `T<:AbstractComput
 function integrate_ref(
     ::isCurvilinear,
     g_ref,
-    cnodes,
     ctype::AbstractEntityType{1},
+    cnodes,
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
 )
@@ -423,7 +423,7 @@ function integrate_ref(
     return apply_quadrature2(f, shape(ctype), quadrature, mapstyle)
 end
 function _apply_curvilinear_metric1((g_ref, cnodes, ctype), x)
-    m = norm(mapping_jacobian(cnodes, ctype, x))
+    m = norm(mapping_jacobian(ctype, cnodes, x))
     map(gx -> m * gx, g_ref(x)) # `map` is needed by legacy
     #m*g_ref(x) ok for new api
 end
@@ -444,7 +444,7 @@ function integrate_on_ref(
 end
 
 function _apply_curvilinear_metric((g, cellinfo), x)
-    m = norm(mapping_jacobian(nodes(cellinfo), celltype(cellinfo), get_coord(x)))
+    m = norm(mapping_jacobian(celltype(cellinfo), nodes(cellinfo), get_coord(x)))
     cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
     m * g(cellpoint)
 end
@@ -466,7 +466,7 @@ end
 
 function _apply_volume_metric(g_and_c::T, x::T1) where {T, T1}
     g, cellinfo = g_and_c
-    m = mapping_det_jacobian(nodes(cellinfo), celltype(cellinfo), get_coord(x))
+    m = mapping_det_jacobian(celltype(cellinfo), nodes(cellinfo), get_coord(x))
     cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
     m * g(cellpoint)
 end
@@ -474,13 +474,13 @@ end
 function integrate_ref(
     ::isSurfacic,
     g_ref,
-    cnodes,
     ctype::AbstractEntityType,
+    cnodes,
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
 )
     I = function (ξ)
-        J = mapping_jacobian(cnodes, ctype, ξ)
+        J = mapping_jacobian(ctype, cnodes, ξ)
         return norm(J[:, 1] × J[:, 2])
     end
     return apply_quadrature(ξ -> I(ξ), g_ref, shape(ctype), quadrature)
@@ -495,32 +495,12 @@ function integrate_face_ref(g_ref, finfo::FaceInfo, quadrature::AbstractQuadratu
     _g_ref = ξ -> g_ref(FacePoint(ξ, finfo, ReferenceDomain()))
     return integrate_ref(
         _g_ref,
-        nodes(finfo),
         facetype(finfo),
+        nodes(finfo),
         quadrature,
         ComputeQuadratureStyle(_g_ref),
     )
 end
-
-# function integrate_face_ref(g_ref, finfo::FaceInfo{T,T}, ::Val{N}) where {N,T<:CellInfo{AbstractEntityType{1}}}
-
-# end
-
-# #---------------------------------------------------------------- (deprecated) Barycentric integrals
-# """
-#     integrate(g, iside::Int, shape::AbstractShape, order::Val{N}) where{N}
-
-# Integrate function `g` on a side of reference element of type `shape`
-# using barycentric coordinates at the `order`-th order.
-
-# g has to be expressed in terms of reference coordinates
-
-# """
-# function integrate(g, iside::Int, shape::AbstractShape, order::Val{N}) where {N}
-#     vertices = coords(shape, faces2nodes(shape))[iside]
-#     weighting = x -> x[1] * x[2]
-#     return sum(x -> x[1] * g(sum(weighting, zip(x[2], vertices))), quadrature_rule_bary(iside, shape, order))
-# end
 
 struct Integrand{N, F}
     f::F
@@ -542,6 +522,7 @@ Soustraction on an `Integrand` is treated as a multiplication by "(-1)" :
 `-a ≡ ((-1)*a)`
 """
 Base.:-(a::Integrand) = Integrand((-1) * get_function(a))
+Base.:+(a::Integrand) = a
 
 struct Integration{I <: Integrand, M <: Measure}
     integrand::I
@@ -575,6 +556,7 @@ Soustraction on an `Integration` is treated as a multiplication by "(-1)" :
 `-a ≡ ((-1)*a)`
 """
 Base.:-(a::Integration) = (-1) * a
+Base.:+(a::Integration) = a
 
 struct MultiIntegration{N, I <: Tuple{Vararg{Integration, N}}}
     integrations::I
@@ -604,7 +586,9 @@ end
 function MultiIntegration(a::NTuple{N, <:Integration}) where {N}
     MultiIntegration{length(a), typeof(a)}(a)
 end
-MultiIntegration(a::Integration, b::Integration...) = MultiIntegration((a, b...))
+function MultiIntegration(a::Integration, b::Vararg{Integration, N}) where {N}
+    MultiIntegration((a, b...))
+end
 
 Base.getindex(a::MultiIntegration, ::Val{I}) where {I} = a.integrations[I]
 Base.iterate(a::MultiIntegration, i) = iterate(a.integrations, i)
@@ -615,8 +599,9 @@ Base.:+(a::Integration, b::Integration) = MultiIntegration(a, b)
 Base.:+(a::MultiIntegration, b::Integration) = MultiIntegration(a.integrations..., b)
 Base.:+(a::Integration, b::MultiIntegration) = MultiIntegration(a, b.integrations...)
 function Base.:+(a::MultiIntegration, b::MultiIntegration)
-    MultiIntegration(a.integrations, b.integrations...)
+    MultiIntegration((a.integrations..., b.integrations...))
 end
+Base.:+(a::MultiIntegration) = a
 
 Base.:-(a::Integration, b::Integration) = MultiIntegration(a, -b)
 Base.:-(a::MultiIntegration, b::Integration) = MultiIntegration(a.integrations..., -b)
@@ -624,8 +609,9 @@ function Base.:-(a::Integration, b::MultiIntegration)
     MultiIntegration(a, map(-, b.integrations)...)
 end
 function Base.:-(a::MultiIntegration, b::MultiIntegration)
-    MultiIntegration(a.integrations, map(-, b.integrations)...)
+    MultiIntegration((a.integrations..., map(-, b.integrations)...))
 end
+Base.:-(a::MultiIntegration) = MultiIntegration(map(-, a.integrations)...)
 
 # implement AbstractLazy inteface:
 LazyOperators.pretty_name(::MultiIntegration{N}) where {N} = "MultiIntegration: (N=$N)"

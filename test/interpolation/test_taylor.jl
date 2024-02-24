@@ -1,3 +1,5 @@
+import Bcube: shape_functions, grad_shape_functions
+
 @testset "Taylor" begin
 
     # TODO : add more test for gradients, waiting for Ghislain's commit
