@@ -38,7 +38,7 @@ include("./mesh/shape.jl")
 include("./mesh/connectivity.jl")
 
 include("./mesh/mesh.jl")
-export ncells, nnodes, boundary_names, nboundaries, boundary_tag
+export ncells, nnodes, boundary_names, nboundaries, boundary_tag, get_nodes
 
 include("./mesh/gmsh_utils.jl")
 export read_msh,

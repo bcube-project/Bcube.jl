@@ -283,7 +283,8 @@ _ratio(x, y) = abs(x / (y + eps(y)))
         mass = nothing,
     ) where {N, Me, BC <: PeriodicBCType}
 
-Apply the linear scaling limiter (see https://www.brown.edu/research/projects/scientific-computing/sites/brown.edu.research.projects.scientific-computing/files/uploads/Maximum-principle-satisfying%20and%20positivity-preserving.pdf).
+Apply the linear scaling limiter (see "Maximum-principle-satisfying and positivity-preserving high order schemes for
+conservation laws: Survey and new developments", Zhang & Shu).
 
 `u_limited = u̅ + lim_u * (u - u̅)`
 
