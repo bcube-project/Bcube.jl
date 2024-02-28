@@ -5,7 +5,7 @@
     icell = 1
     s = shape(cells(mesh)[icell])
     cInfo = CellInfo(mesh, icell)
-    cPoint = Bcube.CellPoint(SA[0.0, 0.0], cInfo, Bcube.ReferenceDomain())
+    cPoint = CellPoint(SA[0.0, 0.0], cInfo, ReferenceDomain())
 
     # Function and fe spaces
     fs = FunctionSpace(:Lagrange, 1)

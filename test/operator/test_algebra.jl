@@ -154,9 +154,9 @@
             u_b = PhysicalFunction(x -> x[1]^2 + 2 * x[1] * x[2] + x[2]^3)
             ∇u_ana = x -> SA[2 * (x[1] + x[2]); 2 * x[1] + 3 * x[2]^2]
 
-            ξ = Bcube.CellPoint(SA[0.5, -0.1], c, Bcube.ReferenceDomain())
-            x = Bcube.change_domain(ξ, Bcube.PhysicalDomain())
-            ∇u = ∇u_ana(Bcube.get_coord(x))
+            ξ = CellPoint(SA[0.5, -0.1], c, ReferenceDomain())
+            x = change_domain(ξ, Bcube.PhysicalDomain())
+            ∇u = ∇u_ana(get_coord(x))
             ∇u_a_ref = Bcube.materialize(∇(u_a), ξ)
             ∇u_b_ref = Bcube.materialize(∇(u_b), ξ)
             ∇u_a_phy = Bcube.materialize(∇(u_a), x)
@@ -173,10 +173,10 @@
             u_b = ReferenceFunction(ξ -> ξ[1]^2 + 2 * ξ[1] * ξ[2] + ξ[2]^3)
             ∇u_ana = ξ -> SA[2 * (ξ[1] + ξ[2]); 2 * ξ[1] + 3 * ξ[2]^2]
 
-            x = Bcube.CellPoint(SA[0.5, -0.1], c, Bcube.PhysicalDomain())
-            ξ = Bcube.change_domain(x, Bcube.ReferenceDomain()) # not always possible, but ok of for quad
-            ∇u = ∇u_ana(Bcube.get_coord(ξ))
-            _tJinv = tJinv(Bcube.get_coord(ξ))
+            x = CellPoint(SA[0.5, -0.1], c, Bcube.PhysicalDomain())
+            ξ = change_domain(x, ReferenceDomain()) # not always possible, but ok of for quad
+            ∇u = ∇u_ana(get_coord(ξ))
+            _tJinv = tJinv(get_coord(ξ))
             ∇u_a_ref = Bcube.materialize(∇(u_a), ξ)
             ∇u_b_ref = Bcube.materialize(∇(u_b), ξ)
             ∇u_a_phy = Bcube.materialize(∇(u_a), x)
@@ -191,11 +191,11 @@
             u_ref = ReferenceFunction(ξ -> ξ[1]^2 + 2 * ξ[1] * ξ[2] + ξ[2]^3)
             ∇u_ana = t -> SA[2 * (t[1] + t[2]); 2 * t[1] + 3 * t[2]^2]
 
-            ξ = Bcube.CellPoint(SA[0.5, -0.1], c, Bcube.ReferenceDomain())
-            x = Bcube.change_domain(ξ, Bcube.PhysicalDomain())
-            ∇u_ref = ∇u_ana(Bcube.get_coord(ξ))
-            ∇u_phy = ∇u_ana(Bcube.get_coord(x))
-            _tJinv = tJinv(Bcube.get_coord(ξ))
+            ξ = CellPoint(SA[0.5, -0.1], c, ReferenceDomain())
+            x = change_domain(ξ, Bcube.PhysicalDomain())
+            ∇u_ref = ∇u_ana(get_coord(ξ))
+            ∇u_phy = ∇u_ana(get_coord(x))
+            _tJinv = tJinv(get_coord(ξ))
             @test all(Bcube.materialize(∇(u_phy + u_ref), ξ) .≈ ∇u_phy + _tJinv * ∇u_ref)
             @test all(Bcube.materialize(∇(u_phy + u_ref), x) .≈ ∇u_phy + _tJinv * ∇u_ref)
         end
@@ -227,7 +227,7 @@
         u = PhysicalFunction(x -> 3.0)
         v = PhysicalFunction(x -> 2.0)
         cinfo = CellInfo(mesh, 1)
-        cpoint = Bcube.CellPoint(SA[0.1, 0.3], cinfo, Bcube.ReferenceDomain())
+        cpoint = CellPoint(SA[0.1, 0.3], cinfo, ReferenceDomain())
 
         @test Bcube.materialize(u * u, cinfo)(cpoint) ≈ 9
         @test Bcube.materialize(u^2, cinfo)(cpoint) ≈ 9

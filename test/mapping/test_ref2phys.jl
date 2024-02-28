@@ -18,7 +18,7 @@
 
         #- Taylor degree 0
         fs = FunctionSpace(:Taylor, 0)
-        dhl = Bcube.DofHandler(mesh, fs, 1, false)
+        dhl = DofHandler(mesh, fs, 1, false)
         λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         r = rand()
         q = [r]
@@ -31,16 +31,13 @@
         cInfo = CellInfo(mesh, 1)
         _u = Bcube.materialize(u, cInfo)
         @test all(
-            isapprox(
-                _u(Bcube.CellPoint(x, cInfo, Bcube.PhysicalDomain())),
-                r;
-                atol = eps(),
-            ) for x in xtest
+            isapprox(_u(CellPoint(x, cInfo, Bcube.PhysicalDomain())), r; atol = eps()) for
+            x in xtest
         )
 
         #- Taylor degree 1
         fs = FunctionSpace(:Taylor, 1)
-        dhl = Bcube.DofHandler(mesh, fs, 1, false)
+        dhl = DofHandler(mesh, fs, 1, false)
         λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         coef = rand()
         q = [coef * (xmin + xmax) / 2, (xmax - xmin) * coef] # f(x) = coef*x
@@ -56,7 +53,7 @@
         _u = Bcube.materialize(u, cInfo)
         @test all(
             isapprox(
-                _u(Bcube.CellPoint(x, cInfo, Bcube.PhysicalDomain())),
+                _u(CellPoint(x, cInfo, Bcube.PhysicalDomain())),
                 coef * x;
                 atol = eps(),
             ) for x in xtest
@@ -143,7 +140,7 @@
 
         #- Taylor degree 0
         fs = FunctionSpace(:Taylor, 0)
-        dhl = Bcube.DofHandler(mesh, fs, 1, false)
+        dhl = DofHandler(mesh, fs, 1, false)
         λ = shape_functions(fs, shape(ctype))
         r = rand()
         q = [r]
@@ -156,16 +153,13 @@
         cInfo = CellInfo(mesh, 1)
         _u = Bcube.materialize(u, cInfo)
         @test all(
-            isapprox(
-                _u(Bcube.CellPoint(x, cInfo, Bcube.PhysicalDomain())),
-                r;
-                atol = eps(),
-            ) for x in xtest
+            isapprox(_u(CellPoint(x, cInfo, Bcube.PhysicalDomain())), r; atol = eps()) for
+            x in xtest
         )
 
         #- Taylor degree 1
         fs = FunctionSpace(:Taylor, 1)
-        dhl = Bcube.DofHandler(mesh, fs, 1, false)
+        dhl = DofHandler(mesh, fs, 1, false)
         λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         coefx, coefy = rand(2)
         q = [[coefx, coefy] ⋅ xc, Δx * coefx, Δy * coefy] # f(x,y) = coefx*x + coefy*y
@@ -180,7 +174,7 @@
         _u = Bcube.materialize(u, cInfo)
         @test all(
             isapprox(
-                _u(Bcube.CellPoint(x, cInfo, Bcube.PhysicalDomain())),
+                _u(CellPoint(x, cInfo, Bcube.PhysicalDomain())),
                 [coefx, coefy] ⋅ x;
                 atol = 10 * eps(),
             ) for x in xtest

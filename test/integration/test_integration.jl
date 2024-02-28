@@ -298,12 +298,10 @@ end
 
         kface = 1
         _f2n = f2n[kface]
-        finfo_1 =
-            Bcube.FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
+        finfo_1 = FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
         kface = 2
         _f2n = f2n[kface]
-        finfo_2 =
-            Bcube.FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
+        finfo_2 = FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
 
         g = PhysicalFunction(x -> 2.5)
         @test Bcube.integrate_face_ref(g, finfo_1, Quadrature(1)) ≈ 2.5
@@ -338,16 +336,13 @@ end
 
         kface = 1
         _f2n = f2n[kface]
-        finfo_1 =
-            Bcube.FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
+        finfo_1 = FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
         kface = 2
         _f2n = f2n[kface]
-        finfo_2 =
-            Bcube.FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
+        finfo_2 = FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
         kface = 3
         _f2n = f2n[kface]
-        finfo_3 =
-            Bcube.FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
+        finfo_3 = FaceInfo(cinfo, cinfo, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n)
 
         # Test for constant
         g = PhysicalFunction(x -> 2.5)
