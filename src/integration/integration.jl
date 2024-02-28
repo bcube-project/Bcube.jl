@@ -120,32 +120,30 @@ function integrate_ref(
 end
 
 """
-    integrate_on_ref(g, cellinfo::CellInfo, quadrature::AbstractQuadrature, [::T]) where {N,[T<:AbstractComputeQuadratureStyle]}
+    integrate_on_ref(g, cellinfo::CellInfo, quadrature::AbstractQuadrature)
+    integrate_on_ref(
+        g,
+        cellinfo::CellInfo,
+        quadrature::AbstractQuadrature,
+        cqStyle::AbstractComputeQuadratureStyle,
+    )
 
 Integrate a function `g` over a cell decribed by `cellinfo`. The function `g` can be expressed in the reference or
 the physical space corresponding to the cell, both cases are automatically handled by applying necessary mapping when needed.
 
-This function is helpfull to integrate shape functions (for instance ``\\int \\lambda_i \\lambda_j``) when the inverse
-mapping is not known explicitely (hence only ``\\hat{lambda}`` are known, not ``\\lambda``).
-
-If the last argument is given, computation is optimized according to the given concrete type `T<:AbstractComputeQuadratureStyle`.
+If the argument `cqStyle` is given, computation is optimized according to the given concrete type `T<:AbstractComputeQuadratureStyle`.
 """
 function integrate_on_ref(g, cellinfo::CellInfo, quadrature::AbstractQuadrature)
     integrate_on_ref(g, cellinfo, quadrature, ComputeQuadratureStyle(g))
 end
+
 function integrate_on_ref(
     g,
     cellinfo::CellInfo,
     quadrature::AbstractQuadrature,
     cqStyle::AbstractComputeQuadratureStyle,
 )
-    integrate_on_ref(
-        topology_style(celltype(cellinfo), nodes(cellinfo)),
-        g,
-        cellinfo,
-        quadrature,
-        cqStyle,
-    )
+    integrate_on_ref(g, cellinfo, quadrature, cqStyle)
 end
 
 """
@@ -212,45 +210,6 @@ function integrate_ref(
         x -> g_ref(fp(x)),
         ftype,
         [cnodes[i] for i in faces2nodes(ctype)[iside]],
-        quadrature,
-    )
-end
-
-"""
-    integrate_n(g, iside::Int, ctype::AbstractEntityType, cnodes, quadrature::AbstractQuadrature)
-
-Perform an integration over the `iside`th face of an element (defined by `cnodes` and `ctype`).
-
-Here `g` is expressed in the cell-local element : `n` is the normal vector in the local element,
-and `x` is in the local element as well.
-
-# Dev notes:
-This method is DEPRECATED : never used, except in the unit tests...
-"""
-function integrate_n(
-    g,
-    iside::Int,
-    ctype::AbstractEntityType,
-    cnodes,
-    quadrature::AbstractQuadrature,
-)
-    # Get cell shape
-    cshape = shape(ctype)
-
-    # Get face type and nodes
-    ftype = facetypes(ctype)[iside]
-    fnodes = [cnodes[i] for i in faces2nodes(ctype)[iside]]
-
-    # Get face parametrisation
-    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
-
-    # `g` is express in the cell-local-element. The function `normal` takes input from the face-ref-element
-    # so it doesn't need to be mapped. However for the second argument of `g` we need to send ξ from
-    # the face-reference-element to the cell-reference-element to the cell-local-element.
-    return integrate_ref(
-        ξ -> g(normal(ctype, cnodes, iside, ξ), mapping(ctype, cnodes, fp(ξ))),
-        ftype,
-        fnodes,
         quadrature,
     )
 end
@@ -377,7 +336,16 @@ end
 integrate(g, cache) = ∫v(g, cache)
 
 """
-    integrate_ref(g_ref, ctype, cnodes, quadrature::AbstractQuadrature)
+    integrate_on_ref(
+        g::G,
+        cellinfo::CellInfo,
+        quadrature::AbstractQuadrature,
+        mapstyle::MapComputeQuadratureStyle,
+    ) where {G}
+
+Perform an integration of the function `g_ref` (expressed in local element).
+
+Computation is optimized according to the given concrete type `T<:AbstractComputeQuadratureStyle`.
 
 Integration on a node in a ``\\mathbb{R}^n`` space. This trivial function is only to simplify the 'side integral' expression.
 
@@ -386,71 +354,7 @@ For consistency reasons, `g_ref` is a function but it doesnt actually use its ar
 can be anything. For instance consider integrating `g(x) = x` on a node named `node`. Then `g_ref(ξ) = g ∘ node.x`. As you can
 see, `g_ref` doesnt actually depend on `ξ`
 """
-function integrate_ref(
-    ::isNodal,
-    g_ref,
-    ctype,
-    cnodes,
-    quadrature::AbstractQuadrature,
-    ::AbstractComputeQuadratureStyle,
-)
-    return g_ref(nothing)
-end
-
-"""
-    integrate_ref(::isCurvilinear, g_ref, ctype::AbstractEntityType{1}, cnodes, quadrature::AbstractQuadrature, ::T) where {T<:AbstractComputeQuadratureStyle}
-
-Perform an integration of the function `g_ref` (expressed in local element) over a line in a ``\\matbb{R}^n`` space.
-
-The applied formulae is: ``\\int_\\Gamma g(x) dx = \\int_l ||F'(l)|| g_ref(l) dl``
-where ``F ~:~ \\mathbb{R} \\rightarrow \\mathbb{R}^n`` is the reference segment [-1,1] to the R^n line mapping.
-
-Computation is optimized according to the given concrete type `T<:AbstractComputeQuadratureStyle`.
-"""
-function integrate_ref(
-    ::isCurvilinear,
-    g_ref,
-    ctype::AbstractEntityType{1},
-    cnodes,
-    quadrature::AbstractQuadrature,
-    mapstyle::MapComputeQuadratureStyle,
-)
-    # the metric should be apply to `g_ref` before the integration:
-    # compute the determinant of the jacobian
-    # of the mapping only once,
-    # and multiply all components of `gref(x)`
-    f = Base.Fix1(_apply_curvilinear_metric1, (g_ref, cnodes, ctype))
-    return apply_quadrature2(f, shape(ctype), quadrature, mapstyle)
-end
-function _apply_curvilinear_metric1((g_ref, cnodes, ctype), x)
-    m = norm(mapping_jacobian(ctype, cnodes, x))
-    map(gx -> m * gx, g_ref(x)) # `map` is needed by legacy
-    #m*g_ref(x) ok for new api
-end
-
 function integrate_on_ref(
-    ::isCurvilinear,
-    g,
-    cellinfo::CellInfo{<:AbstractEntityType{1}},
-    quadrature::AbstractQuadrature,
-    mapstyle::MapComputeQuadratureStyle,
-)
-    # the metric should be apply to `g` before the integration:
-    # compute the determinant of the jacobian
-    # of the mapping only once,
-    # and multiply all components of `g(x)`
-    f = Base.Fix1(_apply_curvilinear_metric, (g, cellinfo))
-    return apply_quadrature2(f, shape(celltype(cellinfo)), quadrature, mapstyle)
-end
-
-function _apply_curvilinear_metric((g, cellinfo), x)
-    m = norm(mapping_jacobian(celltype(cellinfo), nodes(cellinfo), get_coord(x)))
-    cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
-    m * g(cellpoint)
-end
-
-function integrate_on_ref(
-    ::isVolumic,
     g::G,
     cellinfo::CellInfo,
     quadrature::AbstractQuadrature,
@@ -459,31 +363,18 @@ function integrate_on_ref(
     # the metric should be apply to `g` before the integration:
     # compute the determinant of the jacobian
     # of the mapping only once, and multiply `g(x)`
-    f = Base.Fix1(_apply_volume_metric, (g, cellinfo))
+    f = Base.Fix1(_apply_metric, (g, cellinfo))
     int = apply_quadrature(f, shape(celltype(cellinfo)), quadrature, mapstyle)
     return int
 end
 
-function _apply_volume_metric(g_and_c::T, x::T1) where {T, T1}
+function _apply_metric(g_and_c::T, x::T1) where {T, T1}
     g, cellinfo = g_and_c
-    m = mapping_det_jacobian(celltype(cellinfo), nodes(cellinfo), get_coord(x))
+    ctype = celltype(cellinfo)
+    cnodes = nodes(cellinfo)
+    m = mapping_det_jacobian(topology_style(ctype, cnodes), ctype, cnodes, get_coord(x))
     cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
     m * g(cellpoint)
-end
-
-function integrate_ref(
-    ::isSurfacic,
-    g_ref,
-    ctype::AbstractEntityType,
-    cnodes,
-    quadrature::AbstractQuadrature,
-    mapstyle::MapComputeQuadratureStyle,
-)
-    I = function (ξ)
-        J = mapping_jacobian(ctype, cnodes, ξ)
-        return norm(J[:, 1] × J[:, 2])
-    end
-    return apply_quadrature(ξ -> I(ξ), g_ref, shape(ctype), quadrature)
 end
 
 """
