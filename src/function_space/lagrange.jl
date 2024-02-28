@@ -47,132 +47,6 @@ end
 
 basis_functions_style(::FunctionSpace{<:Lagrange}) = NodalBasisFunctionsStyle()
 
-"""
-    shape_functions(::FunctionSpace{<:Lagrange}, :: Val{N}, ::AbstractShape, ξ) where {N}
-
-# Implementation
-For N > 1, the default version consists in "replicating" the shape functions.
-If `shape_functions` returns the vector `[λ₁; λ₂; λ₃]`, and if the `FESpace` is of size `2`,
-then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0; λ₃ 0; 0 λ₁; 0 λ₂; 0 λ₃]`.
-
-# Triangle
-## Order 1
-```math
-\\hat{\\lambda}_1(\\xi, \\eta) = 1 - \\xi - \\eta \\hspace{1cm}
-\\hat{\\lambda}_2(\\xi, \\eta) = \\xi                \\hspace{1cm}
-\\hat{\\lambda}_3(\\xi, \\eta) = \\eta
-```
-
-## Order 2
-```math
-\\begin{aligned}
-    & \\hat{\\lambda}_1(\\xi, \\eta) = (1 - \\xi - \\eta)(1 - 2 \\xi - 2 \\eta) \\\\
-    & \\hat{\\lambda}_2(\\xi, \\eta) = \\xi (2\\xi - 1) \\\\
-    & \\hat{\\lambda}_3(\\xi, \\eta) = \\eta (2\\eta - 1) \\\\
-    & \\hat{\\lambda}_{12}(\\xi, \\eta) = 4 \\xi (1 - \\xi - \\eta) \\\\
-    & \\hat{\\lambda}_{23}(\\xi, \\eta) = 4 \\xi \\eta \\\\
-    & \\hat{\\lambda}_{31}(\\xi, \\eta) = 4 \\eta (1 - \\xi - \\eta)
-\\end{aligned}
-```
-
-# Prism
-## Order 1
-```math
-\\hat{\\lambda}_1(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta)(1 - \\zeta)/2 \\hspace{1cm}
-\\hat{\\lambda}_2(\\xi, \\eta, \\zeta) = \\xi (1 - \\zeta)/2          \\hspace{1cm}
-\\hat{\\lambda}_3(\\xi, \\eta, \\zeta) = \\eta (1 - \\zeta)/2  \\hspace{1cm}
-\\hat{\\lambda}_5(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta)(1 + \\zeta)/2 \\hspace{1cm}
-\\hat{\\lambda}_6(\\xi, \\eta, \\zeta) = \\xi (1 + \\zeta)/2          \\hspace{1cm}
-\\hat{\\lambda}_7(\\xi, \\eta, \\zeta) = \\eta (1 + \\zeta)/2  \\hspace{1cm}
-```
-"""
-function _doc_shape_functions_lagrange end
-
-"""
-    ∂λξ_∂ξ(::FunctionSpace{<:Lagrange}, ::Val{1}, ::AbstractShape, ξ)
-
-# Triangle
-## Order 0
-```math
-\\nabla \\hat{\\lambda}(\\xi, \\eta) =
-\\begin{pmatrix}
-    0 \\\\ 0
-\\end{pmatrix}
-```
-
-## Order 1
-```math
-\\begin{aligned}
-    & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) =
-        \\begin{pmatrix}
-            -1 \\\\ -1
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_2(\\xi, \\eta) =
-        \\begin{pmatrix}
-            1 \\\\ 0
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_3(\\xi, \\eta) =
-        \\begin{pmatrix}
-            0 \\\\ 1
-        \\end{pmatrix} \\\\
-\\end{aligned}
-```
-
-## Order 2
-```math
-\\begin{aligned}
-    & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) =
-        \\begin{pmatrix}
-            -3 + 4 (\\xi + \\eta) \\\\ -3 + 4 (\\xi + \\eta)
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_2(\\xi, \\eta) =
-        \\begin{pmatrix}
-            -1 + 4 \\xi \\\\ 0
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_3(\\xi, \\eta) =
-        \\begin{pmatrix}
-            0 \\\\ -1 + 4 \\eta
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_{12}(\\xi, \\eta) =
-        4 \\begin{pmatrix}
-            1 - 2 \\xi - \\eta \\\\ - \\xi
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_{23}(\\xi, \\eta) =
-        4 \\begin{pmatrix}
-            \\eta \\\\ \\xi
-        \\end{pmatrix} \\\\
-    & \\nabla \\hat{\\lambda}_{31}(\\xi, \\eta) =
-        4 \\begin{pmatrix}
-            - \\eta \\\\ 1 - 2 \\eta - \\xi
-        \\end{pmatrix} \\\\
-\\end{aligned}
-```
-
-# Square
-## Order 0
-```math
-\\nabla \\hat{\\lambda}(\\xi, \\eta) =
-\\begin{pmatrix}
-    0 \\\\ 0
-\\end{pmatrix}
-```
-
-"""
-function _doc_∂λξ_∂ξ_lagrange end
-
-"""
-    shape_functions_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}
-    ∂λξ_∂ξ_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}
-
-# Implementation
-Based on `Symbolic.jl`. First tests show that this version is slower than the implementation based on `meta`
-when `D` is greater. Further investigations are needed to understand this behavior.
-
-`shape_functions_symbolic` uses a "generated" function named `_shape_functions_symbolic`. The core of the
-generated function is an `Expression` that is created by `__shape_functions_symbolic`. This latter function
-uses the `Symbolics` package and the lagrange polynomials (defined in `_lagrange_poly`).
-"""
-
 function _lagrange_poly(j, ξ, nodes)
     coef = 1.0 / prod((nodes[j] - nodes[k]) for k in eachindex(nodes) if k ≠ j)
     return coef * prod((ξ - nodes[k]) for k in eachindex(nodes) if k ≠ j)
@@ -195,6 +69,18 @@ end
     __shape_functions_symbolic(quadrule, T)
 end
 
+"""
+    shape_functions_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}
+    ∂λξ_∂ξ_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}
+
+# Implementation
+Based on `Symbolic.jl`. First tests show that this version is slower than the implementation based on `meta`
+when `D` is greater. Further investigations are needed to understand this behavior.
+
+`shape_functions_symbolic` uses a "generated" function named `_shape_functions_symbolic`. The core of the
+generated function is an `Expression` that is created by `__shape_functions_symbolic`. This latter function
+uses the `Symbolics` package and the lagrange polynomials (defined in `_lagrange_poly`).
+"""
 function shape_functions_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Line, ξ) where {D}
     quadtype = lagrange_quadrature_type(fs)
     quad = Quadrature(quadtype, Val(D))
@@ -284,6 +170,47 @@ function _scalar_shape_functions(
     shape_functions_symbolic(fs, shape, ξ)
 end
 
+"""
+    shape_functions(::FunctionSpace{<:Lagrange}, :: Val{N}, ::AbstractShape, ξ) where {N}
+
+# Implementation
+For N > 1, the default version consists in "replicating" the shape functions.
+If `shape_functions` returns the vector `[λ₁; λ₂; λ₃]`, and if the `FESpace` is of size `2`,
+then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0; λ₃ 0; 0 λ₁; 0 λ₂; 0 λ₃]`.
+
+# Triangle
+## Order 1
+```math
+\\hat{\\lambda}_1(\\xi, \\eta) = 1 - \\xi - \\eta \\hspace{1cm}
+\\hat{\\lambda}_2(\\xi, \\eta) = \\xi                \\hspace{1cm}
+\\hat{\\lambda}_3(\\xi, \\eta) = \\eta
+```
+
+## Order 2
+```math
+\\begin{aligned}
+    & \\hat{\\lambda}_1(\\xi, \\eta) = (1 - \\xi - \\eta)(1 - 2 \\xi - 2 \\eta) \\\\
+    & \\hat{\\lambda}_2(\\xi, \\eta) = \\xi (2\\xi - 1) \\\\
+    & \\hat{\\lambda}_3(\\xi, \\eta) = \\eta (2\\eta - 1) \\\\
+    & \\hat{\\lambda}_{12}(\\xi, \\eta) = 4 \\xi (1 - \\xi - \\eta) \\\\
+    & \\hat{\\lambda}_{23}(\\xi, \\eta) = 4 \\xi \\eta \\\\
+    & \\hat{\\lambda}_{31}(\\xi, \\eta) = 4 \\eta (1 - \\xi - \\eta)
+\\end{aligned}
+```
+
+# Prism
+## Order 1
+```math
+\\begin{aligned}
+    \\hat{\\lambda}_1(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta)(1 - \\zeta)/2 \\hspace{1cm}
+    \\hat{\\lambda}_2(\\xi, \\eta, \\zeta) = \\xi (1 - \\zeta)/2          \\hspace{1cm}
+    \\hat{\\lambda}_3(\\xi, \\eta, \\zeta) = \\eta (1 - \\zeta)/2  \\hspace{1cm}
+    \\hat{\\lambda}_5(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta)(1 + \\zeta)/2 \\hspace{1cm}
+    \\hat{\\lambda}_6(\\xi, \\eta, \\zeta) = \\xi (1 + \\zeta)/2          \\hspace{1cm}
+    \\hat{\\lambda}_7(\\xi, \\eta, \\zeta) = \\eta (1 + \\zeta)/2  \\hspace{1cm}
+\\end{aligned}
+```
+"""
 function shape_functions(
     fs::FunctionSpace{<:Lagrange, D},
     ::Val{N},
@@ -309,6 +236,77 @@ end
 # Lagrange function for degree = 0
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Line, ξ) = SA[1.0]
 ndofs(::FunctionSpace{<:Lagrange, 0}, ::Line) = 1
+
+"""
+    ∂λξ_∂ξ(::FunctionSpace{<:Lagrange}, ::Val{1}, ::AbstractShape, ξ)
+
+# Triangle
+## Order 0
+```math
+\\nabla \\hat{\\lambda}(\\xi, \\eta) =
+\\begin{pmatrix}
+    0 \\\\ 0
+\\end{pmatrix}
+```
+
+## Order 1
+```math
+\\begin{aligned}
+    & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) =
+        \\begin{pmatrix}
+            -1 \\\\ -1
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_2(\\xi, \\eta) =
+        \\begin{pmatrix}
+            1 \\\\ 0
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_3(\\xi, \\eta) =
+        \\begin{pmatrix}
+            0 \\\\ 1
+        \\end{pmatrix} \\\\
+\\end{aligned}
+```
+
+## Order 2
+```math
+\\begin{aligned}
+    & \\nabla \\hat{\\lambda}_1(\\xi, \\eta) =
+        \\begin{pmatrix}
+            -3 + 4 (\\xi + \\eta) \\\\ -3 + 4 (\\xi + \\eta)
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_2(\\xi, \\eta) =
+        \\begin{pmatrix}
+            -1 + 4 \\xi \\\\ 0
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_3(\\xi, \\eta) =
+        \\begin{pmatrix}
+            0 \\\\ -1 + 4 \\eta
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_{12}(\\xi, \\eta) =
+        4 \\begin{pmatrix}
+            1 - 2 \\xi - \\eta \\\\ - \\xi
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_{23}(\\xi, \\eta) =
+        4 \\begin{pmatrix}
+            \\eta \\\\ \\xi
+        \\end{pmatrix} \\\\
+    & \\nabla \\hat{\\lambda}_{31}(\\xi, \\eta) =
+        4 \\begin{pmatrix}
+            - \\eta \\\\ 1 - 2 \\eta - \\xi
+        \\end{pmatrix} \\\\
+\\end{aligned}
+```
+
+# Square
+## Order 0
+```math
+\\nabla \\hat{\\lambda}(\\xi, \\eta) =
+\\begin{pmatrix}
+    0 \\\\ 0
+\\end{pmatrix}
+```
+
+"""
 function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Line, ξ::Number)
     SA[0.0]
 end

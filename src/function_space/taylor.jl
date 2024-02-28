@@ -6,28 +6,6 @@ FunctionSpace(::Val{:Taylor}, degree::Integer) = FunctionSpace(Taylor(), degree)
 
 basis_functions_style(::FunctionSpace{<:Taylor}) = ModalBasisFunctionsStyle()
 
-function shape_functions(
-    fs::FunctionSpace{<:Taylor},
-    ::Val{N},
-    shape::AbstractShape,
-    ξ,
-) where {N} #::Union{T,AbstractVector{T}} ,T<:Number
-    if N == 1
-        return _scalar_shape_functions(fs, shape, ξ)
-    elseif N < MAX_LENGTH_STATICARRAY
-        return kron(SMatrix{N, N}(1I), _scalar_shape_functions(fs, shape, ξ))
-    else
-        return kron(Diagonal([1.0 for i in 1:N]), _scalar_shape_functions(fs, shape, ξ))
-    end
-end
-function shape_functions(
-    fs::FunctionSpace{<:Taylor, D},
-    n::Val{N},
-    shape::AbstractShape,
-) where {D, N}
-    ξ -> shape_functions(fs, n, shape, ξ)
-end
-
 """
     shape_functions(::FunctionSpace{<:Taylor}, ::AbstractShape, ξ)
 
@@ -55,8 +33,34 @@ then this default behaviour consists in returning the matrix `[λ₁ 0; λ₂ 0;
 \\end{aligned}
 ```
 """
-function _doc_shape_functions_taylor end
+function shape_functions(
+    fs::FunctionSpace{<:Taylor},
+    ::Val{N},
+    shape::AbstractShape,
+    ξ,
+) where {N} #::Union{T,AbstractVector{T}} ,T<:Number
+    if N == 1
+        return _scalar_shape_functions(fs, shape, ξ)
+    elseif N < MAX_LENGTH_STATICARRAY
+        return kron(SMatrix{N, N}(1I), _scalar_shape_functions(fs, shape, ξ))
+    else
+        return kron(Diagonal([1.0 for i in 1:N]), _scalar_shape_functions(fs, shape, ξ))
+    end
+end
+function shape_functions(
+    fs::FunctionSpace{<:Taylor, D},
+    n::Val{N},
+    shape::AbstractShape,
+) where {D, N}
+    ξ -> shape_functions(fs, n, shape, ξ)
+end
 
+# Shared functions for all Taylor elements of some kind
+function _scalar_shape_functions(::FunctionSpace{<:Taylor, 0}, ::AbstractShape, ξ)
+    return SA[1.0]
+end
+
+# Functions for Line shape
 """
     ∂λξ_∂ξ(::FunctionSpace{<:Taylor}, ::Val{1}, ::AbstractShape, ξ)
 
@@ -84,14 +88,6 @@ function _doc_shape_functions_taylor end
 \\end{aligned}
 ```
 """
-function _doc_∂λξ_∂ξ_taylor end
-
-# Shared functions for all Taylor elements of some kind
-function _scalar_shape_functions(::FunctionSpace{<:Taylor, 0}, ::AbstractShape, ξ)
-    return SA[1.0]
-end
-
-# Functions for Line shape
 function ∂λξ_∂ξ(::FunctionSpace{<:Taylor, 0}, ::Val{1}, ::Line, ξ)
     return SA[0.0]
 end

@@ -1,4 +1,3 @@
-import Bcube: ndofs, shape_functions, ∂λξ_∂ξ, Mesh, Cube, Prism, ∂λξ_∂x
 Σ = sum
 
 """

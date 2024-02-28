@@ -42,6 +42,87 @@ function isapprox_arrays(a::AbstractArray, b::AbstractArray; rtol::Real = eps())
     return success
 end
 
+import Bcube:
+    absolute_indices,
+    boundary_faces,
+    boundary_nodes,
+    by,
+    cells,
+    CellInfo,
+    CellPoint,
+    celltype,
+    cell_side,
+    center,
+    change_domain,
+    connectivities,
+    connectivities_indices,
+    Connectivity,
+    connectivity_cell2cell_by_faces,
+    connectivity_cell2cell_by_nodes,
+    coords,
+    Cube,
+    dof,
+    DofHandler,
+    edges2nodes,
+    FaceInfo,
+    FacePoint,
+    faces,
+    faces2nodes,
+    face_area,
+    face_shapes,
+    from,
+    f2n_from_c2n,
+    get_coord,
+    get_dofs,
+    get_fespace,
+    get_mapping,
+    get_nodes,
+    has_cells,
+    has_edges,
+    has_entities,
+    has_faces,
+    has_nodes,
+    has_vertices,
+    indices,
+    inner_faces,
+    interpolate,
+    inverse_connectivity,
+    Line,
+    mapping,
+    mapping_det_jacobian,
+    mapping_face,
+    mapping_inv,
+    mapping_jacobian,
+    mapping_jacobian_inv,
+    maxsize,
+    max_ndofs,
+    Mesh,
+    minsize,
+    myrand,
+    nedges,
+    ndofs,
+    nfaces,
+    nlayers,
+    nodes,
+    normal,
+    normals,
+    nvertices,
+    n_entities,
+    oriented_cell_side,
+    outer_faces,
+    Prism,
+    PhysicalDomain,
+    ReferenceDomain,
+    shape,
+    shape_functions,
+    spacedim,
+    Square,
+    to,
+    topodim,
+    Triangle,
+    ∂λξ_∂ξ,
+    ∂λξ_∂x
+
 # This dir will be removed at the end of the tests
 tempdir = mktempdir()
 
@@ -62,7 +143,7 @@ fname2sum = Dict(r[2] => r[1] for r in eachrow(f))
     custom_include("./interpolation/test_shape.jl")
     custom_include("./interpolation/test_lagrange.jl")
     custom_include("./interpolation/test_taylor.jl")
-    # custom_include("./interpolation/test_projection.jl") # TODO: update with new API
+    custom_include("./interpolation/test_projection.jl")
     custom_include("./integration/test_integration.jl")
     custom_include("./dof/test_dofhandler.jl")
     # custom_include("./dof/test_variable.jl")  #TODO : update with new API
