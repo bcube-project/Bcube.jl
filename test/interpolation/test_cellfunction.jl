@@ -1,5 +1,3 @@
-import Bcube: Mesh, Connectivity
-
 function test_CellPoint(cellinfo, x_ref, x_phys)
     p_ref = Bcube.CellPoint(x_ref, cellinfo, Bcube.ReferenceDomain())
     @test Bcube.change_domain(p_ref, Bcube.ReferenceDomain()) == p_ref

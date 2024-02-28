@@ -1,18 +1,3 @@
-import Bcube:
-    topodim,
-    spacedim,
-    cells,
-    has_cells,
-    has_nodes,
-    has_vertices,
-    has_edges,
-    has_entities,
-    has_faces,
-    n_entities,
-    nvertices,
-    absolute_indices,
-    boundary_faces,
-    boundary_nodes
 const mesh_dir = string(@__DIR__, "/../../input/mesh/")
 
 @testset "gmsh - line order1" begin

@@ -1,5 +1,3 @@
-import Bcube: ndofs, dof, max_ndofs
-
 @testset "DofHandler" begin
     @testset "2D" begin
         @testset "Discontinuous" begin

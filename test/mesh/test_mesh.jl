@@ -1,23 +1,3 @@
-import Bcube:
-    topodim,
-    spacedim,
-    connectivities_indices,
-    get_nodes,
-    connectivities_indices,
-    connectivities,
-    indices,
-    cells,
-    coords,
-    from,
-    to,
-    by,
-    nlayers,
-    faces,
-    inner_faces,
-    outer_faces,
-    connectivity_cell2cell_by_faces,
-    connectivity_cell2cell_by_nodes
-
 @testset "mesh" begin
     m = basic_mesh()
 

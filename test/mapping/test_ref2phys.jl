@@ -1,14 +1,3 @@
-import Bcube:
-    connectivities_indices,
-    myrand,
-    center,
-    dof,
-    normal,
-    shape,
-    interpolate,
-    shape_functions,
-    Mesh
-
 @testset "ref2loc" begin
 
     # TODO : add more test for gradients, waiting for Ghislain's commit

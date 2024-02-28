@@ -1,23 +1,3 @@
-import Bcube:
-    mapping,
-    mapping_face,
-    mapping_inv,
-    mapping_det_jacobian,
-    mapping_jacobian,
-    mapping_jacobian_inv,
-    connectivities_indices,
-    celltype,
-    coords,
-    faces,
-    inner_faces,
-    shape,
-    FaceInfo,
-    ReferenceDomain,
-    PhysicalDomain,
-    FacePoint,
-    change_domain,
-    get_coord
-
 @testset "mapping" begin
 
     # bmxam: For Jacobians we should have two type of tests : one using 'rand' checking analytical formulae,
