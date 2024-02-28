@@ -67,7 +67,7 @@ function _codim_and_type(f::AbstractLazy, mesh::Mesh)
     value = _f(cPoint)
 
     # Codim and type
-    N = value isa Number ? (1,) : size(N)
+    N = value isa Number ? (1,) : size(value)
     T = eltype(value)
     return N, T
 end
