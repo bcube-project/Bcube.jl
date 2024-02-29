@@ -51,6 +51,8 @@ function one_cell_mesh(
         return one_quad_mesh(Val(order), xmin, xmax, ymin, ymax)
     elseif (type == :tri || type == :triangle)
         return one_tri_mesh(Val(order), xmin, xmax, ymin, ymax)
+    elseif (type == :tetra)
+        return one_tetra_mesh(Val(order), xmin, xmax, ymin, ymax, zmin, zmax)
     elseif (type == :hexa || type == :cube)
         return one_hexa_mesh(Val(order), xmin, xmax, ymin, ymax, zmin, zmax)
     elseif (type == :prism || type == :penta)
@@ -460,6 +462,32 @@ function one_quad_mesh(::Val{3}, xmin, xmax, ymin, ymax)
     return Mesh(nodes, celltypes, cell2node)
 end
 
+function one_tetra_mesh(::Val{1}, xmin, xmax, ymin, ymax, zmin, zmax)
+    nodes = [
+        Node([xmin, ymin, zmin]),
+        Node([xmax, ymin, zmin]),
+        Node([xmin, ymax, zmin]),
+        Node([xmin, ymin, zmax]),
+    ]
+    celltypes = [Tetra4_t()]
+    cell2node = Connectivity([4], collect(1:4))
+
+    # Prepare boundary nodes
+    bnd_names = ("F1", "F2", "F3", "F4")
+    tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
+    tag2nodes = Dict(tag => [faces2nodes(Tetra4_t)[tag]...] for tag in 1:length(bnd_names))
+    tag2bfaces = Dict(tag => [tag] for tag in 1:length(bnd_names))
+
+    return Mesh(
+        nodes,
+        celltypes,
+        cell2node;
+        bc_names = tag2name,
+        bc_nodes = tag2nodes,
+        bc_faces = tag2bfaces,
+    )
+end
+
 function one_hexa_mesh(::Val{1}, xmin, xmax, ymin, ymax, zmin, zmax)
     nodes = [
         Node([xmin, ymin, zmin]),
@@ -472,7 +500,7 @@ function one_hexa_mesh(::Val{1}, xmin, xmax, ymin, ymax, zmin, zmax)
         Node([xmin, ymax, zmax]),
     ]
     celltypes = [Hexa8_t()]
-    cell2node = Connectivity([8], [1, 2, 3, 4, 5, 6, 7, 8])
+    cell2node = Connectivity([8], collect(1:8))
     return Mesh(nodes, celltypes, cell2node)
 end
 

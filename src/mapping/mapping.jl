@@ -769,6 +769,23 @@ function mapping(nodes, ::Hexa27_t, ξηζ)
     )
 end
 
+# Tetra
+mapping(nodes, ::Tetra, ξ) = mapping(nodes, Tetra4_t(), ξ)
+
+"""
+    mapping(nodes, ::Tetra4_t, ξ)
+
+Map the reference 4-nodes Tetraahedron [0,1] x [0,1] x [0,1] on the local triangle.
+
+```
+"""
+function mapping(nodes, ::Tetra4_t, ξ)
+    return (1 - ξ[1] - ξ[2] - ξ[3]) .* nodes[1].x +
+           ξ[1] .* nodes[2].x +
+           ξ[2] .* nodes[3].x +
+           ξ[3] .* nodes[4].x
+end
+
 # Penta6
 mapping(nodes, ::Prism, ξ) = mapping(nodes, Penta6_t(), ξ)
 

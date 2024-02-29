@@ -312,6 +312,12 @@ end
         end
     end
 
+    @testset "Tetra" begin
+        for deg in 0:1
+            test_lagrange_shape_function(Tetra(), deg)
+        end
+    end
+
     @testset "Prism" begin
         for deg in 0:1
             test_lagrange_shape_function(Prism(), deg)

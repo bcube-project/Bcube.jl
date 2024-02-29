@@ -501,6 +501,56 @@ end
         end
     end
 
+    @testset "Lagrange tetra" begin
+        # One mesh cell
+        mesh = one_cell_mesh(
+            :tetra;
+            xmin = 1.0,
+            xmax = 3.0,
+            ymin = 1.0,
+            ymax = 4.0,
+            zmin = 1.0,
+            zmax = 5.0,
+        )
+        c2n = connectivities_indices(mesh, :c2n)
+        icell = 1
+        ctype = cells(mesh)[icell]
+        cnodes = get_nodes(mesh, c2n[icell])
+        @test integrate(x -> 1, cnodes, ctype, Quadrature(1)) ≈ 4
+        dΩ = Measure(CellDomain(mesh), 2)
+        g = PhysicalFunction(x -> 1)
+        b = Bcube.compute(∫(g)dΩ)
+        @test b[1] ≈ 4
+        gref = ReferenceFunction(x -> 1)
+        b = Bcube.compute(∫(gref)dΩ)
+        @test b[1] ≈ 4
+
+        lx = 2.0
+        ly = 3.0
+        lz = 4.0
+        mesh = one_cell_mesh(
+            :tetra;
+            xmin = 0.0,
+            xmax = lx,
+            ymin = 0.0,
+            ymax = ly,
+            zmin = 0.0,
+            zmax = lz,
+        )
+        e14 = SA[0, 0, lz]
+        e13 = SA[0, ly, 0]
+        e12 = SA[lx, 0, 0]
+        e24 = SA[-lx, 0, lz]
+        e23 = SA[-lx, ly, 0]
+        s(a, b) = 0.5 * norm(cross(a, b))
+        surface_ref = (s(-e12, e23), s(-e12, e24), s(e24, e23), s(e13, e14))
+        for i in 1:4
+            dΓ = Measure(BoundaryFaceDomain(mesh, "F$i"), 1)
+            b = Bcube.compute(∫(side⁻(g))dΓ)
+            @test b[1] ≈ surface_ref[i]
+        end
+    end
+
     @testset "Lagrange prism" begin
         # One mesh cell
         mesh = one_cell_mesh(
