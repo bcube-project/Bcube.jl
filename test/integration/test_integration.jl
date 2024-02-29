@@ -528,7 +528,7 @@ end
         icell = 1
         ctype = cells(mesh)[icell]
         cnodes = get_nodes(mesh, c2n[icell])
-        @test integrate(x -> 1, cnodes, ctype, Quadrature(1)) ≈ 4
+        @test Bcube.integrate(x -> 1, ctype, cnodes, Quadrature(1)) ≈ 4
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)
         b = Bcube.compute(∫(g)dΩ)
