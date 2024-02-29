@@ -276,6 +276,75 @@
         @test eh1 < tol
     end
 
+    @testset "Constrained Poisson" begin
+        n = 2
+        Lx = 2.0
+
+        # Build mesh
+        meshParam = (nx = n + 1, ny = n + 1, lx = Lx, ly = Lx, xc = 0.0, yc = 0.0)
+        tmp_path = "tmp.msh"
+        gen_rectangle_mesh(tmp_path, :quad; meshParam...)
+        mesh = read_msh(tmp_path)
+        rm(tmp_path)
+
+        # Choose degree and define function space, trial space and test space
+        degree = 2
+        fs = FunctionSpace(:Lagrange, degree)
+        U = TrialFESpace(fs, mesh)
+        V = TestFESpace(U)
+
+        Λᵤ = MultiplierFESpace(mesh, 1)
+        Λᵥ = TestFESpace(Λᵤ)
+
+        # The usual trial FE space and multiplier space are combined into a MultiFESpace
+        P = MultiFESpace(U, Λᵤ)
+        Q = MultiFESpace(V, Λᵥ)
+
+        # Define volume and boundary measures
+        dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
+        Γ₁ = BoundaryFaceDomain(mesh, ("West",))
+        dΓ₁ = Measure(Γ₁, 2 * degree + 1)
+        Γ = BoundaryFaceDomain(mesh, ("East", "South", "West", "North"))
+        dΓ = Measure(Γ, 2 * degree + 1)
+
+        # Define solution FE Function
+        ϕ = FEFunction(U)
+
+        f = PhysicalFunction(x -> 1.0)
+
+        int_val = 4.0 / 3.0
+
+        volume = sum(Bcube.compute(∫(PhysicalFunction(x -> 1.0))dΩ))
+
+        # Define bilinear and linear forms
+        function a((u, λᵤ), (v, λᵥ))
+            ∫(∇(u) ⋅ ∇(v))dΩ + ∫(side⁻(λᵤ) * side⁻(v))dΓ + ∫(side⁻(λᵥ) * side⁻(u))dΓ
+        end
+
+        l((v, λᵥ)) =
+            ∫(f * v + int_val * λᵥ / volume)dΩ + ∫(-2.0 * side⁻(v) + 0.0 * side⁻(λᵥ))dΓ₁
+
+        # Assemble to get matrices and vectors
+        A = assemble_bilinear(a, P, Q)
+        L = assemble_linear(l, Q)
+        # Solve problem
+        sol = A \ L
+
+        ϕ = FEFunction(Q)
+
+        # Compare to analytical solution
+        set_dof_values!(ϕ, sol)
+        u, λ = ϕ
+
+        u_ref = PhysicalFunction(x -> -0.5 * (x[1] - 1.0)^2 + 1.0)
+        error = u_ref - u
+
+        l2(u) = sqrt(sum(Bcube.compute(∫(u ⋅ u)dΩ)))
+        el2 = l2(error)
+        tol = 1.e-15
+        @test el2 < tol
+    end
+
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials

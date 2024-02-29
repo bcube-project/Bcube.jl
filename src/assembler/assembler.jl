@@ -231,10 +231,11 @@ function _assemble_linear!(b, l, V, integration::Integration)
 end
 
 function _assemble_linear!(b, l, V, integration::MultiIntegration{N}) where {N}
-    for i in 1:N
-        ival = Val(i)
-        lᵢ(v) = l(v)[ival]
-        _assemble_linear!(b, lᵢ, V, integration[ival])
+    ival = Val(N)
+    lᵢ(v) = l(v)[ival]
+    _assemble_linear!(b, lᵢ, V, integration[ival])
+    if N > 1 # recursive calls
+        _assemble_linear!(b, l, V, MultiIntegration(Base.front(integration.integrations)))
     end
     return nothing
 end
@@ -424,9 +425,37 @@ end
 _update_b!(b::AbstractVector, dofs, vals::NullOperator) = nothing
 
 """
+    _count_n_elts(
+        U::TrialFESpace,
+        V::TestFESpace,
+        domain::CellDomain{M, IND},
+    ) where {M, IND}
+    function _count_n_elts(
+        U::AbstractMultiFESpace{N, Tu},
+        V::AbstractMultiFESpace{N, Tv},
+        domain::AbstractDomain,
+    ) where {N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}    
+    function _count_n_elts(
+        U::TrialFESpace,
+        V::TestFESpace,
+        domain::BoundaryFaceDomain{M, BC, L, C},
+    ) where {M, BC, L, C}
+
+
 Count the (maximum) number of elements in the matrix corresponding to the bilinear assembly of U, V
-on a cell domain, where `U` and `V` are `TrialFESpace` and `TestFESpace`
+on a domain.
+
+# Arguments
+- `U::TrialFESpace` : TrialFESpace associated to the first argument of the bilinear form.
+- `V::TestFESpace` : TestFESpace associated to the second argument of the bilinear form.
+- `domain`::AbstractDomain : domain of integration of the bilinear form.
+
+# Warning
+TO DO: for the moment this function is not really implemented for a BoundaryFaceDomain. 
+This requires to be able to distinguish between the usual TrialsFESpace and MultiplierFESpace.
+
 """
+
 function _count_n_elts(
     U::TrialFESpace,
     V::TestFESpace,
@@ -438,15 +467,11 @@ function _count_n_elts(
     )
 end
 
-"""
-Count the (maximum) number of elements in the matrix corresponding to the bilinear assembly of U, V
-on a cell domain, where `U` and `V` are `AbstractMultiFESpace`
-"""
 function _count_n_elts(
     U::AbstractMultiFESpace{N, Tu},
     V::AbstractMultiFESpace{N, Tv},
-    domain::CellDomain{M, IND},
-) where {M, IND, N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}
+    domain::AbstractDomain,
+) where {N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}
     n = 0
     for _U in U
         for _V in V
@@ -454,6 +479,14 @@ function _count_n_elts(
         end
     end
     return n
+end
+
+function _count_n_elts(
+    U::TrialFESpace,
+    V::TestFESpace,
+    domain::BoundaryFaceDomain{M, BC, L, C},
+) where {M, BC, L, C}
+    return 1
 end
 
 maywrap(x) = LazyWrap(x)

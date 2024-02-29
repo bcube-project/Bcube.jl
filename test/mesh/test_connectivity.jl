@@ -1,3 +1,5 @@
+import Bcube: Connectivity, minsize, maxsize, inverse_connectivity
+
 @testset "connectivity" begin
     ne = 4
     numIndices = [2, 4, 3, 1]
