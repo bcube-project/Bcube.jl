@@ -1,3 +1,6 @@
+import Bcube:
+    Connectivity, connectivities_indices, cells, CellInfo, get_nodes, spacedim, nodes, Mesh
+
 @testset "Algebra" begin
     @testset "Gradient" begin
         # We test the mapping of a gradient. The idea is to compute the integral of a function `f` whose
@@ -71,6 +74,32 @@
         l(v) = ∫(tr(∇(f) - ∇f) ⋅ v)dΩ
         _a = assemble_linear(l, V)
         @test all(isapprox.(_a, [0.0, 0.0, 0.0, 0.0]; atol = 100 * eps()))
+
+        @testset "TangentialGradient" begin
+            ctype = Bar2_t()
+
+            nodes = [Node([-1.0]), Node([1.0])]
+            celltypes = [ctype]
+            cell2node = Bcube.Connectivity([2], [1, 2])
+            mesh = Bcube.Mesh(nodes, celltypes, cell2node)
+
+            nodes_hypersurface = [Node([0.0, -1.0]), Node([0.0, 1.0])]
+            celltypes = [ctype]
+            cell2node = Bcube.Connectivity([2], [1, 2])
+            mesh_hypersurface = Bcube.Mesh(nodes_hypersurface, celltypes, cell2node)
+
+            fs = FunctionSpace(:Lagrange, 1)
+            n = Val(1)
+
+            ∇_volumic = Bcube.∂λξ_∂x(fs, n, ctype, nodes, [0.0])
+            ∇_hyper = Bcube.∂λξ_∂x_hypersurface(fs, n, ctype, nodes_hypersurface, [0.0])
+            @test all(isapprox.(∇_volumic, ∇_hyper[:, 2]))
+
+            h(x) = x[1]
+            ∇_volumic = Bcube.∂fξ_∂x(h, n, ctype, nodes, [0.0])
+            ∇_hyper = Bcube.∂fξ_∂x_hypersurface(h, n, ctype, nodes_hypersurface, [0.0])
+            @test ∇_volumic[1] == ∇_hyper[2]
+        end
 
         @testset "AbstractLazy" begin
             mesh = one_cell_mesh(:quad)

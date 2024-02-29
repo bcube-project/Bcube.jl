@@ -75,7 +75,7 @@ function shape_functions(fs::AbstractFunctionSpace, shape::AbstractShape)
 end
 
 """
-    shape_functions_vec(fs::AbstractFunctionSpace{T,D}, ::Val{N}, shape::AbstractShape, ξ) where {D,N}
+    shape_functions_vec(fs::AbstractFunctionSpace, ::Val{N}, shape::AbstractShape, ξ) where {N}
 
 Return all the shape functions of FunctionSpace on a Shape evaluated in ξ as a vector.
 
@@ -108,6 +108,7 @@ function shape_functions_vec(
         return SVector{ndofs_tot}(SVector{N}(λs[i, j] for j in 1:N) for i in 1:ndofs_tot)
     end
 end
+
 function shape_functions_vec(
     fs::AbstractFunctionSpace,
     n::Val{N},
@@ -130,52 +131,38 @@ function shape_functions_vec(
 end
 
 """
-    grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, shape::AbstractShape) where N
+    ∂λξ_∂ξ(::AbstractFunctionSpace, ::Val{N}, shape::AbstractShape) where N
 
-Gradient of shape functions for any function space. The result is an array whose elements
-are the gradient of each shape functions. `N` is the size of the finite element space.
+Gradient, with respect to the reference coordinate system, of shape functions for any function space.
+The result is an array whose elements are the gradient of each shape functions.
+`N` is the size of the finite element space.
 
 # Implementation
 
 Default version using automatic differentiation. Specialize to increase performance.
 """
-# grad_shape_functions(::AbstractFunctionSpace, ::Val{N}, ::AbstractShape, ξ::T) where {N,T} = error("Function 'grad_shape_functions' not implemented")
-function grad_shape_functions(
-    ::AbstractFunctionSpace,
-    ::Val{N},
-    ::AbstractShape,
-    ξ,
-) where {N}
-    error("Function 'grad_shape_functions' not implemented")
-end
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
-    n::Val{N},
-    shape::AbstractShape,
-) where {N}
-    ξ -> grad_shape_functions(fs, n, shape, ξ)
+function ∂λξ_∂ξ end
+
+function ∂λξ_∂ξ(fs::AbstractFunctionSpace, n::Val{N}, shape::AbstractShape) where {N}
+    ξ -> ∂λξ_∂ξ(fs, n, shape, ξ)
 end
 
 # default : rely on forwarddiff
 _diff(f, x::AbstractVector{<:Number}) = ForwardDiff.jacobian(f, x)
 _diff(f, x::Number) = ForwardDiff.derivative(f, x)
-function grad_shape_functions(fs::AbstractFunctionSpace, n::Val{1}, shape::AbstractShape, ξ)
+function ∂λξ_∂ξ(fs::AbstractFunctionSpace, n::Val{1}, shape::AbstractShape, ξ)
     _diff(shape_functions(fs, n, shape), ξ)
 end
 
 # alias for scalar case
-function grad_shape_functions(fs::AbstractFunctionSpace, shape::AbstractShape, ξ)
-    grad_shape_functions(fs, Val(1), shape, ξ)
+function ∂λξ_∂ξ(fs::AbstractFunctionSpace, shape::AbstractShape, ξ)
+    ∂λξ_∂ξ(fs, Val(1), shape, ξ)
 end
-function grad_shape_functions(
-    fs::AbstractFunctionSpace,
-    shape::AbstractShape,
-    ξ::AbstractVector,
-)
-    grad_shape_functions(fs, Val(1), shape, ξ)
+function ∂λξ_∂ξ(fs::AbstractFunctionSpace, shape::AbstractShape, ξ::AbstractVector)
+    ∂λξ_∂ξ(fs, Val(1), shape, ξ)
 end
-function grad_shape_functions(fs::AbstractFunctionSpace, shape::AbstractShape)
-    ξ -> grad_shape_functions(fs, Val(1), shape, ξ)
+function ∂λξ_∂ξ(fs::AbstractFunctionSpace, shape::AbstractShape)
+    ξ -> ∂λξ_∂ξ(fs, Val(1), shape, ξ)
 end
 
 """

@@ -180,6 +180,11 @@ function quadrature_rule(iside::Int, shape::AbstractShape, degree::Val{N}) where
     return weights, xq
 end
 
+# Point quadratures
+function quadrature_rule(::Point, ::Val{D}, ::AbstractQuadratureType) where {D}
+    return SA[1.0], SA[0.0]
+end
+
 # Line quadratures
 """
     _gausslegendre1D(::Val{N}) where N
