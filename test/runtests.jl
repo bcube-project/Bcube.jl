@@ -117,6 +117,7 @@ import Bcube:
     shape_functions,
     spacedim,
     Square,
+    Tetra,
     to,
     topodim,
     Triangle,
