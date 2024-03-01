@@ -421,7 +421,7 @@ Shape functions for Tetra Lagrange element of degree 1 in a 3D space.
 \\hat{\\lambda}_1(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta - \\zeta) \\hspace{1cm}
 \\hat{\\lambda}_2(\\xi, \\eta, \\zeta) = \\xi                        \\hspace{1cm}
 \\hat{\\lambda}_3(\\xi, \\eta, \\zeta) = \\eta                       \\hspace{1cm}
-\\hat{\\lambda}_5(\\xi, \\eta, \\zeta) = \\zeta)                     \\hspace{1cm}
+\\hat{\\lambda}_5(\\xi, \\eta, \\zeta) = \\zeta                      \\hspace{1cm}
 ```
 """
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Tetra, ξηζ)

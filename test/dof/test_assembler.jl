@@ -362,7 +362,7 @@
         end
 
         function driver_heat_solver()
-            mesh_path = "tmp1.msh"
+            mesh_path = joinpath(tempdir, "tmp1.msh")
             gen_hexa_mesh(mesh_path, :tetra)
             mesh = read_msh(mesh_path)
 
@@ -376,7 +376,7 @@
             err = heat_solver(mesh, degree, dirichlet_dict, q, η, T_analytical)
             @test err < 1.0e-14
 
-            mesh_path = joinpath(@__DIR__, "tmp2.msh")
+            mesh_path = joinpath(tempdir, "tmp2.msh")
             gen_hexa_mesh(mesh_path, :hexa; n = [5, 5, 5])
             mesh = read_msh(mesh_path)
             degree = 2
