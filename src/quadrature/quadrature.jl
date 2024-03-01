@@ -568,6 +568,19 @@ function quadrature_rule_bary(iside::Int, shape::Tetra, ::Val{2})
     return weights, baryCoords
 end
 
+function quadrature_rule(::Tetra, ::Val{1}, ::QuadratureLegendre)
+    raw_unzip(get_quadrature_points(Val{:GLTET1}))
+end
+function quadrature_rule(::Tetra, ::Val{2}, ::QuadratureLegendre)
+    raw_unzip(get_quadrature_points(Val{:GLTET4}))
+end
+function quadrature_rule(::Tetra, ::Val{3}, ::QuadratureLegendre)
+    raw_unzip(get_quadrature_points(Val{:GLTET5}))
+end
+function quadrature_rule(::Tetra, ::Val{4}, ::QuadratureLegendre)
+    raw_unzip(get_quadrature_points(Val{:GLTET15}))
+end
+
 #  To be adapted to implement integration on square faces
 #function quadrature_rule(::Square, ::Val{1}, ::Barycentric)
 #    weights = (1.0,)

@@ -105,8 +105,9 @@ with
 where
 `` \\Delta = (x_1 - x_2)(y_3 - y_2) - (x_3 - x_2)(y_1 - y_2)``
 """
-mapping_inv(::AbstractEntityType, cnodes, x) =
+function mapping_inv(::AbstractEntityType, cnodes, x)
     error("Function 'mapping_inv' is not defined")
+end
 mapping_inv(ctype::AbstractEntityType, cnodes) = x -> mapping_inv(ctype, cnodes, x)
 
 """
@@ -649,6 +650,20 @@ function mapping(::Hexa27_t, cnodes, ξηζ)
         ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ + 1) / 2.0 .* cnodes[26].x +
         -(ξ^2 - 1) * (η^2 - 1) * (ζ^2 - 1) .* cnodes[27].x
     )
+end
+
+"""
+    mapping(nodes, ::Tetra4_t, ξ)
+
+Map the reference 4-nodes Tetraahedron [0,1] x [0,1] x [0,1] on the local triangle.
+
+```
+"""
+function mapping(::Tetra4_t, cnodes, ξ)
+    return (1 - ξ[1] - ξ[2] - ξ[3]) .* cnodes[1].x +
+           ξ[1] .* cnodes[2].x +
+           ξ[2] .* cnodes[3].x +
+           ξ[3] .* cnodes[4].x
 end
 
 # Penta6
