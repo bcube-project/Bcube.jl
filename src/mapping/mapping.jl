@@ -251,6 +251,15 @@ function mapping_det_jacobian(ctype::AbstractEntityType, cnodes, ξ)
     abs(det(mapping_jacobian(ctype, cnodes, ξ)))
 end
 
+function mapping_det_jacobian(::TopologyStyle, ctype::AbstractEntityType, cnodes, ξ) end
+
+mapping_det_jacobian(::isVolumic, args...) = mapping_det_jacobian(args...)
+
+function mapping_det_jacobian(::Union{isCurvilinear, isSurfacic}, ctype, cnodes, ξ)
+    jac = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+    return abs(det(jac))
+end
+
 """
     mapping_face(cshape::AbstractShape, side)
     mapping_face(cshape::AbstractShape, side, permutation)
