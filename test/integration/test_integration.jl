@@ -189,7 +189,7 @@ end
         ctype = cells(mesh)[1]
         fs = FunctionSpace(:Lagrange, 1)
         λ = shape_functions(fs, shape(ctype))
-        ∇λ = ξ -> grad_shape_functions(fs, Val(1), ctype, cnodes, ξ)
+        ∇λ = ξ -> ∂λξ_∂x(fs, Val(1), ctype, cnodes, ξ)
         degree = Val(2)
         quad = Quadrature(degree)
         @test Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[1], ctype, cnodes, quad) ≈ Δx * Δy / 9

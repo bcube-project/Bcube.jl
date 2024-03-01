@@ -226,10 +226,9 @@
 
         # Build mesh
         meshParam = (nx = n + 1, ny = n + 1, lx = Lx, ly = Lx, xc = 0.0, yc = 0.0)
-        tmp_path = "tmp.msh"
-        gen_rectangle_mesh(tmp_path, :quad; meshParam...)
-        mesh = read_msh(tmp_path)
-        rm(tmp_path)
+        path = joinpath(tempdir, "mesh.msh")
+        gen_rectangle_mesh(path, :quad; meshParam...)
+        mesh = read_msh(path)
 
         # Choose degree and define function space, trial space and test space
         fs = FunctionSpace(:Lagrange, degree)

@@ -273,6 +273,23 @@ end
 
 _ratio(x, y) = abs(x / (y + eps(y)))
 
+"""
+    linear_scaling_limiter(
+        u::SingleFieldFEFunction,
+        dω::Measure;
+        bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
+        DMPrelax = 0.0,
+        periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}} = nothing,
+        mass = nothing,
+    ) where {N, Me, BC <: PeriodicBCType}
+
+Apply the linear scaling limiter (see "Maximum-principle-satisfying and positivity-preserving high order schemes for
+conservation laws: Survey and new developments", Zhang & Shu).
+
+`u_limited = u̅ + lim_u * (u - u̅)`
+
+The first returned argument is the coefficient `lim_u`, and the second is `u_limited`.
+"""
 function linear_scaling_limiter(
     u::SingleFieldFEFunction,
     dω::Measure;

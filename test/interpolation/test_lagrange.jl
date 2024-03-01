@@ -27,8 +27,8 @@ function test_lagrange_shape_function(shape, degree)
             λtest = shape_functions(fs, quad)
             @test all(map(≈, λtest, λref))
 
-            ∇λref = [grad_shape_functions(fs, shape, ξ) for ξ in ξquad]
-            ∇λtest = grad_shape_functions(fs, quad)
+            ∇λref = [∂λξ_∂ξ(fs, shape, ξ) for ξ in ξquad]
+            ∇λtest = ∂λξ_∂ξ(fs, quad)
             @test all(map(≈, ∇λtest, ∇λref))
 
             @test isa(Bcube.is_collocated(fs, quad), Bcube.IsNotCollocatedStyle)
@@ -57,43 +57,43 @@ end
             test_lagrange_shape_function(shape, deg)
         end
 
-        interp = FunctionSpace(:Lagrange, 0)
-        λ = shape_functions(interp, shape)
-        ∇λ = grad_shape_functions(interp, shape)
+        fs = FunctionSpace(:Lagrange, 0)
+        λ = shape_functions(fs, shape)
+        ∇λ = ∂λξ_∂ξ(fs, shape)
         @test λ(π)[1] ≈ 1.0
         @test ∇λ(π)[1] ≈ 0.0
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [0.0])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [0.0])
         @test λ == [1.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([0.0]) == 1.0
-        λ = Bcube.shape_functions_vec(interp, Val(2), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(2), shape)
         @test λ[1]([0.0]) == [1.0, 0.0]
         @test λ[2]([0.0]) == [0.0, 1.0]
 
-        interp = FunctionSpace(:Lagrange, 1)
-        λ = shape_functions(interp, shape)
-        ∇λ = grad_shape_functions(interp, shape)
+        fs = FunctionSpace(:Lagrange, 1)
+        λ = shape_functions(fs, shape)
+        ∇λ = ∂λξ_∂ξ(fs, shape)
         @test λ(-1) ≈ [1.0, 0.0]
         @test λ(1) ≈ [0.0, 1.0]
         @test Σ(λ(π)) ≈ 1.0
         @test ∇λ(π) ≈ [-1.0 / 2.0, 1.0 / 2.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [0.0])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [0.0])
         @test λ == [0.5, 0.5]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([0.0]) == 0.5
         @test λ[2]([0.0]) == 0.5
 
-        interp = FunctionSpace(:Lagrange, 2)
-        λ = shape_functions(interp, shape)
-        ∇λ = grad_shape_functions(interp, shape)
+        fs = FunctionSpace(:Lagrange, 2)
+        λ = shape_functions(fs, shape)
+        ∇λ = ∂λξ_∂ξ(fs, shape)
         @test λ(-1) ≈ [1.0, 0.0, 0.0]
         @test λ(0) ≈ [0.0, 1.0, 0.0]
         @test λ(1) ≈ [0.0, 0.0, 1.0]
         @test Σ(λ(π)) ≈ 1.0
         @test ∇λ(0.0) ≈ [-1.0 / 2.0, 0.0, 1.0 / 2.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [0.0])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [0.0])
         @test λ == [0.0, 1.0, 0.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([0.0]) == 0.0
         @test λ[2]([0.0]) == 1.0
         @test λ[3]([0.0]) == 0.0
@@ -107,8 +107,8 @@ end
         cnodes = get_nodes(mesh, c2n[1])
         Finv = Bcube.mapping_inv(ctype, cnodes)
 
-        interp = FunctionSpace(:Lagrange, 1)
-        ∇λ = x -> grad_shape_functions(interp, Val(1), ctype, cnodes, Finv(x))
+        fs = FunctionSpace(:Lagrange, 1)
+        ∇λ = x -> ∂λξ_∂x(fs, Val(1), ctype, cnodes, Finv(x))
         @test ∇λ(0.5) ≈ reshape([-1.0, 1.0], (2, 1))
     end
 
@@ -138,19 +138,19 @@ end
             SA[1 / 3, 1 / 3],
         )
 
-        interp = FunctionSpace(:Lagrange, 0)
-        λ = x -> shape_functions(interp, shape, x)
-        ∇λ = x -> grad_shape_functions(interp, shape, x)
+        fs = FunctionSpace(:Lagrange, 0)
+        λ = x -> shape_functions(fs, shape, x)
+        ∇λ = x -> ∂λξ_∂ξ(fs, shape, x)
         @test λ([π, ℯ])[1] ≈ 1.0
         @test ∇λ([π, ℯ]) ≈ [0.0 0.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [1.0 / 3.0, 1.0 / 3.0])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [1.0 / 3.0, 1.0 / 3.0])
         @test λ == [1.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([1.0 / 3.0, 1.0 / 3.0]) == 1.0
 
-        interp = FunctionSpace(:Lagrange, 1)
-        λ = x -> shape_functions(interp, shape, x)
-        ∇λ = x -> grad_shape_functions(interp, shape, x)
+        fs = FunctionSpace(:Lagrange, 1)
+        λ = x -> shape_functions(fs, shape, x)
+        ∇λ = x -> ∂λξ_∂ξ(fs, shape, x)
         @test λ([0, 0]) ≈ [1.0, 0.0, 0.0]
         @test λ([1, 0]) ≈ [0.0, 1.0, 0.0]
         @test λ([0, 1]) ≈ [0.0, 0.0, 1.0]
@@ -160,16 +160,16 @@ end
             1.0 0.0
             0.0 1.0
         ]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [1.0 / 3.0, 1.0 / 3.0])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [1.0 / 3.0, 1.0 / 3.0])
         @test λ ≈ [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([1.0 / 3.0, 1.0 / 3.0]) ≈ 1.0 / 3.0
         @test λ[2]([1.0 / 3.0, 1.0 / 3.0]) ≈ 1.0 / 3.0
         @test λ[3]([1.0 / 3.0, 1.0 / 3.0]) ≈ 1.0 / 3.0
 
-        interp = FunctionSpace(:Lagrange, 2)
-        λ = x -> shape_functions(interp, shape, x)
-        ∇λ = x -> grad_shape_functions(interp, shape, x)
+        fs = FunctionSpace(:Lagrange, 2)
+        λ = x -> shape_functions(fs, shape, x)
+        ∇λ = x -> ∂λξ_∂ξ(fs, shape, x)
         @test λ([0, 0])[1:3] ≈ [1.0, 0.0, 0.0]
         @test λ([1, 0])[1:3] ≈ [0.0, 1.0, 0.0]
         @test λ([0, 1])[1:3] ≈ [0.0, 0.0, 1.0]
@@ -182,7 +182,7 @@ end
             0.0 0.0
             0.0 4.0
         ]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [1.0 / 3.0, 1.0 / 3])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [1.0 / 3.0, 1.0 / 3])
         @test λ ≈ [
             -0.11111111111111112,
             -0.11111111111111112,
@@ -191,7 +191,7 @@ end
             0.4444444444444444,
             0.44444444444444453,
         ]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([1.0 / 3.0, 1.0 / 3.0]) ≈ -0.111111111111111
         @test λ[2]([1.0 / 3.0, 1.0 / 3.0]) ≈ -0.111111111111111
         @test λ[3]([1.0 / 3.0, 1.0 / 3.0]) ≈ -0.111111111111111
@@ -219,8 +219,8 @@ end
         vol =
             0.5 * abs((S2[1] - S1[1]) * (S3[2] - S1[2]) - (S3[1] - S1[1]) * (S2[2] - S1[1]))
 
-        interp = FunctionSpace(:Lagrange, 1)
-        ∇λ = x -> grad_shape_functions(interp, Val(1), ctype, n, x)
+        fs = FunctionSpace(:Lagrange, 1)
+        ∇λ = x -> ∂λξ_∂x(fs, Val(1), ctype, n, x)
         @test ∇λ([0, 0])[1, :] ≈ (0.5 / vol) * ([S2[2] - S3[2], S3[1] - S2[1]])
         @test ∇λ([0, 0])[2, :] ≈ (0.5 / vol) * ([S3[2] - S1[2], S1[1] - S3[1]])
         @test ∇λ([0, 0])[3, :] ≈ (0.5 / vol) * ([S1[2] - S2[2], S2[1] - S1[1]])
@@ -247,19 +247,19 @@ end
             test_lagrange_shape_function(shape, deg)
         end
 
-        interp = FunctionSpace(:Lagrange, 0)
-        λ = x -> shape_functions(interp, shape, x)
-        ∇λ = x -> grad_shape_functions(interp, shape, x)
+        fs = FunctionSpace(:Lagrange, 0)
+        λ = x -> shape_functions(fs, shape, x)
+        ∇λ = x -> ∂λξ_∂ξ(fs, shape, x)
         @test λ([π, ℯ])[1] ≈ 1.0
         @test ∇λ([π, ℯ])[1, :] ≈ [0.0, 0.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [0.0, 0.0])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [0.0, 0.0])
         @test λ == [1.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([0.0, 0.0]) == 1.0
 
-        interp = FunctionSpace(:Lagrange, 1)
-        λ = x -> shape_functions(interp, shape, x)
-        ∇λ = x -> grad_shape_functions(interp, shape, x)
+        fs = FunctionSpace(:Lagrange, 1)
+        λ = ξ -> shape_functions(fs, shape, ξ)
+        ∇λ = ξ -> ∂λξ_∂ξ(fs, shape, ξ)
         @test λ([-1, -1])[1] ≈ 1.0
         @test λ([1, -1])[2] ≈ 1.0
         @test λ([1, 1])[4] ≈ 1.0
@@ -269,14 +269,14 @@ end
         @test ∇λ([0, 0])[2, :] ≈ [1.0, -1.0] ./ 4.0
         @test ∇λ([0, 0])[4, :] ≈ [1.0, 1.0] ./ 4.0
         @test ∇λ([0, 0])[3, :] ≈ [-1.0, 1.0] ./ 4.0
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [0.0, 0.0])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [0.0, 0.0])
         @test λ == [0.25, 0.25, 0.25, 0.25]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([0.0, 0.0]) == 0.25
         @test λ[2]([0.0, 0.0]) == 0.25
         @test λ[3]([0.0, 0.0]) == 0.25
         @test λ[4]([0.0, 0.0]) == 0.25
-        λ = Bcube.shape_functions_vec(interp, Val(2), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(2), shape)
         @test λ[1]([0.0, 0.0]) == [0.25, 0.0]
         @test λ[2]([0.0, 0.0]) == [0.25, 0.0]
         @test λ[3]([0.0, 0.0]) == [0.25, 0.0]
@@ -286,16 +286,16 @@ end
         @test λ[7]([0.0, 0.0]) == [0.0, 0.25]
         @test λ[8]([0.0, 0.0]) == [0.0, 0.25]
 
-        interp = FunctionSpace(:Lagrange, 2)
-        λ = x -> shape_functions(interp, shape, x)
+        fs = FunctionSpace(:Lagrange, 2)
+        λ = ξ -> shape_functions(fs, shape, ξ)
         @test λ([-1, -1])[1] ≈ 1.0
         @test λ([1, -1])[3] ≈ 1.0
         @test λ([1, 1])[9] ≈ 1.0
         @test λ([-1, 1])[7] ≈ 1.0
         @test Σ(λ([π, ℯ])) ≈ 1.0
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape, [0.0, 0.0])
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape, [0.0, 0.0])
         @test λ == [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
-        λ = Bcube.shape_functions_vec(interp, Val(1), shape)
+        λ = Bcube.shape_functions_vec(fs, Val(1), shape)
         @test λ[1]([0.0, 0.0]) == 0.0
         @test λ[2]([0.0, 0.0]) == 0.0
         @test λ[3]([0.0, 0.0]) == 0.0
