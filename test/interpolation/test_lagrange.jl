@@ -1,4 +1,4 @@
-import Bcube: ndofs, shape_functions, ∂λξ_∂ξ, Mesh, Cube, Prism, ∂λξ_∂x
+import Bcube: ndofs, shape_functions, ∂λξ_∂ξ, ∂λξ_∂x, Mesh, Cube, Prism, Tetra
 Σ = sum
 
 """
@@ -310,6 +310,12 @@ end
     @testset "Cube" begin
         for deg in 0:2
             test_lagrange_shape_function(Cube(), deg)
+        end
+    end
+
+    @testset "Tetra" begin
+        for deg in 0:1
+            test_lagrange_shape_function(Tetra(), deg)
         end
     end
 

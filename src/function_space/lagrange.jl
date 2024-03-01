@@ -389,6 +389,42 @@ function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Square, ξ)
     return SA[0.0 0.0]
 end
 
+# Tetra
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Tetra, ξ) = SA[1.0]
+grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Tetra, ξ) = SA[0.0 0.0 0.0]
+ndofs(::FunctionSpace{<:Lagrange, 0}, ::Tetra) = 1
+
+"""
+    shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Tetra, ξ)
+
+Shape functions for Tetra Lagrange element of degree 1 in a 3D space.
+
+```math
+\\hat{\\lambda}_1(\\xi, \\eta, \\zeta) = (1 - \\xi - \\eta - \\zeta) \\hspace{1cm}
+\\hat{\\lambda}_2(\\xi, \\eta, \\zeta) = \\xi                        \\hspace{1cm}
+\\hat{\\lambda}_3(\\xi, \\eta, \\zeta) = \\eta                       \\hspace{1cm}
+\\hat{\\lambda}_5(\\xi, \\eta, \\zeta) = \\zeta                      \\hspace{1cm}
+```
+"""
+function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Tetra, ξηζ)
+    ξ, η, ζ = ξηζ
+    return SA[
+        1 - ξ - η - ζ
+        ξ
+        η
+        ζ
+    ]
+end
+function grad_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Tetra, ξηζ)
+    return SA[
+        -1 -1 -1
+        1 0 0
+        0 1 0
+        0 0 1
+    ]
+end
+ndofs(::FunctionSpace{<:Lagrange, 1}, ::Tetra) = 4
+
 # Functions for Cube shape
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Cube, ξ) = SA[1.0]
 ndofs(::FunctionSpace{<:Lagrange, 0}, ::Cube) = 1
@@ -668,6 +704,21 @@ end
 
 @generated function idof_by_face_with_bounds(fs::FunctionSpace{<:Lagrange}, shape::Cube)
     return _idof_by_face_with_bounds(fs(), shape())
+end
+
+# Tetra
+function idof_by_edge(::FunctionSpace{<:Lagrange, 1}, shape::Tetra)
+    ntuple(i -> SA[], nedges(shape))
+end
+function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Tetra)
+    (SA[1, 2], SA[2, 3], SA[3, 1], SA[1, 4], SA[2, 4], SA[3, 4])
+end
+
+function idof_by_face(::FunctionSpace{<:Lagrange, 1}, shape::Tetra)
+    ntuple(i -> SA[], nfaces(shape))
+end
+function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Tetra)
+    (SA[1, 3, 2], SA[1, 2, 4], SA[2, 3, 4], SA[3, 1, 4])
 end
 
 # Prism
