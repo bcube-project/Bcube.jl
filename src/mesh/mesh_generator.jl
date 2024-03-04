@@ -72,15 +72,18 @@ Generate either a line mesh, a rectangle mesh, a cubic mesh... depending on the 
 
 # Example
 ```julia-repl
-mesh_of_a_line   = ncube_mesh([10])
-mesh_of_a_square = ncube_mesh([4, 5])
+mesh_of_a_line = ncube_mesh([10])
+mesh_of_a_square = ncube_mesh([4, 5]
+mesh_of_a_hexa = ncube_mesh([4, 5, 6])
 ```
 """
 function ncube_mesh(n::Vector{Int}; order = 1)
     if (length(n) == 1)
         return line_mesh(n[1]; order = order)
     elseif (length(n) == 2)
-        return rectangle_mesh(n[1], n[2]; order = order)
+        return rectangle_mesh(n...; order = order)
+    elseif (length(n) == 3)
+        return hexa_mesh(n...; order = order)
     else
         throw(ArgumentError("mesh not available for R^" * string(length(n))))
     end
