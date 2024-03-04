@@ -435,13 +435,13 @@ function hexa_mesh(
                     (iz - 1 + 0) * nx * ny + (iy - 1 + 1) * nx + ix + 1
                 cell2node[8 * ielt - 4] =
                     (iz - 1 + 0) * nx * ny + (iy - 1 + 1) * nx + ix + 0
-                cell2node[8 * ielt - 7] =
+                cell2node[8 * ielt - 3] =
                     (iz - 1 + 1) * nx * ny + (iy - 1 + 0) * nx + ix + 0
-                cell2node[8 * ielt - 6] =
+                cell2node[8 * ielt - 2] =
                     (iz - 1 + 1) * nx * ny + (iy - 1 + 0) * nx + ix + 1
-                cell2node[8 * ielt - 5] =
+                cell2node[8 * ielt - 1] =
                     (iz - 1 + 1) * nx * ny + (iy - 1 + 1) * nx + ix + 1
-                cell2node[8 * ielt - 4] =
+                cell2node[8 * ielt - 0] =
                     (iz - 1 + 1) * nx * ny + (iy - 1 + 1) * nx + ix + 0
             end
         end
