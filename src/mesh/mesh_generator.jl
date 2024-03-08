@@ -73,7 +73,7 @@ Generate either a line mesh, a rectangle mesh, a cubic mesh... depending on the 
 # Example
 ```julia-repl
 mesh_of_a_line = ncube_mesh([10])
-mesh_of_a_square = ncube_mesh([4, 5]
+mesh_of_a_square = ncube_mesh([4, 5])
 mesh_of_a_hexa = ncube_mesh([4, 5, 6])
 ```
 """
