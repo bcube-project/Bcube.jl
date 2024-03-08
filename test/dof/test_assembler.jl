@@ -226,10 +226,9 @@
 
         # Build mesh
         meshParam = (nx = n + 1, ny = n + 1, lx = Lx, ly = Lx, xc = 0.0, yc = 0.0)
-        tmp_path = "tmp.msh"
-        gen_rectangle_mesh(tmp_path, :quad; meshParam...)
-        mesh = read_msh(tmp_path)
-        rm(tmp_path)
+        path = joinpath(tempdir, "mesh.msh")
+        gen_rectangle_mesh(path, :quad; meshParam...)
+        mesh = read_msh(path)
 
         # Choose degree and define function space, trial space and test space
         fs = FunctionSpace(:Lagrange, degree)
@@ -274,6 +273,121 @@
         tol = 1.e-12
         @test el2 < tol
         @test eh1 < tol
+    end
+
+    @testset "Constrained Poisson" begin
+        n = 2
+        Lx = 2.0
+
+        # Build mesh
+        meshParam = (nx = n + 1, ny = n + 1, lx = Lx, ly = Lx, xc = 0.0, yc = 0.0)
+        tmp_path = "tmp.msh"
+        gen_rectangle_mesh(tmp_path, :quad; meshParam...)
+        mesh = read_msh(tmp_path)
+        rm(tmp_path)
+
+        # Choose degree and define function space, trial space and test space
+        degree = 2
+        fs = FunctionSpace(:Lagrange, degree)
+        U = TrialFESpace(fs, mesh)
+        V = TestFESpace(U)
+
+        Λᵤ = MultiplierFESpace(mesh, 1)
+        Λᵥ = TestFESpace(Λᵤ)
+
+        # The usual trial FE space and multiplier space are combined into a MultiFESpace
+        P = MultiFESpace(U, Λᵤ)
+        Q = MultiFESpace(V, Λᵥ)
+
+        # Define volume and boundary measures
+        dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
+        Γ₁ = BoundaryFaceDomain(mesh, ("West",))
+        dΓ₁ = Measure(Γ₁, 2 * degree + 1)
+        Γ = BoundaryFaceDomain(mesh, ("East", "South", "West", "North"))
+        dΓ = Measure(Γ, 2 * degree + 1)
+
+        # Define solution FE Function
+        ϕ = FEFunction(U)
+
+        f = PhysicalFunction(x -> 1.0)
+
+        int_val = 4.0 / 3.0
+
+        volume = sum(Bcube.compute(∫(PhysicalFunction(x -> 1.0))dΩ))
+
+        # Define bilinear and linear forms
+        function a((u, λᵤ), (v, λᵥ))
+            ∫(∇(u) ⋅ ∇(v))dΩ + ∫(side⁻(λᵤ) * side⁻(v))dΓ + ∫(side⁻(λᵥ) * side⁻(u))dΓ
+        end
+
+        function l((v, λᵥ))
+            ∫(f * v + int_val * λᵥ / volume)dΩ + ∫(-2.0 * side⁻(v) + 0.0 * side⁻(λᵥ))dΓ₁
+        end
+
+        # Assemble to get matrices and vectors
+        A = assemble_bilinear(a, P, Q)
+        L = assemble_linear(l, Q)
+        # Solve problem
+        sol = A \ L
+
+        ϕ = FEFunction(Q)
+
+        # Compare to analytical solution
+        set_dof_values!(ϕ, sol)
+        u, λ = ϕ
+
+        u_ref = PhysicalFunction(x -> -0.5 * (x[1] - 1.0)^2 + 1.0)
+        error = u_ref - u
+
+        l2(u) = sqrt(sum(Bcube.compute(∫(u ⋅ u)dΩ)))
+        el2 = l2(error)
+        tol = 1.e-15
+        @test el2 < tol
+    end
+
+    @testset "Heat solver 3d" begin
+        function heat_solver(mesh, degree, dirichlet_dict, q, η, T_analytical)
+            fs = FunctionSpace(:Lagrange, degree)
+            U = TrialFESpace(fs, mesh, dirichlet_dict)
+            V = TestFESpace(U)
+            dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
+            a(u, v) = ∫(η * ∇(u) ⋅ ∇(v))dΩ
+            l(v) = ∫(q * v)dΩ
+            sys = AffineFESystem(a, l, U, V)
+            ϕ = Bcube.solve(sys)
+            Tcn = var_on_centers(ϕ, mesh)
+            Tca = map(T_analytical, get_cell_centers(mesh))
+            return norm(Tcn .- Tca, Inf) / norm(Tca, Inf)
+        end
+
+        function driver_heat_solver()
+            mesh_path = joinpath(tempdir, "tmp1.msh")
+            gen_hexa_mesh(mesh_path, :tetra)
+            mesh = read_msh(mesh_path)
+
+            λ = 100.0
+            η = λ
+
+            degree = 1
+            dirichlet_dict = Dict("xmin" => 260.0, "xmax" => 285.0)
+            q = 0.0
+            T_analytical(x) = 260.0 * (0.5 - x[1]) + 285 * (x[1] + 0.5)
+            err = heat_solver(mesh, degree, dirichlet_dict, q, η, T_analytical)
+            @test err < 1.0e-14
+
+            mesh_path = joinpath(tempdir, "tmp2.msh")
+            gen_hexa_mesh(mesh_path, :hexa; n = [5, 5, 5])
+            mesh = read_msh(mesh_path)
+            degree = 2
+            dirichlet_dict = Dict("xmin" => 260.0)
+            q = 1500.0
+            T2_analytical(x) = 260.0 + (q / λ) * x[1] * (1.0 - 0.5 * x[1])
+            scale(x) = (x[1] + 0.5)
+            err = heat_solver(mesh, degree, dirichlet_dict, q, η, T2_analytical ∘ scale)
+            @test err < 1.0e-14
+            #
+        end
+        driver_heat_solver()
     end
 
     # @testset "Symbolic (to be completed)" begin

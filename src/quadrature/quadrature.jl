@@ -180,6 +180,11 @@ function quadrature_rule(iside::Int, shape::AbstractShape, degree::Val{N}) where
     return weights, xq
 end
 
+# Point quadratures
+function quadrature_rule(::Point, ::Val{D}, ::AbstractQuadratureType) where {D}
+    return SA[1.0], SA[0.0]
+end
+
 # Line quadratures
 """
     _gausslegendre1D(::Val{N}) where N
@@ -561,6 +566,19 @@ function quadrature_rule_bary(iside::Int, shape::Tetra, ::Val{2})
         (2.0 / 3.0, 1.0 / 6.0, 1.0 / 6.0),
     )
     return weights, baryCoords
+end
+
+function quadrature_rule(::Tetra, ::Val{1}, ::QuadratureLegendre)
+    raw_unzip(get_quadrature_points(Val{:GLTET1}))
+end
+function quadrature_rule(::Tetra, ::Val{2}, ::QuadratureLegendre)
+    raw_unzip(get_quadrature_points(Val{:GLTET4}))
+end
+function quadrature_rule(::Tetra, ::Val{3}, ::QuadratureLegendre)
+    raw_unzip(get_quadrature_points(Val{:GLTET5}))
+end
+function quadrature_rule(::Tetra, ::Val{4}, ::QuadratureLegendre)
+    raw_unzip(get_quadrature_points(Val{:GLTET15}))
 end
 
 #  To be adapted to implement integration on square faces

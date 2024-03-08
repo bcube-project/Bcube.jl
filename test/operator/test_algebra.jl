@@ -1,3 +1,6 @@
+import Bcube:
+    Connectivity, connectivities_indices, cells, CellInfo, get_nodes, spacedim, nodes, Mesh
+
 @testset "Algebra" begin
     @testset "Gradient" begin
         # We test the mapping of a gradient. The idea is to compute the integral of a function `f` whose
@@ -28,7 +31,7 @@
 
         # Scalar test : gradient of scalar `f` in physical coordinates is [1, 2]
         function f1(ξ)
-            x, y = mapping(cnodes, ctype, ξ)
+            x, y = Bcube.mapping(ctype, cnodes, ξ)
             return x + 2y
         end
         g = ReferenceFunction(f1)
@@ -39,7 +42,7 @@
 
         # Vector test : gradient of vector `f` in physical coordinates is [[1,2],[3,4]]
         function f2(ξ)
-            x, y = mapping(cnodes, ctype, ξ)
+            x, y = Bcube.mapping(ctype, cnodes, ξ)
             return [x + 2y, 3x + 4y]
         end
         g = ReferenceFunction(f2)
@@ -71,6 +74,32 @@
         l(v) = ∫(tr(∇(f) - ∇f) ⋅ v)dΩ
         _a = assemble_linear(l, V)
         @test all(isapprox.(_a, [0.0, 0.0, 0.0, 0.0]; atol = 100 * eps()))
+
+        @testset "TangentialGradient" begin
+            ctype = Bar2_t()
+
+            nodes = [Node([-1.0]), Node([1.0])]
+            celltypes = [ctype]
+            cell2node = Bcube.Connectivity([2], [1, 2])
+            mesh = Bcube.Mesh(nodes, celltypes, cell2node)
+
+            nodes_hypersurface = [Node([0.0, -1.0]), Node([0.0, 1.0])]
+            celltypes = [ctype]
+            cell2node = Bcube.Connectivity([2], [1, 2])
+            mesh_hypersurface = Bcube.Mesh(nodes_hypersurface, celltypes, cell2node)
+
+            fs = FunctionSpace(:Lagrange, 1)
+            n = Val(1)
+
+            ∇_volumic = Bcube.∂λξ_∂x(fs, n, ctype, nodes, [0.0])
+            ∇_hyper = Bcube.∂λξ_∂x_hypersurface(fs, n, ctype, nodes_hypersurface, [0.0])
+            @test all(isapprox.(∇_volumic, ∇_hyper[:, 2]))
+
+            h(x) = x[1]
+            ∇_volumic = Bcube.∂fξ_∂x(h, n, ctype, nodes, [0.0])
+            ∇_hyper = Bcube.∂fξ_∂x_hypersurface(h, n, ctype, nodes_hypersurface, [0.0])
+            @test ∇_volumic[1] == ∇_hyper[2]
+        end
 
         @testset "AbstractLazy" begin
             mesh = one_cell_mesh(:quad)
@@ -117,9 +146,9 @@
             c = CellInfo(mesh, 1)
             cnodes = nodes(c)
             ctype = Bcube.celltype(c)
-            F = mapping(cnodes, ctype)
+            F = Bcube.mapping(ctype, cnodes)
             # tJinv = transpose(R ./ s) # if we want the analytic one...
-            tJinv(ξ) = transpose(mapping_jacobian_inv(cnodes, ctype, ξ))
+            tJinv(ξ) = transpose(Bcube.mapping_jacobian_inv(ctype, cnodes, ξ))
 
             # Test 1
             u1 = PhysicalFunction(x -> x[1])

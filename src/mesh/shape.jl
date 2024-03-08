@@ -29,6 +29,8 @@ shape(::Quad9_t) = Square()
 shape(::Quad16_t) = Square()
 shape(::Hexa8_t) = Cube()
 shape(::Penta6_t) = Prism()
+shape(::Tetra4_t) = Tetra()
+shape(::Tetra10_t) = Tetra()
 
 """
     entity(s::AbstractShape, ::Val{D}) where D
@@ -196,6 +198,9 @@ nfaces(::Prism) = nfaces(Penta6_t())
 coords(::Line) = (SA[-1.0], SA[1.0])
 coords(::Triangle) = (SA[0.0, 0.0], SA[1.0, 0.0], SA[0.0, 1.0])
 coords(::Square) = (SA[-1.0, -1.0], SA[1.0, -1.0], SA[1.0, 1.0], SA[-1.0, 1.0])
+function coords(::Tetra)
+    (SA[0.0, 0.0, 0.0], SA[1.0, 0.0, 0.0], SA[0.0, 1.0, 0.0], SA[0.0, 0.0, 1.0])
+end
 function coords(::Cube)
     (
         SA[-1.0, -1.0, -1.0],
@@ -223,6 +228,7 @@ face_area(::Line) = SA[1.0, 1.0]
 face_area(::Triangle) = SA[1.0, √(2.0), 1.0]
 face_area(::Square) = SA[2.0, 2.0, 2.0, 2.0]
 face_area(::Cube) = SA[4.0, 4.0, 4.0, 4.0, 4.0, 4.0]
+face_area(::Tetra) = SA[0.5, 0.5, 0.5 * √(3.0), 0.5]
 face_area(::Prism) = SA[2.0, 2 * √(2.0), 2.0, 0.5, 0.5]
 
 faces2nodes(::Line) = (SA[1], SA[2])
@@ -237,6 +243,9 @@ function faces2nodes(::Cube)
         SA[1, 5, 8, 4],
         SA[5, 6, 7, 8],
     )
+end
+function faces2nodes(::Tetra)
+    (SA[1, 3, 2], SA[1, 2, 4], SA[2, 3, 4], SA[3, 1, 4])
 end
 function faces2nodes(::Prism)
     (SA[1, 2, 5, 4], SA[2, 3, 6, 5], SA[3, 1, 4, 6], SA[1, 3, 2], SA[4, 5, 6])
@@ -256,6 +265,9 @@ function normals(::Cube)
         SA[0.0, 0.0, 1.0],
     )
 end
+function normals(::Tetra)
+    (SA[0.0, 0.0, -1.0], SA[0.0, -1.0, 0.0], SA[1.0, 1.0, 1.0] / √3, SA[-1.0, 0.0, 0.0])
+end
 function normals(::Prism)
     (
         SA[0.0, -1.0, 0.0],
@@ -271,12 +283,14 @@ center(::Line) = SA[0.0]
 center(::Triangle) = SA[1.0 / 3.0, 1.0 / 3.0]
 center(::Square) = SA[0.0, 0.0]
 center(::Cube) = SA[0.0, 0.0, 0.0]
+center(::Tetra) = SA[0.25, 0.25, 0.25]
 center(::Prism) = SA[1.0 / 3.0, 1.0 / 3.0, 0.0]
 
 # Face shapes : see notes in generic function documentation
 face_shapes(::Line) = (Point(), Point())
 face_shapes(shape::Union{Triangle, Square}) = ntuple(i -> Line(), nfaces(shape))
 face_shapes(shape::Cube) = ntuple(i -> Square(), nfaces(shape))
+face_shapes(shape::Tetra) = ntuple(i -> Triangle(), nfaces(shape))
 face_shapes(::Prism) = (Square(), Square(), Square(), Triangle(), Triangle())
 
 # Measure
@@ -284,4 +298,5 @@ measure(::Line) = 2.0
 measure(::Triangle) = 0.5
 measure(::Square) = 4.0
 measure(::Cube) = 8.0
+measure(::Tetra) = 1.0 / 6
 measure(::Prism) = 1.0

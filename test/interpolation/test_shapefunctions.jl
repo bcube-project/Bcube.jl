@@ -1,3 +1,5 @@
+import Bcube: shape, cells, CellInfo
+
 @testset "Shape functions" begin
     # Mesh
     nspa = 2

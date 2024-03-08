@@ -3,22 +3,24 @@
 
 Interpolate solution on mesh vertices.
 
-The result is a (nnodes, ncomps) matrix.
+The result is a (nnodes, ncomps) matrix if ncomps > 1, or a (nnodes) vector otherwise.
 
 WARNING : for now, the contribution to one vertice is the arithmetic mean of
 all the data obtained from the neighbor cells of this node. We could use
 the surface area (among other possible choices).
 """
-function var_on_vertices(f::AbstractFEFunction, mesh::Mesh)
+function var_on_vertices(f::AbstractLazy, mesh::Mesh)
+    N, T = _codim_and_type(f, mesh)
+    @assert length(N) <= 1 "N = $(length(N)) > 1 not supported yet"
+    values = zeros(T, nnodes(mesh), N[1])
+    _var_on_vertices!(values, f, mesh)
+    return N[1] == 1 ? vec(values) : values
+end
+
+function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
     # Alias
-    feSpace = get_fespace(f)
     c2n = connectivities_indices(mesh, :c2n)
     cellTypes = cells(mesh)
-
-    # Allocate
-    nc = get_size(feSpace)
-    T = _get_returned_type(f, mesh)
-    values = zeros(T, nnodes(mesh), nc)
 
     # Number of contributions per nodes
     ncontributions = zeros(Int, nnodes(mesh))
@@ -32,7 +34,7 @@ function var_on_vertices(f::AbstractFEFunction, mesh::Mesh)
         cnodes = get_nodes(mesh, _c2n)
         cInfo = CellInfo(icell, ctype, cnodes)
 
-        # Materialize FE function on CellInfo
+        # Materialize function on CellInfo
         _f = materialize(f, cInfo)
 
         # Loop over the cell nodes (in ref element)
@@ -44,50 +46,48 @@ function var_on_vertices(f::AbstractFEFunction, mesh::Mesh)
     end
 
     # Arithmetic mean
-    for ic in 1:nc
+    for ic in size(values, 2)
         values[:, ic] .= values[:, ic] ./ ncontributions
     end
-
-    return values
 end
 
-function _get_returned_type(f::AbstractFEFunction, mesh::Mesh)
+"""
+Evaluate codimension of `f` and returned type. The returned codimension
+is always a Tuple of codimension(s), even for a scalar.
+"""
+function _codim_and_type(f::AbstractLazy, mesh::Mesh)
     # Get info about first cell of the mesh
-    icell = 1
-    ctype = cells(mesh)[icell]
-    cInfo = CellInfo(mesh, icell)
+    cInfo = CellInfo(mesh, 1)
 
     # Materialize FE function on CellInfo
     _f = materialize(f, cInfo)
 
-    # Evaluate function at the center
-    ξc = center(shape(ctype))
-    cPoint = CellPoint(ξc, cInfo, ReferenceDomain())
+    # Evaluate the function on the center of the cell
+    cPoint = CellPoint(center(shape(celltype(cInfo))), cInfo, ReferenceDomain())
+    value = _f(cPoint)
 
-    # Return the type
-    return eltype(_f(cPoint))
+    # Codim and type
+    N = value isa Number ? (1,) : size(value)
+    T = eltype(value)
+    return N, T
 end
 
 """
-    var_on_centers(f::AbstractSingleFEFunction, mesh::AbstractMesh)
+    var_on_centers(f::AbstractLazy, mesh::AbstractMesh)
 
-Interpolate solution on mesh vertices.
+Interpolate solution on mesh centers.
 
 The result is a (ncells, ncomps) matrix if ncomps > 1, or a (ncells) vector otherwise.
 """
-function var_on_centers(f::AbstractSingleFieldFEFunction{N}, mesh::AbstractMesh) where {N}
-    values = zeros(ncells(mesh), N) # TODO : use number type of feSpace
+function var_on_centers(f::AbstractLazy, mesh::AbstractMesh)
+    N, T = _codim_and_type(f, mesh)
+    @assert length(N) <= 1 "N = $(length(N)) > 1 not supported yet"
+    values = zeros(T, ncells(mesh), N[1])
     _var_on_centers!(values, f, mesh)
-    return values
+    return N[1] == 1 ? vec(values) : values
 end
 
-function var_on_centers(f::AbstractSingleFieldFEFunction{1}, mesh::AbstractMesh)
-    values = zeros(ncells(mesh), 1) # TODO : use number type of feSpace
-    _var_on_centers!(values, f, mesh)
-    return vec(values)
-end
-
-function _var_on_centers!(values, f::AbstractSingleFieldFEFunction, mesh::AbstractMesh)
+function _var_on_centers!(values, f::AbstractLazy, mesh::AbstractMesh)
     # Alias
     c2n = connectivities_indices(mesh, :c2n)
     celltypes = cells(mesh)

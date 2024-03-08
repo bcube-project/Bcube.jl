@@ -252,7 +252,7 @@ end
 end
 @inline nfaces(t::Type{Tetra4_t}) = 4
 @inline faces2nodes(::Type{Tetra4_t}) = ((1, 3, 2), (1, 2, 4), (2, 3, 4), (3, 1, 4))
-@inline facetypes(::Type{Tetra4_t}) = (Tri3_t(), Tri3_t(), Tri3_t())
+@inline facetypes(::Type{Tetra4_t}) = (Tri3_t(), Tri3_t(), Tri3_t(), Tri3_t())
 
 #---- Tetra10 ----
 @inline nnodes(::Type{Tetra10_t}) = 10
@@ -510,38 +510,40 @@ struct isSurfacic <: TopologyStyle end
 struct isVolumic <: TopologyStyle end
 
 """
-    topology_style(spaceDim::Int, topoDim::Int)
+    topology_style(::AbstractEntityType{topoDim}, ::Node{spaceDim, T}) where {topoDim, spaceDim, T}
+    topology_style(::AbstractEntityType{topoDim}, ::AbstractArray{Node{spaceDim, T}, N}) where {spaceDim, T, N, topoDim}
+)
 
 Indicate the `TopologyStyle` of an entity of topology `topoDim` living in space of dimension `spaceDim`.
 """
 @inline function topology_style(
-    ::Node{spaceDim, T},
     ::AbstractEntityType{topoDim},
-) where {spaceDim, T, topoDim}
+    ::Node{spaceDim, T},
+) where {topoDim, spaceDim, T}
     isVolumic()
 end # everything is volumic by default
 @inline function topology_style(
-    ::Node{spaceDim, T},
     ::AbstractEntityType{0},
+    ::Node{spaceDim, T},
 ) where {spaceDim, T}
     isNodal()
 end # Any "Node" is... nodal
 @inline function topology_style(
-    ::Node{spaceDim, T},
     ::AbstractEntityType{1},
+    ::Node{spaceDim, T},
 ) where {spaceDim, T}
     isCurvilinear()
 end # Any "line" is curvilinear
-@inline topology_style(::Node{2, T}, ::AbstractEntityType{2}) where {T} = isVolumic() # A surface in R^2 is "volumic"
+@inline topology_style(::AbstractEntityType{2}, ::Node{2, T}) where {T} = isVolumic() # A surface in R^2 is "volumic"
 @inline function topology_style(
-    ::Node{spaceDim, T},
     ::AbstractEntityType{2},
+    ::Node{spaceDim, T},
 ) where {spaceDim, T}
     isSurfacic()
 end # Any other surface is "surfacic"
 @inline function topology_style(
-    nodes::AbstractArray{Node{spaceDim, T}, N},
     etype::AbstractEntityType{topoDim},
+    nodes::AbstractArray{Node{spaceDim, T}, N},
 ) where {spaceDim, T, N, topoDim}
-    topology_style(nodes[1], etype)
+    topology_style(etype, nodes[1])
 end

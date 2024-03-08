@@ -1,13 +1,15 @@
+import Bcube: Mesh, shape
+
 function test_divergence2d(mesh, u, degree)
 
     # Connectivity
     c2n = connectivities_indices(mesh, :c2n)
     cnodes = get_nodes(mesh, c2n[1])
-    ct = cells(mesh)[1]
+    ctype = cells(mesh)[1]
 
     return sum(
-        integrate_n((n, x) -> u(x) ⋅ n, iside, cnodes, ct, Quadrature(degree)) for
-        iside in 1:nfaces(ct)
+        Bcube.integrate_n((n, x) -> u(x) ⋅ n, iside, ctype, cnodes, Quadrature(degree)) for
+        iside in 1:nfaces(ctype)
     )
 end
 
@@ -18,12 +20,12 @@ end
 
         # Connectivity
         c2n = connectivities_indices(mesh, :c2n)
-        n = get_nodes(mesh, c2n[1])
+        cnodes = get_nodes(mesh, c2n[1])
 
         # Test length of line
         @test all(
-            integrate(x -> 1.0, n, cells(mesh)[1], Quadrature(Val(degree))) ≈ 1.0 for
-            degree in 1:5
+            Bcube.integrate(x -> 1.0, cells(mesh)[1], cnodes, Quadrature(Val(degree))) ≈
+            1.0 for degree in 1:5
         )
     end
 
@@ -37,118 +39,120 @@ end
 
         # Connectivity
         c2n = connectivities_indices(mesh, :c2n)
-        n = get_nodes(mesh, c2n[1])
         cnodes = get_nodes(mesh, c2n[1])
-        ct = cells(mesh)[1]
+        cnodes = get_nodes(mesh, c2n[1])
+        ctype = cells(mesh)[1]
 
         # Test area of tri
         @test all(
-            integrate(x -> 1.0, n, cells(mesh)[1], Quadrature(Val(degree))) ≈ 2.0 for
-            degree in 1:5
+            Bcube.integrate(x -> 1.0, cells(mesh)[1], cnodes, Quadrature(Val(degree))) ≈
+            2.0 for degree in 1:5
         )
 
         # Test for P1 shape functions and products of P1 shape functions
         fs = FunctionSpace(:Lagrange, 1)
-        λ = shape_functions(fs, shape(ct))
+        λ = shape_functions(fs, shape(ctype))
         degree = Val(2)
         quad = Quadrature(degree)
 
-        @test integrate_ref(ξ -> λ(ξ)[1], cnodes, ct, quad) ≈ 2.0 / 3.0
-        @test integrate_ref(ξ -> λ(ξ)[2], cnodes, ct, quad) ≈ 2.0 / 3.0
-        @test integrate_ref(ξ -> λ(ξ)[3], cnodes, ct, quad) ≈ 2.0 / 3.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[1], ctype, cnodes, quad) ≈ 2.0 / 3.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[2], ctype, cnodes, quad) ≈ 2.0 / 3.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[3], ctype, cnodes, quad) ≈ 2.0 / 3.0
 
-        @test integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[1], cnodes, ct, quad) ≈ 1.0 / 3.0
-        @test integrate_ref(ξ -> λ(ξ)[2] * λ(ξ)[2], cnodes, ct, quad) ≈ 1.0 / 3.0
-        @test integrate_ref(ξ -> λ(ξ)[3] * λ(ξ)[3], cnodes, ct, quad) ≈ 1.0 / 3.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[1], ctype, cnodes, quad) ≈ 1.0 / 3.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[2] * λ(ξ)[2], ctype, cnodes, quad) ≈ 1.0 / 3.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[3] * λ(ξ)[3], ctype, cnodes, quad) ≈ 1.0 / 3.0
 
-        @test integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[2], cnodes, ct, quad) ≈ 1.0 / 6.0
-        @test integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[3], cnodes, ct, quad) ≈ 1.0 / 6.0
-        @test integrate_ref(ξ -> λ(ξ)[2] * λ(ξ)[3], cnodes, ct, quad) ≈ 1.0 / 6.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[2], ctype, cnodes, quad) ≈ 1.0 / 6.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[3], ctype, cnodes, quad) ≈ 1.0 / 6.0
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[2] * λ(ξ)[3], ctype, cnodes, quad) ≈ 1.0 / 6.0
 
         # Test for P2 shape functions and some products of P2 shape functions
         fs = FunctionSpace(:Lagrange, 2)
-        λ = shape_functions(fs, shape(ct))
+        λ = shape_functions(fs, shape(ctype))
 
         _atol = 2 * eps()
         _rtol = 4 * eps()
         for degree in 2:8
             # atol fixed to 1e-10 to get a pass for degree 4
+            quad = Quadrature(degree)
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[1], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[1], ctype, cnodes, quad),
                 0.0,
                 atol = _atol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[2], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[2], ctype, cnodes, quad),
                 0.0,
                 atol = _atol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[3], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[3], ctype, cnodes, quad),
                 0.0,
                 atol = _atol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[4], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[4], ctype, cnodes, quad),
                 2.0 / 3.0,
                 rtol = _rtol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[5], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[5], ctype, cnodes, quad),
                 2.0 / 3.0,
                 rtol = _rtol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[6], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[6], ctype, cnodes, quad),
                 2.0 / 3.0,
                 rtol = _rtol,
             )
         end
 
         for degree in 4:8
+            quad = Quadrature(degree)
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[1], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[1], ctype, cnodes, quad),
                 1.0 / 15.0,
                 rtol = _rtol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[2] * λ(ξ)[2], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[2] * λ(ξ)[2], ctype, cnodes, quad),
                 1.0 / 15.0,
                 rtol = _rtol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[3] * λ(ξ)[3], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[3] * λ(ξ)[3], ctype, cnodes, quad),
                 1.0 / 15.0,
                 rtol = _rtol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[4] * λ(ξ)[4], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[4] * λ(ξ)[4], ctype, cnodes, quad),
                 16.0 / 45.0,
                 rtol = _rtol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[5] * λ(ξ)[5], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[5] * λ(ξ)[5], ctype, cnodes, quad),
                 16.0 / 45.0,
                 rtol = _rtol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[6] * λ(ξ)[6], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[6] * λ(ξ)[6], ctype, cnodes, quad),
                 16.0 / 45.0,
                 rtol = _rtol,
             )
 
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[4], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[4], ctype, cnodes, quad),
                 0.0,
                 atol = _atol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[5], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[5], ctype, cnodes, quad),
                 -2.0 / 45.0,
                 rtol = _rtol,
             )
             @test isapprox(
-                integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[6], cnodes, ct, Quadrature(degree)),
+                Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[6], ctype, cnodes, quad),
                 0.0,
                 atol = _atol,
             )
@@ -160,15 +164,18 @@ end
         mesh = basic_mesh()
         c2n = connectivities_indices(mesh, :c2n)
         icell = 2 # Test integration on quad '2'
-        n = get_nodes(mesh, c2n[icell])
-        ct = cells(mesh)[icell]
+        cnodes = get_nodes(mesh, c2n[icell])
+        ctype = cells(mesh)[icell]
 
         @test all(
-            isapprox(integrate(x -> 2.0, n, ct, Quadrature(degree)), 2.0) for degree in 1:13
+            isapprox(Bcube.integrate(x -> 2.0, ctype, cnodes, Quadrature(degree)), 2.0) for
+            degree in 1:13
         )
         @test all(
-            isapprox(integrate(x -> 2x[1] + 3x[2], n, ct, Quadrature(degree)), 4.5) for
-            degree in 1:13
+            isapprox(
+                Bcube.integrate(x -> 2x[1] + 3x[2], ctype, cnodes, Quadrature(degree)),
+                4.5,
+            ) for degree in 1:13
         )
 
         # An other quad
@@ -179,16 +186,17 @@ end
         mesh = one_cell_mesh(:quad; xmin, xmax, ymin, ymax)
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
-        ct = cells(mesh)[1]
+        ctype = cells(mesh)[1]
         fs = FunctionSpace(:Lagrange, 1)
-        λ = shape_functions(fs, shape(ct))
-        ∇λ = ξ -> grad_shape_functions(fs, Val(1), ct, cnodes, ξ)
+        λ = shape_functions(fs, shape(ctype))
+        ∇λ = ξ -> ∂λξ_∂x(fs, Val(1), ctype, cnodes, ξ)
         degree = Val(2)
         quad = Quadrature(degree)
-        @test integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[1], cnodes, ct, quad) ≈ Δx * Δy / 9
-        @test integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[2], cnodes, ct, quad) ≈ Δx * Δy / 18
-        @test integrate_ref(ξ -> λ(ξ)[2] * λ(ξ)[2], cnodes, ct, quad) ≈ Δx * Δy / 9
-        @test integrate_ref(ξ -> ∇λ(ξ)[1, :] ⋅ ∇λ(ξ)[1, :], cnodes, ct, quad) ≈
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[1], ctype, cnodes, quad) ≈ Δx * Δy / 9
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[1] * λ(ξ)[2], ctype, cnodes, quad) ≈
+              Δx * Δy / 18
+        @test Bcube.integrate_ref(ξ -> λ(ξ)[2] * λ(ξ)[2], ctype, cnodes, quad) ≈ Δx * Δy / 9
+        @test Bcube.integrate_ref(ξ -> ∇λ(ξ)[1, :] ⋅ ∇λ(ξ)[1, :], ctype, cnodes, quad) ≈
               (Δx^2 + Δy^2) / (3 * Δx * Δy)
     end
 
@@ -206,19 +214,19 @@ end
 
             for icell in (1, 2)
                 cnodes = get_nodes(mesh, c2n[icell])
-                ct = cells(mesh)[icell]
-                @test integrate(g, 1, cnodes, ct, quad) ≈ Δx
-                @test integrate(g, 2, cnodes, ct, quad) ≈ Δy
-                @test integrate(g, 3, cnodes, ct, quad) ≈ Δx
-                @test integrate(g, 4, cnodes, ct, quad) ≈ Δy
+                ctype = cells(mesh)[icell]
+                @test Bcube.integrate(g, 1, ctype, cnodes, quad) ≈ Δx
+                @test Bcube.integrate(g, 2, ctype, cnodes, quad) ≈ Δy
+                @test Bcube.integrate(g, 3, ctype, cnodes, quad) ≈ Δx
+                @test Bcube.integrate(g, 4, ctype, cnodes, quad) ≈ Δy
             end
 
             icell = 3
             cnodes = get_nodes(mesh, c2n[icell])
-            ct = cells(mesh)[icell]
-            @test integrate(g, 1, cnodes, ct, quad) ≈ Δx
-            @test integrate(g, 2, cnodes, ct, quad) ≈ norm([Δx, Δy])
-            @test integrate(g, 3, cnodes, ct, quad) ≈ Δy
+            ctype = cells(mesh)[icell]
+            @test Bcube.integrate(g, 1, ctype, cnodes, quad) ≈ Δx
+            @test Bcube.integrate(g, 2, ctype, cnodes, quad) ≈ norm([Δx, Δy])
+            @test Bcube.integrate(g, 3, ctype, cnodes, quad) ≈ Δy
         end
     end
 
@@ -254,9 +262,9 @@ end
         # Test integration accuracy
         degquad = Val(200)
         quad = Quadrature(degquad)
-        @test integrate(x -> 1, lnodes, Bar3_t(), quad) ≈ L
-        @test integrate(x -> 1, 1, cnodes, ctype, quad) ≈ L
-        @test integrate_ref(x -> 1, lnodes, Bar3_t(), quad) ≈ L
+        @test Bcube.integrate(x -> 1, Bar3_t(), lnodes, quad) ≈ L
+        @test Bcube.integrate(x -> 1, 1, ctype, cnodes, quad) ≈ L
+        @test Bcube.integrate_ref(x -> 1, Bar3_t(), lnodes, quad) ≈ L
     end
 
     @testset "Sphere" begin
@@ -267,7 +275,7 @@ end
         S = sum(1:ncells(mesh)) do icell
             cnodes = get_nodes(mesh, c2n[icell])
             ctype = cells(mesh)[icell]
-            integrate_ref(ξ -> 1.0, cnodes, ctype, Quadrature(1))
+            Bcube.integrate_ref(ξ -> 1.0, ctype, cnodes, Quadrature(1))
         end
         @test isapprox(S, 4π; atol = 1e-1)
     end
@@ -276,15 +284,15 @@ end
         mesh = one_cell_mesh(:line)
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
-        ct = cells(mesh)[1]
+        ctype = cells(mesh)[1]
 
         g = x -> 2.5
-        @test integrate(g, 1, cnodes, ct, Quadrature(1)) ≈ 2.5
-        @test integrate(g, 2, cnodes, ct, Quadrature(1)) ≈ 2.5
+        @test Bcube.integrate(g, 1, ctype, cnodes, Quadrature(1)) ≈ 2.5
+        @test Bcube.integrate(g, 2, ctype, cnodes, Quadrature(1)) ≈ 2.5
 
         g = x -> x[1] # this is x -> x but since all nodes are in R^n, we need to select the component (as for triangles below)
-        @test integrate(g, 1, cnodes, ct, Quadrature(2)) ≈ -1.0
-        @test integrate(g, 2, cnodes, ct, Quadrature(2)) ≈ 1.0
+        @test Bcube.integrate(g, 1, ctype, cnodes, Quadrature(2)) ≈ -1.0
+        @test Bcube.integrate(g, 2, ctype, cnodes, Quadrature(2)) ≈ 1.0
 
         #--- NEW-API version
         cinfo = CellInfo(mesh, 1)
@@ -312,19 +320,19 @@ end
         mesh = one_cell_mesh(:tri; xmin = 0.0, ymin = 0.0)
         c2n = connectivities_indices(mesh, :c2n)
         cnodes = get_nodes(mesh, c2n[1])
-        ct = cells(mesh)[1]
+        ctype = cells(mesh)[1]
 
         # Test for constant
         g = x -> 2.5
-        @test integrate(g, 1, cnodes, ct, Quadrature(1)) ≈ 2.5
-        @test integrate(g, 2, cnodes, ct, Quadrature(1)) ≈ 2.5 * √(2.0)
-        @test integrate(g, 3, cnodes, ct, Quadrature(1)) ≈ 2.5
+        @test Bcube.integrate(g, 1, ctype, cnodes, Quadrature(1)) ≈ 2.5
+        @test Bcube.integrate(g, 2, ctype, cnodes, Quadrature(1)) ≈ 2.5 * √(2.0)
+        @test Bcube.integrate(g, 3, ctype, cnodes, Quadrature(1)) ≈ 2.5
 
         # Test for linear function
         g = x -> x[1] + x[2]
-        @test integrate(g, 1, cnodes, ct, Quadrature(2)) ≈ 0.5
-        @test integrate(g, 2, cnodes, ct, Quadrature(2)) ≈ √(2.0)
-        @test integrate(g, 3, cnodes, ct, Quadrature(2)) ≈ 0.5
+        @test Bcube.integrate(g, 1, ctype, cnodes, Quadrature(2)) ≈ 0.5
+        @test Bcube.integrate(g, 2, ctype, cnodes, Quadrature(2)) ≈ √(2.0)
+        @test Bcube.integrate(g, 3, ctype, cnodes, Quadrature(2)) ≈ 0.5
 
         #----- NEW-API version
         cinfo = CellInfo(mesh, 1)
@@ -479,11 +487,11 @@ end
 
     @testset "Lagrange cube" begin
         mesh = scale(translate(one_cell_mesh(:cube), [1.0, 1.0, 2.0]), 2.0)
-        @test integrate(x -> 1, mesh.nodes, cells(mesh)[1], Quadrature(1)) == 64
+        @test Bcube.integrate(x -> 1, cells(mesh)[1], mesh.nodes, Quadrature(1)) == 64
 
         mesh = one_cell_mesh(:cube)
         icell = 1
-        ct = cells(mesh)[icell]
+        ctype = cells(mesh)[icell]
         q = Quadrature(1)
         f(x) = 1
         ξηζ = SA[0.0, 0.0, 0.0]
@@ -494,10 +502,64 @@ end
             m = translate(mesh, rand(3))
             m = scale(m, s)
 
-            nodes = get_nodes(m)
+            cnodes = get_nodes(m)
 
-            @test isapprox_arrays(mapping_jacobian(nodes, ct, ξηζ), s .* I3; rtol = 1e-14)
-            @test isapprox(integrate(f, nodes, ct, q), 8 * s^3)
+            @test isapprox_arrays(
+                Bcube.mapping_jacobian(ctype, cnodes, ξηζ),
+                s .* I3;
+                rtol = 1e-14,
+            )
+            @test isapprox(Bcube.integrate(f, ctype, cnodes, q), 8 * s^3)
+        end
+    end
+
+    @testset "Lagrange tetra" begin
+        # One mesh cell
+        mesh = one_cell_mesh(
+            :tetra;
+            xmin = 1.0,
+            xmax = 3.0,
+            ymin = 1.0,
+            ymax = 4.0,
+            zmin = 1.0,
+            zmax = 5.0,
+        )
+        c2n = connectivities_indices(mesh, :c2n)
+        icell = 1
+        ctype = cells(mesh)[icell]
+        cnodes = get_nodes(mesh, c2n[icell])
+        @test Bcube.integrate(x -> 1, ctype, cnodes, Quadrature(1)) ≈ 4
+        dΩ = Measure(CellDomain(mesh), 2)
+        g = PhysicalFunction(x -> 1)
+        b = Bcube.compute(∫(g)dΩ)
+        @test b[1] ≈ 4
+        gref = ReferenceFunction(x -> 1)
+        b = Bcube.compute(∫(gref)dΩ)
+        @test b[1] ≈ 4
+
+        lx = 2.0
+        ly = 3.0
+        lz = 4.0
+        mesh = one_cell_mesh(
+            :tetra;
+            xmin = 0.0,
+            xmax = lx,
+            ymin = 0.0,
+            ymax = ly,
+            zmin = 0.0,
+            zmax = lz,
+        )
+        e14 = SA[0, 0, lz]
+        e13 = SA[0, ly, 0]
+        e12 = SA[lx, 0, 0]
+        e24 = SA[-lx, 0, lz]
+        e23 = SA[-lx, ly, 0]
+        s(a, b) = 0.5 * norm(cross(a, b))
+        surface_ref = (s(-e12, e23), s(-e12, e24), s(e24, e23), s(e13, e14))
+        for i in 1:4
+            dΓ = Measure(BoundaryFaceDomain(mesh, "F$i"), 1)
+            b = Bcube.compute(∫(side⁻(g))dΓ)
+            @test b[1] ≈ surface_ref[i]
         end
     end
 
@@ -516,7 +578,7 @@ end
         icell = 1
         ctype = cells(mesh)[icell]
         cnodes = get_nodes(mesh, c2n[icell])
-        @test integrate(x -> 1, cnodes, ctype, Quadrature(1)) == 0.75
+        @test Bcube.integrate(x -> 1, ctype, cnodes, Quadrature(1)) == 0.75
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)
         b = Bcube.compute(∫(g)dΩ)

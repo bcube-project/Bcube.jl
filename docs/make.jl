@@ -32,7 +32,6 @@ makedocs(;
             "api/mesh/mesh_generator.md",
             "api/interpolation/shape.md",
             "api/interpolation/function_space.md",
-            "api/interpolation/spaces.md",
             "api/interpolation/fespace.md",
             "api/mapping/mapping.md",
             "api/integration/integration.md",

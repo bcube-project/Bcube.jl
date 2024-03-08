@@ -7,6 +7,7 @@ const GMSHTYPE = Dict(
     1 => Bar2_t(),
     2 => Tri3_t(),
     3 => Quad4_t(),
+    4 => Tetra4_t(),
     5 => Hexa8_t(),
     6 => Penta6_t(),
     9 => Tri6_t(),
@@ -1147,6 +1148,94 @@ function _gen_2cubes_mesh(output)
     # Gen mesh
     gmsh.model.geo.synchronize()
     gmsh.model.mesh.generate(3)
+
+    # Write result
+    gmsh.write(output)
+
+    # End
+    gmsh.finalize()
+end
+
+"""
+# Implementation
+Extrusion is not used to enable "random" tri filling (whereas with extrusion we can at worse obtain regular rectangle triangle)
+"""
+function gen_cylinder_shell_mesh(
+    output,
+    Lz;
+    radius = 1.0,
+    lc = 1e-1,
+    order = 1,
+    n_partitions = 0,
+    recombine = false,
+    transfinite = false,
+    nz = 10,
+    nθ = 45,
+    kwargs...,
+)
+    gmsh.initialize()
+    gmsh.model.add("model") # helps debugging
+    _apply_gmsh_options(; kwargs...)
+
+    # Points
+    O1 = gmsh.model.geo.addPoint(0, 0, 0, lc)
+    O2 = gmsh.model.geo.addPoint(0, 0, Lz, lc)
+
+    A1 = gmsh.model.geo.addPoint(radius, 0, 0, lc)
+    B1 = gmsh.model.geo.addPoint(radius * cos(2π / 3), radius * sin(2π / 3), 0, lc)
+    C1 = gmsh.model.geo.addPoint(radius * cos(4π / 3), radius * sin(4π / 3), 0, lc)
+
+    A2 = gmsh.model.geo.addPoint(radius, 0, Lz, lc)
+    B2 = gmsh.model.geo.addPoint(radius * cos(2π / 3), radius * sin(2π / 3), Lz, lc)
+    C2 = gmsh.model.geo.addPoint(radius * cos(4π / 3), radius * sin(4π / 3), Lz, lc)
+
+    # Lines
+    AOB1 = gmsh.model.geo.addCircleArc(A1, O1, B1)
+    BOC1 = gmsh.model.geo.addCircleArc(B1, O1, C1)
+    COA1 = gmsh.model.geo.addCircleArc(C1, O1, A1)
+    AOB2 = gmsh.model.geo.addCircleArc(A2, O2, B2)
+    BOC2 = gmsh.model.geo.addCircleArc(B2, O2, C2)
+    COA2 = gmsh.model.geo.addCircleArc(C2, O2, A2)
+
+    A1A2 = gmsh.model.geo.addLine(A1, A2)
+    B1B2 = gmsh.model.geo.addLine(B1, B2)
+    C1C2 = gmsh.model.geo.addLine(C1, C2)
+
+    # Surfaces
+    loops = [
+        gmsh.model.geo.addCurveLoop([AOB1, B1B2, -AOB2, -A1A2]),
+        gmsh.model.geo.addCurveLoop([BOC1, C1C2, -BOC2, -B1B2]),
+        gmsh.model.geo.addCurveLoop([COA1, A1A2, -COA2, -C1C2]),
+    ]
+
+    surfs = map(loop -> gmsh.model.geo.addSurfaceFilling([loop]), loops)
+
+    # Mesh settings
+    if transfinite
+        _nθ = round(Int, nθ / 3)
+        map(
+            line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, _nθ),
+            (AOB1, BOC1, COA1, AOB2, BOC2, COA2),
+        )
+        map(line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, nz), (A1A2, B1B2, C1C2))
+        map(surf -> gmsh.model.geo.mesh.setTransfiniteSurface(surf), surfs)
+    end
+    recombine && map(surf -> gmsh.model.geo.mesh.setRecombine(2, surf), surfs)
+
+    gmsh.model.geo.synchronize()
+
+    # Define boundaries (`1` stands for 1D, i.e lines)
+    domain = gmsh.model.addPhysicalGroup(2, surfs)
+    bottom = gmsh.model.addPhysicalGroup(1, [AOB1, BOC1, COA1])
+    top = gmsh.model.addPhysicalGroup(1, [AOB2, BOC2, COA2])
+    gmsh.model.setPhysicalName(1, bottom, "bottom")
+    gmsh.model.setPhysicalName(1, top, "top")
+    gmsh.model.setPhysicalName(2, domain, "domain")
+
+    # Gen mesh
+    gmsh.model.mesh.setOrder(order)
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
     gmsh.write(output)

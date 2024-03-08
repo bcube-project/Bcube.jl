@@ -1,36 +1,41 @@
+import Bcube:
+    CellDomain,
+    Measure,
+    DomainIterator,
+    materialize,
+    shape,
+    celltype,
+    coords,
+    ReferenceDomain,
+    CellPoint,
+    CellInfo,
+    _codim_and_type,
+    nodes,
+    center,
+    PhysicalDomain
+
 @testset "projection" begin
     @testset "1D_Line" begin
         mesh = line_mesh(11; xmin = -1.0, xmax = 1.0)
+        Ω = CellDomain(mesh)
+        dΩ = Measure(CellDomain(mesh), 2)
 
-        fSpace = FunctionSpace(:Lagrange, 1)
-        fes = FESpace(fSpace, :continuous)
-        u = CellVariable(:u, mesh, fes)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+        u = FEFunction(U)
 
-        projector = L2_projector(u)
+        f = PhysicalFunction(x -> 2 * x[1] + 3)
+        projection_l2!(u, f, dΩ)
 
-        f = x -> 2 * x[1] + 3
-        F = projection(f, projector)
+        for cInfo in DomainIterator(Ω)
+            _u = materialize(u, cInfo)
+            _f = materialize(f, cInfo)
 
-        c2n = connectivities_indices(mesh, :c2n)
-        cellTypes = cells(mesh)
-
-        for icell in 1:ncells(mesh)
-            # Alias for cell type
-            ct = cellTypes[icell]
-
-            # Alias for nodes
-            n = get_nodes(mesh, c2n[icell])
-
-            S1 = n[1].x[1]
-            S2 = n[2].x[1]
-            S = [S1, S2]
-
-            # Corresponding shape
-            s = shape(ct)
+            s = shape(celltype(cInfo))
 
             # Loop over line vertices
-            for i in 1:2
-                @test isapprox(f(S[i]), F[dof(u, icell, 1, i)], atol = 1e-8)
+            for ξ in coords(s)
+                cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
+                @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
             end
         end
 
@@ -39,59 +44,71 @@
         xmin = 2.0
         xmax = 7.0
         mesh = one_cell_mesh(:line; xmin, xmax)
-        cnodes = get_nodes(mesh)
-        ct = cells(mesh)[1]
-        Finv = mapping_inv(cnodes, ct)
-        xc = center(cnodes, ct)
+        Ω = CellDomain(mesh)
+        dΩ = Measure(CellDomain(mesh), 2)
+
+        cInfo = CellInfo(mesh, 1)
+        ctype = celltype(cInfo)
+        cnodes = nodes(cInfo)
+        xc = center(ctype, cnodes).x # coordinates in PhysicalDomain
+
         fs = FunctionSpace(:Taylor, 1)
-        fes = FESpace(fs, :discontinuous)
-        u2 = CellVariable(:u, mesh, fes)
+        U = TrialFESpace(fs, mesh, :discontinuous)
+        u = FEFunction(U)
 
         #- create test function and project on solution space
-        f(x) = 2 * x[1] + 4.0
-        q = projection(f, L2_projector(u2))
+        f = PhysicalFunction(x -> 2 * x[1] + 4.0)
+        projection_l2!(u, f, dΩ)
+
+        f_cInfo = materialize(f, cInfo)
+        _f = x -> materialize(f_cInfo, CellPoint(x, cInfo, PhysicalDomain()))
+
         #- compare the result vector + the resulting interpolation function
-        @test all(q .≈ [f(xc), ForwardDiff.gradient(f, xc)[1] * (xmax - xmin)]) # q = [f(x0), f'(x0) dx]
-        λ = x -> shape_functions(fs, shape(ct), Finv(x))
-        uᵢ = interpolate(λ, q)
-        @test all(uᵢ([x]) .≈ f([x]) for x in range(xmin, xmax; length = 5))
+        @test all(
+            get_dof_values(u) .≈
+            [_f(xc), ForwardDiff.derivative(_f, xc)[1] * (xmax - xmin)],
+        ) # u = [f(x0), f'(x0) dx]
     end
 
     @testset "2D_Triangle" begin
         path = joinpath(tempdir, "mesh.msh")
+        gen_rectangle_mesh(path, :tri; nx = 3, ny = 4)
         mesh = read_msh(path)
+        Ω = CellDomain(mesh)
+        dΩ = Measure(Ω, 2)
+
         fSpace = FunctionSpace(:Lagrange, 1)
-        fes = FESpace(fSpace, :continuous)
-        u = CellVariable(:u, mesh, fes)
-        f = x -> x[1] + x[2]
+        U = TrialFESpace(fSpace, mesh, :continuous)
+        u = FEFunction(U)
+        f = PhysicalFunction(x -> x[1] + x[2])
 
-        c2n = connectivities_indices(mesh, :c2n)
-        cellTypes = cells(mesh)
+        projection_l2!(u, f, dΩ)
 
-        projector = L2_projector(u)
-        F = projection(f, projector)
-
-        for icell in 1:ncells(mesh)
-            # Alias for cell type
-            ct = cellTypes[icell]
-
-            # Alias for nodes
-            n = get_nodes(mesh, c2n[icell])
-
-            S1 = [n[1].x[1], n[1].x[2]]
-            S2 = [n[2].x[1], n[2].x[2]]
-            S3 = [n[3].x[1], n[3].x[2]]
-            S = [S1, S2, S3]
+        for cInfo in DomainIterator(Ω)
+            _u = materialize(u, cInfo)
+            _f = materialize(f, cInfo)
 
             # Corresponding shape
-            s = shape(ct)
-
-            λ = x -> shape_functions(fSpace, s, x)
+            s = shape(celltype(cInfo))
 
             # Loop over triangle vertices
-            for i in 1:3
-                @test isapprox(f(S[i]), F[dof(u, icell, 1, i)], atol = 1e-8)
+            for ξ in coords(s)
+                cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
+                @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
             end
         end
+    end
+
+    @testset "misc" begin
+        mesh = one_cell_mesh(:quad)
+        N, T = _codim_and_type(PhysicalFunction(x -> x[1]), mesh)
+        @test N == (1,)
+        @test T == Float64
+        N, T = _codim_and_type(PhysicalFunction(x -> 1), mesh)
+        @test N == (1,)
+        @test T == Int
+        N, T = _codim_and_type(PhysicalFunction(x -> x), mesh)
+        @test N == (2,)
+        @test T == Float64
     end
 end
