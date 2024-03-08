@@ -104,6 +104,7 @@ function gradient(
     gs::AbstractGradientStyle,
 )
     f(_ξ) = op(CellPoint(_ξ, get_cellinfo(cPoint), ReferenceDomain()))
+    f = Base.Fix2(_op_cpoint, (op, cPoint))
     ξ = get_coord(cPoint)
     valS = _size_codomain(f, ξ)
     cInfo = get_cellinfo(cPoint)
@@ -117,6 +118,40 @@ function gradient(
     # f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint_phys), PhysicalDomain()))
     # fx = f(get_coord(cPoint_phys))
     # return _gradient_or_jacobian(Val(length(fx)), f, get_coord(cPoint_phys))
+end
+
+function _op_cpoint(ξ, (op, cPoint))
+    op(CellPoint(ξ, get_cellinfo(cPoint), ReferenceDomain()))
+end
+
+# Hack to fix type inference in julia 1.10
+if VERSION >= v"1.10"
+    function ForwardDiffExt.static_dual_eval(
+        ::Type{T},
+        f::Base.Fix2{typeof(_op_cpoint)},
+        x::StaticArray,
+    ) where {T}
+        @noinline f(@noinline ForwardDiffExt.dualize(T, x))
+    end
+    # Hack to fix type inference in julia 1.10
+    @noinline function ForwardDiff.jacobian(
+        f::Base.Fix2{typeof(_op_cpoint)},
+        x::StaticArray,
+    )
+        @noinline ForwardDiff.vector_mode_jacobian(f, x)
+    end
+    # Hack to fix type inference in julia 1.10
+    function ForwardDiff.vector_mode_jacobian(
+        f::Base.Fix2{typeof(_op_cpoint)},
+        x::StaticArray,
+    )
+        T = typeof(ForwardDiff.Tag(f, eltype(x)))
+        return ForwardDiffExt.extract_jacobian(
+            T,
+            ForwardDiffExt.static_dual_eval(T, f, x),
+            x,
+        )
+    end
 end
 
 ∂fξ_∂x(::VolumicGradientStyle, args...) = ∂fξ_∂x(args...)
@@ -253,7 +288,24 @@ function LazyOperators.materialize(
 ) where {O}
     return MapOver(
         materialize(
-            Base.Fix2(materialize, cPoint) ∘ Base.Fix2(Gradient, gradient_style(lOp)),
+            x -> materialize(Gradient(x, gradient_style(lOp)), cPoint),
+            get_args(lOp)...,
+        ),
+    )
+end
+
+# Specialize the previous method when `Gradient` is applied
+# to two levels of LazyMapOver in order to help compiler inference
+# to deal with recursion.
+# This may be used by `bilinear_assemble` when a bilinear form
+# containing a `Gradient` is evaluated at a `CellPoint`
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{LazyMapOver{<:NTuple{N, LazyMapOver}}}},
+    cPoint::CellPoint,
+) where {O, N}
+    return MapOver(
+        materialize(
+            x -> materialize(Gradient(x, gradient_style(lOp)), cPoint),
             get_args(lOp)...,
         ),
     )

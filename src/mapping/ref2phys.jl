@@ -281,11 +281,12 @@ end
 Compute the gradient, with respect to the physical coordinates, of a function `f` on a point
 in the reference domain. `N` is the size of the codomain of `f`.
 """
-function ∂fξ_∂x(f, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
+function ∂fξ_∂x(f::F, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ) where {F}
     return transpose(mapping_jacobian_inv(ctype, cnodes, ξ)) * ForwardDiff.gradient(f, ξ)
 end
-function ∂fξ_∂x(f, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where {N}
-    return ForwardDiff.jacobian(f, ξ) * mapping_jacobian_inv(ctype, cnodes, ξ)
+function ∂fξ_∂x(f::F, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where {F, N}
+    jac = @noinline ForwardDiff.jacobian(f, ξ)
+    return jac * mapping_jacobian_inv(ctype, cnodes, ξ)
 end
 
 function ∂fξ_∂x_hypersurface(f, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
