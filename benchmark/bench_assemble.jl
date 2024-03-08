@@ -7,7 +7,8 @@ using Bcube
 
 suite = BenchmarkGroup()
 
-function basic_bilinear(suite)
+function basic_bilinear()
+    suite = BenchmarkGroup()
     degree = 1
     degquad = 2 * degree + 1
     mesh = rectangle_mesh(251, 11; xmax = 1.0, ymax = 0.1)
