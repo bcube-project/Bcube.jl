@@ -125,21 +125,33 @@ function _op_cpoint(ξ, (op, cPoint))
 end
 
 # Hack to fix type inference in julia 1.10
-function ForwardDiffExt.static_dual_eval(
-    ::Type{T},
-    f::Base.Fix2{typeof(_op_cpoint)},
-    x::StaticArray,
-) where {T}
-    @noinline f(@noinline ForwardDiffExt.dualize(T, x))
-end
-# Hack to fix type inference in julia 1.10
-@noinline function ForwardDiff.jacobian(f::Base.Fix2{typeof(_op_cpoint)}, x::StaticArray)
-    @noinline ForwardDiff.vector_mode_jacobian(f, x)
-end
-# Hack to fix type inference in julia 1.10
-function ForwardDiff.vector_mode_jacobian(f::Base.Fix2{typeof(_op_cpoint)}, x::StaticArray)
-    T = typeof(ForwardDiff.Tag(f, eltype(x)))
-    return ForwardDiffExt.extract_jacobian(T, ForwardDiffExt.static_dual_eval(T, f, x), x)
+if VERSION >= v"1.10"
+    function ForwardDiffExt.static_dual_eval(
+        ::Type{T},
+        f::Base.Fix2{typeof(_op_cpoint)},
+        x::StaticArray,
+    ) where {T}
+        @noinline f(@noinline ForwardDiffExt.dualize(T, x))
+    end
+    # Hack to fix type inference in julia 1.10
+    @noinline function ForwardDiff.jacobian(
+        f::Base.Fix2{typeof(_op_cpoint)},
+        x::StaticArray,
+    )
+        @noinline ForwardDiff.vector_mode_jacobian(f, x)
+    end
+    # Hack to fix type inference in julia 1.10
+    function ForwardDiff.vector_mode_jacobian(
+        f::Base.Fix2{typeof(_op_cpoint)},
+        x::StaticArray,
+    )
+        T = typeof(ForwardDiff.Tag(f, eltype(x)))
+        return ForwardDiffExt.extract_jacobian(
+            T,
+            ForwardDiffExt.static_dual_eval(T, f, x),
+            x,
+        )
+    end
 end
 
 ∂fξ_∂x(::VolumicGradientStyle, args...) = ∂fξ_∂x(args...)

@@ -14,7 +14,9 @@ using Printf # just for tmp vtk, to be removed
 import LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
 
-const ForwardDiffExt = Base.get_extension(ForwardDiff, :ForwardDiffStaticArraysExt)
+if VERSION >= v"1.10"
+    const ForwardDiffExt = Base.get_extension(ForwardDiff, :ForwardDiffStaticArraysExt)
+end
 
 const MAX_LENGTH_STATICARRAY = (10^6)
 
