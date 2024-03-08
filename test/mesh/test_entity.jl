@@ -1,13 +1,3 @@
-import Bcube:
-    nodes,
-    nedges,
-    edges2nodes,
-    faces2nodes,
-    nfaces,
-    f2n_from_c2n,
-    cell_side,
-    oriented_cell_side
-
 @testset "entity types" begin
 
     # Bar2
