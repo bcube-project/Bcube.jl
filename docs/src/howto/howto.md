@@ -1,17 +1,48 @@
-# How to
+# How to... (FAQ)
 
-To be completed to answer common user questions.
+## Build your own `LazyOperator`
+Imagine that you want some kind of function (~operator) that has a different behavior depending on the cell (or face) it is applied to. The `PhysicalFunction` won't do the job since it is assumed that the provided function applies the same way in all the different cells. What you want is a `LazyOperator`. Here is how to build a custom one.
+
+For the example, let's say that you want an operator whose action is to multiply `x`, the evaluated point, by the index of the cell surrounding `x`. Start importing some Bcube material and by declaring a type corresponding to this operator:
+```julia
+using Bcube
+import Bcube: CellInfo, CellPoint, get_coord, LazyOperators
+struct DummyOperator <: Bcube.AbstractLazy end
+```
+
+Then, specify what happens when `Bcube` asks for the restriction of your operator in a given cell. This is done before applying it to any point. In most case, you don't want to do anything special, so just return the operator itself:
+```julia
+LazyOperators.materialize(Op::DummyOperator, ::CellInfo) = Op
+```
+
+Now, specify what to return when `Bcube` wants to apply this operator on a given point in a cell. As said earlier, we want it the return the point, multiplied by the cell index (but it could be anything you want):
+```julia
+function LazyOperators.materialize(
+    ::DummyOperator,
+    cPoint::CellPoint,
+)
+    x = get_coord(cPoint)
+    cInfo = Bcube.get_cellinfo(cPoint)
+    index = Bcube.cellindex(cInfo)
+    return x * index
+end
+```
+
+That's it! To see your operator in action, take a look at the related [section](@ref Evaluate-a-LazyOperator-on-a-specific-point).
+
+In this short example, note that we restricted ourselves to `CellPoint` : the `DummyOperator` won't be applicable to a face. To do so, you have to specialize the materialization on a `Side` of a `FaceInfo` and on a `Side` of a `FacePoint`. Checkout the source code for `TangentialProjector` to see this in action. Besides, the `CellPoint` is parametrized by a `DomainStyle`, allowing to specify different behavior depending on if your operator is applied to a point in the `ReferenceDomain` or in the `PhysicalDomain`.
 
 ## Evaluate a `LazyOperator` on a specific point
 Suppose that you have built a mesh and defined a `LazyOperator` on this mesh and you want, for debug purpose, evaluate this operator on a point of your choice. First, let's define our example operator:
 ```julia
+using Bcube
 mesh = circle_mesh(10)
-op = Bcube.TangentialOperator()
+op = Bcube.TangentialProjector()
 ```
 Then, let's define the point where we want to evaluate this operator. For this, we need to create a so-called `CellPoint`. It's structure is quite basic : it needs the coordinates, the mesh cell owning these coordinates, and if the coordinates are given in the `ReferenceDomain` or in the `PhysicalDomain`. Here, we will select the first cell of the mesh, and choose the coordinates `[0.5]` (recall that we are in 1D, hence this vector of one component):
 ```julia
 cInfo = Bcube.CellInfo(mesh, 1)
-cPoint = Bcube.CellPoint(SA[0.5], cInfo, Bcube.ReferenceDomain())
+cPoint = Bcube.CellPoint([0.5], cInfo, Bcube.ReferenceDomain())
 ```
 Now, they are always two steps to evaluate a `LazyOperator`. First we need to materialize it on a cell (or a face) and then to evaluate it on a cell-point (or face-point). The materialization on a cell does not necessarily triggers something, it depends on the operator. For instance, an analytic function will not have a specific behaviour depending on the cell; however a shape function will.
 ```julia
