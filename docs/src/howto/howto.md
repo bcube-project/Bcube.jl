@@ -12,12 +12,12 @@ struct DummyOperator <: Bcube.AbstractLazy end
 
 Then, specify what happens when `Bcube` asks for the restriction of your operator in a given cell. This is done before applying it to any point. In most case, you don't want to do anything special, so just return the operator itself:
 ```julia
-materialize(op::DummyOperator, ::CellInfo) = op
+Bcube.materialize(op::DummyOperator, ::CellInfo) = op
 ```
 
 Now, specify what to return when `Bcube` wants to apply this operator on a given point in a cell. As said earlier, we want it the return the point, multiplied by the cell index (but it could be anything you want):
 ```julia
-function materialize(
+function Bcube.materialize(
     ::DummyOperator,
     cPoint::CellPoint,
 )
