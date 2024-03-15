@@ -25,6 +25,7 @@ function basic_bilinear()
 
     suite["mass matrix"] = @benchmarkable assemble_bilinear($a, $Uspace, $Vspace)
     suite["stiffness matrix"] = @benchmarkable assemble_bilinear($m, $Uspace, $Vspace)
+    return suite
 end
 
 avg(u) = 0.5 * (side⁺(u) + side⁻(u))
