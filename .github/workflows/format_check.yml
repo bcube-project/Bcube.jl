@@ -19,7 +19,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'draft') == false
     strategy:
       matrix:
-        julia-version: [1.8]
+        julia-version: [1.10]
         julia-arch: [x86]
         os: [ubuntu-latest]
     steps:
