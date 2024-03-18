@@ -48,6 +48,7 @@ import Bcube:
     boundary_nodes,
     by,
     cells,
+    cellindex,
     CellInfo,
     CellPoint,
     celltype,
