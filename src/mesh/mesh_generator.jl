@@ -90,7 +90,7 @@ function ncube_mesh(n::Vector{Int}; order = 1)
 end
 
 """
-    line_mesh(n; xmin = 0., xmax = 1., order = 1, names = ("LEFT", "RIGHT"))
+    line_mesh(n; xmin = 0., xmax = 1., order = 1, names = ("xmin", "xmax"))
 
 Generate a mesh of a line of `n` vertices.
 
@@ -99,7 +99,7 @@ Generate a mesh of a line of `n` vertices.
 julia> mesh = line_mesh(5)
 ```
 """
-function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("LEFT", "RIGHT"))
+function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"))
     l = xmax - xmin # line length
     nelts = n - 1 # Number of cells
 
@@ -195,7 +195,7 @@ end
         ymin = 0.0,
         ymax = 1.0,
         order = 1,
-        bnd_names = ("north", "south", "east", "west"),
+        bnd_names = ("xmin", "xmax", "ymin", "ymax"),
     )
 
 Generate a 2D mesh of a rectangle with `nx` and `ny` vertices in the x and y directions respectively.
@@ -214,7 +214,7 @@ function rectangle_mesh(
     ymin = 0.0,
     ymax = 1.0,
     order = 1,
-    bnd_names = ("north", "south", "east", "west"),
+    bnd_names = ("xmin", "xmax", "ymin", "ymax"),
 )
     @assert (nx > 1 && ny > 1) "`nx` and `ny`, the number of nodes, must be greater than 1 (nx=$nx, ny=$ny)"
 
@@ -257,15 +257,10 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_name
             nodes[(iy - 1) * nx + ix] = Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy])
 
             # Boundary conditions
-            if ix == 1 # West
-                push!(tag2nodes[4], iglob)
-            elseif ix == nx # East
-                push!(tag2nodes[3], iglob)
-            elseif iy == 1
-                push!(tag2nodes[2], iglob)
-            elseif iy == ny
-                push!(tag2nodes[1], iglob)
-            end
+            (ix == 1) && push!(tag2nodes[1], iglob)
+            (ix == nx) && push!(tag2nodes[2], iglob)
+            (iy == 1) && push!(tag2nodes[3], iglob)
+            (iy == ny) && push!(tag2nodes[4], iglob)
 
             iglob += 1
         end
@@ -284,10 +279,10 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_name
     end
 
     # Cell type is constant
-    celltypes = [Quad4_t() for ielt in 1:nelts]
+    celltypes = fill(Quad4_t(), nelts)
 
     # Number of nodes of each cell : always 4
-    cell2nnodes = 4 * ones(Int, nelts)
+    cell2nnodes = fill(4, nelts)
 
     return Mesh(
         nodes,
@@ -325,13 +320,26 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     Δx = lx / (nx - 1) / 2
     Δy = ly / (ny - 1) / 2
 
+    # Prepare boundary nodes
+    tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
+    tag2nodes = Dict(tag => Int[] for tag in 1:length(bnd_names))
+
     # Nodes
     # we override some nodes multiple times, but it is easier this way
     nodes = Array{Node{2, Float64}}(undef, nnodes)
+    iglob = 1
     for iy in 1:(ny + (ny - 1))
         for ix in 1:(nx + (nx - 1))
             nodes[(iy - 1) * (nx + (nx - 1)) + ix] =
                 Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy])
+
+            # Boundary conditions
+            (ix == 1) && push!(tag2nodes[1], iglob)
+            (ix == nx + (nx - 1)) && push!(tag2nodes[2], iglob)
+            (iy == 1) && push!(tag2nodes[3], iglob)
+            (iy == ny + (ny - 1)) && push!(tag2nodes[4], iglob)
+
+            iglob += 1
         end
     end
 
@@ -359,12 +367,18 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     end
 
     # Cell type is constant
-    celltypes = [Quad9_t() for ielt in 1:nelts]
+    celltypes = fill(Quad9_t(), nelts)
 
-    # Number of nodes of each cell : always 4
-    cell2nnodes = 9 * ones(Int, nelts)
+    # Number of nodes of each cell : always 9
+    cell2nnodes = fill(9, nelts)
 
-    return Mesh(nodes, celltypes, Connectivity(cell2nnodes, cell2node))
+    return Mesh(
+        nodes,
+        celltypes,
+        Connectivity(cell2nnodes, cell2node);
+        bc_names = tag2name,
+        bc_nodes = tag2nodes,
+    )
 end
 
 function hexa_mesh(
