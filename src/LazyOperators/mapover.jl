@@ -20,6 +20,7 @@ struct LazyMapOver{A} <: AbstractLazyMapOver{A}
     args::A
 end
 
+LazyMapOver(args::Tuple) = LazyMapOver{typeof(args)}(args)
 LazyMapOver(args...) = LazyMapOver{typeof(args)}(args)
 
 get_args(a::LazyMapOver) = a.args
@@ -33,6 +34,15 @@ materialize(f::F, a::LazyMapOver) where {F <: Function} = lazy_map_over(f, a)
 (a::LazyMapOver)(x::Vararg{Any, N}) where {N} = materialize(a, x...)
 
 function lazy_map_over(f::F, a::Vararg{LazyMapOver, N}) where {F <: Function, N}
+    _tuplemap(f, _tuplemap(get_args, a)...)
+end
+
+# Specialize the previous method for two levels of LazyMapOver
+# in order to help compiler inference to deal with recursion.
+function lazy_map_over(
+    f::F,
+    a::Vararg{LazyMapOver{<:NTuple{N1, LazyMapOver}}, N},
+) where {F <: Function, N, N1}
     _tuplemap(f, _tuplemap(get_args, a)...)
 end
 
