@@ -63,26 +63,6 @@ end
         λphys = Bcube.CellFunction(_f, Bcube.PhysicalDomain(), Val(1))
         @test λphys(a) == _f.((x1_phys, x2_phys))
     end
-
-    @testset "MeshData" begin
-        mesh = line_mesh(3)
-
-        array = [1.0, 2.0]
-        funcs = [x -> x, x -> 2x]
-        cellArray = MeshCellData(array)
-        cellFuncs = MeshCellData(funcs)
-        for cInfo in DomainIterator(CellDomain(mesh))
-            i = cellindex(cInfo)
-            cPointRef = CellPoint([0.0], cInfo, ReferenceDomain())
-            cPointPhy = change_domain(cPointRef, PhysicalDomain())
-
-            _cellArray = Bcube.materialize(cellArray, cInfo)
-            @test Bcube.materialize(_cellArray, cPointRef) == array[i]
-
-            _cellFuncs = Bcube.materialize(cellFuncs, cInfo)
-            @test Bcube.materialize(_cellFuncs, cPointRef) == funcs[i](get_coord(cPointPhy))
-        end
-    end
 end
 
 @testset "CoplanarRotation" begin

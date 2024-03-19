@@ -1,5 +1,6 @@
 @testset "MeshData" begin
     @testset "CellData" begin
+        #--- Test 1
         n = 3
         mesh = line_mesh(n)
         dΩ = Measure(CellDomain(mesh), 2)
@@ -16,5 +17,24 @@
         d = Bcube.MeshCellData(data)
         integ = ∫(d ⋅ [0, 1, 0, 0])dΩ
         @test Bcube.compute(integ) == [1.0, 3.0]
+
+        #--- Test 2
+        mesh = line_mesh(3)
+
+        array = [1.0, 2.0]
+        funcs = [PhysicalFunction(x -> x), PhysicalFunction(x -> 2x)]
+        cellArray = MeshCellData(array)
+        cellFuncs = MeshCellData(funcs)
+        for cInfo in DomainIterator(CellDomain(mesh))
+            i = cellindex(cInfo)
+            cPointRef = CellPoint([0.0], cInfo, ReferenceDomain())
+            cPointPhy = change_domain(cPointRef, PhysicalDomain())
+
+            _cellArray = Bcube.materialize(cellArray, cInfo)
+            @test Bcube.materialize(_cellArray, cPointRef) == array[i]
+
+            _cellFuncs = Bcube.materialize(cellFuncs, cInfo)
+            @test Bcube.materialize(_cellFuncs, cPointRef) == funcs[i](get_coord(cPointPhy))
+        end
     end
 end
