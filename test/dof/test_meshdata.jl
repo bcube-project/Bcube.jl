@@ -1,5 +1,5 @@
 @testset "MeshData" begin
-    @testset "CellData" begin
+    @testset "MeshCellData" begin
         n = 3
         mesh = line_mesh(n)
         dΩ = Measure(CellDomain(mesh), 2)
