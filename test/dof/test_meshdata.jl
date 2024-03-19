@@ -34,7 +34,7 @@
             @test Bcube.materialize(_cellArray, cPointRef) == array[i]
 
             _cellFuncs = Bcube.materialize(cellFuncs, cInfo)
-            @test Bcube.materialize(_cellFuncs, cPointRef) == funcs[i](get_coord(cPointPhy))
+            @test Bcube.materialize(_cellFuncs, cPointRef) == funcs[i](cPointPhy)
         end
     end
 end
