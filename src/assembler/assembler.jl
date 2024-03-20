@@ -434,7 +434,7 @@ _update_b!(b::AbstractVector, dofs, vals::NullOperator) = nothing
         U::AbstractMultiFESpace{N, Tu},
         V::AbstractMultiFESpace{N, Tv},
         domain::AbstractDomain,
-    ) where {N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}    
+    ) where {N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}
     function _count_n_elts(
         U::TrialFESpace,
         V::TestFESpace,
@@ -451,7 +451,7 @@ on a domain.
 - `domain`::AbstractDomain : domain of integration of the bilinear form.
 
 # Warning
-TO DO: for the moment this function is not really implemented for a BoundaryFaceDomain. 
+TO DO: for the moment this function is not really implemented for a BoundaryFaceDomain.
 This requires to be able to distinguish between the usual TrialsFESpace and MultiplierFESpace.
 
 """
@@ -734,21 +734,31 @@ Base.repeat(a::SVector, ::Val{N}) where {N} = reduce(vcat, ntuple(i -> a, Val(N)
 
 Compute an integral, independently from a FEM/DG framework (i.e without FESpace)
 
-Return an array (of size ncells) of the integral evaluated over each cell (or face).
+Return a dict (same size of the domain of integration) <elt mesh-index> => <integral evaluated over the elt>.
 
-When integrating the constant function `PhysicalFunction(x -> 1)`, the sum of this
-result array will give you:
-* the volume of the `CellDomain` if the integration was performed over a `CellDomain`
-* the area of the `BoundaryFaceDomain` if the integration was performed over a `BoundaryFaceDomain`
-* **twice** the area of the `InteriorFaceDomain` if the integration was performed over an `InteriorFaceDomain`
+# Example
+Compute volume of each cell and each face.
+```julia
+mesh = rectangle_mesh(2, 3)
+dΩ = Measure(CellDomain(mesh), 1)
+∂Ω = Measure(BoundaryFaceDomain(mesh), 1)
+f = PhysicalFunction(x -> 1)
+@show Bcube.compute(∫(f)dΩ)
+@show Bcube.compute(∫(side⁻(f))∂Ω)
+```
 """
 function compute(integration::Integration)
     measure = get_measure(integration)
     domain = get_domain(measure)
-    mesh = get_mesh(domain)
-    fs = FunctionSpace(:Lagrange, 0)
-    V = TestFESpace(fs, mesh)
-    return assemble_linear(v -> integration, V)
+    f = get_function(get_integrand(integration))
+    quadrature = get_quadrature(measure)
+
+    values = map(DomainIterator(domain)) do elementInfo
+        _f = materialize(f, elementInfo)
+        _integrate_on_ref_element(_f, elementInfo, quadrature)
+    end
+
+    return Dict(indices(domain) .=> values)
 end
 
 """
