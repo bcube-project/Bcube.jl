@@ -18,7 +18,6 @@
         data = collect(reinterpret(SVector{4, Int}, collect(1:(4 * ncells(mesh)))))
         d = Bcube.MeshCellData(data)
         integ = ∫(d ⋅ [0, 1, 0, 0])dΩ
-        @test Bcube.compute(integ) == [1.0, 3.0]
         vals = compute(integ)
         @test vals[1] == 1.0
         @test vals[2] == 3.0
@@ -41,5 +40,28 @@
             _cellFuncs = Bcube.materialize(cellFuncs, cInfo)
             @test Bcube.materialize(_cellFuncs, cPointRef) == funcs[i](cPointPhy)
         end
+    end
+
+    @testset "FaceData" begin
+        nodes = [Node([0.0, 0.0]), Node([2.0, 0.0]), Node([3.0, 1.0]), Node([1.0, 2.0])]
+        celltypes = [Quad4_t()]
+        cell2node = Connectivity([4], [1, 2, 3, 4])
+        bnd_name = "BORDER"
+        tag2name = Dict(1 => bnd_name)
+        tag2nodes = Dict(1 => collect(1:4))
+
+        mesh = Mesh(nodes, celltypes, cell2node; bc_names = tag2name, bc_nodes = tag2nodes)
+
+        f(fnodes) = PhysicalFunction(x -> begin
+            norm(x - coords(get_nodes(mesh, fnodes[1])))
+        end)
+        f2n = connectivities_indices(mesh, :f2n)
+        D = MeshFaceData([f(fnodes) for fnodes in f2n])
+
+        ∂Ω = Measure(BoundaryFaceDomain(mesh), 3)
+
+        a = collect(values(Bcube.compute(∫(side⁻(D))∂Ω)))
+        l = collect(values(Bcube.compute(∫(side⁻(PhysicalFunction(x -> 1.0)))∂Ω)))
+        @test isapprox_arrays(a, l .^ 2 ./ 2; rtol = 1e-15)
     end
 end

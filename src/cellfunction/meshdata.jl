@@ -1,5 +1,6 @@
 abstract type AbstractMeshDataLocation end
 struct CellData <: AbstractMeshDataLocation end
+struct FaceData <: AbstractMeshDataLocation end
 struct PointData <: AbstractMeshDataLocation end
 
 """
@@ -27,8 +28,21 @@ set_values!(data::MeshData, values::Union{Number, AbstractVector}) = data.values
 get_location(::MeshData{L}) where {L} = L()
 
 function LazyOperators.materialize(data::MeshData{CellData}, cInfo::CellInfo)
-    return get_values(data)[cellindex(cInfo)]
+    value = get_values(data)[cellindex(cInfo)]
+    return wrap_value(value)
 end
 
+function LazyOperators.materialize(
+    data::MeshData{FaceData},
+    side::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    fInfo = get_args(side)[1]
+    return get_values(data)[faceindex(fInfo)]
+end
+
+wrap_value(value) = value
+wrap_value(value::Union{Number, AbstractArray}) = ReferenceFunction(ξ -> value)
+
 MeshCellData(values::AbstractVector) = MeshData(CellData(), values)
+MeshFaceData(values::AbstractVector) = MeshData(FaceData(), values)
 MeshPointData(values::AbstractVector) = MeshData(PointData(), values)
