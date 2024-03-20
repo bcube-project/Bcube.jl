@@ -9,7 +9,9 @@
         data = collect(1:ncells(mesh))
         d = Bcube.MeshCellData(data)
         integ = ∫(d)dΩ
-        @test Bcube.compute(integ) == [0.5, 1.0]
+        vals = compute(integ)
+        @test vals[1] == 0.5
+        @test vals[2] == 1.0
 
         # tensor data
         # data = [[1,2,3,4], [5,6,7,8], ...]
@@ -17,6 +19,9 @@
         d = Bcube.MeshCellData(data)
         integ = ∫(d ⋅ [0, 1, 0, 0])dΩ
         @test Bcube.compute(integ) == [1.0, 3.0]
+        vals = compute(integ)
+        @test vals[1] == 1.0
+        @test vals[2] == 3.0
 
         #--- Test 2
         mesh = line_mesh(3)

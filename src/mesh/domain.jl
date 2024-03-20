@@ -401,9 +401,10 @@ get_face_normals(::AbstractFaceDomain) = FaceNormal()
 
 abstract type AbstractDomainIterator{D <: AbstractDomain} end
 get_domain(iter::AbstractDomainIterator) = iter.domain
-Base.iterate(iter::AbstractDomainIterator) = error("to be defined")
-Base.iterate(iter::AbstractDomainIterator, state) = error("to be defined")
+Base.iterate(::AbstractDomainIterator) = error("to be defined")
+Base.iterate(::AbstractDomainIterator, state) = error("to be defined")
 Base.eltype(::AbstractDomainIterator) = error("to be defined")
+Base.length(iter::AbstractDomainIterator) = length(indices(get_domain(iter)))
 
 struct DomainIterator{D <: AbstractDomain} <: AbstractDomainIterator{D}
     domain::D
