@@ -91,7 +91,7 @@ include("./cellfunction/cellfunction.jl")
 export PhysicalFunction, ReferenceFunction, side_p, side_n, side⁺, side⁻, jump
 
 include("./cellfunction/meshdata.jl")
-export MeshCellData, MeshPointData, get_values, set_values!
+export MeshCellData, MeshFaceData, MeshPointData, get_values, set_values!
 
 include("./fespace/dofhandler.jl")
 
