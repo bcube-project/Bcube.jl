@@ -13,4 +13,9 @@ benchmark/Manifest.toml
 params.json
 .ipynb_checkpoints/
 /example/private/
+*.aux
+*.fls
+*.log
+*.synctex.gz
+*.fdb_latexmk
 
