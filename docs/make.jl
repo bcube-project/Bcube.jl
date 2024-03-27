@@ -39,7 +39,7 @@ makedocs(;
             "api/dof/dof.md",
             "api/output/vtk.md",
         ],
-        "How to..." => "howto/howto.md",
+        "How to... (FAQ)" => "howto/howto.md",
     ],
 )
 

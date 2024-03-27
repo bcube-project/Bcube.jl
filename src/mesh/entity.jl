@@ -512,7 +512,7 @@ struct isVolumic <: TopologyStyle end
 """
     topology_style(::AbstractEntityType{topoDim}, ::Node{spaceDim, T}) where {topoDim, spaceDim, T}
     topology_style(::AbstractEntityType{topoDim}, ::AbstractArray{Node{spaceDim, T}, N}) where {spaceDim, T, N, topoDim}
-)
+
 
 Indicate the `TopologyStyle` of an entity of topology `topoDim` living in space of dimension `spaceDim`.
 """
