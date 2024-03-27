@@ -1,5 +1,6 @@
 \documentclass[tikz,convert={density=600,size=1080x800,outext=.png}]{standalone} % we can also output .svg
 \usetikzlibrary{backgrounds}
+\usetikzlibrary{arrows.meta}
 \usepackage{amsmath}
 \newcommand{\bo}[1]{\boldsymbol{#1}}
 \tikzset{background fill/.style={background rectangle/.style={fill=#1},show background rectangle}}
@@ -44,8 +45,8 @@
 
     \pgfmathsetmacro{\x}{\refXMin - 0.7}
     \pgfmathsetmacro{\y}{\refXMin - 0.6}
-    \draw[->] (\x,\y) -- ++(0.4, 0) node[below] {\tiny $\xi$};
-    \draw[->] (\x,\y) -- ++(0, 0.4) node[left] {\tiny $\eta$};
+    \draw[-{Latex[length=1mm, width=1mm]}] (\x,\y) -- ++(0.4, 0) node[below] {\tiny $\xi$};
+    \draw[-{Latex[length=1mm, width=1mm]}] (\x,\y) -- ++(0, 0.4) node[left] {\tiny $\eta$};
 
 
     % Map line
@@ -95,8 +96,8 @@
 
     \pgfmathsetmacro{\x}{\refXMax + 2*\arrowMarginX + \arrowWidth + 2}
     \pgfmathsetmacro{\y}{0 - 0.6}
-    \draw[->] (\x,\y) -- ++(0.4, 0) node[below] {\tiny $x$};
-    \draw[->] (\x,\y) -- ++(0, 0.4) node[left] {\tiny $y$};
+    \draw[-{Latex[length=1mm, width=1mm]}] (\x,\y) -- ++(0.4, 0) node[below] {\tiny $x$};
+    \draw[-{Latex[length=1mm, width=1mm]}] (\x,\y) -- ++(0, 0.4) node[left] {\tiny $y$};
 
 \end{tikzpicture}
 \end{document}
