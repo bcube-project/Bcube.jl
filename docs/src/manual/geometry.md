@@ -10,4 +10,4 @@ F(\xi) = \sum_{i=1}^n \hat{\lambda}_i(\xi)M_i
 
 where $(\lambda)_i$ are the Lagrange polynomials whose order matches the element order.
 
-![sketch](../assets/sketch/sketch-integration.png)
+![sketch](../assets/sketch/sketch-mapping.png)
