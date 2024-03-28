@@ -41,7 +41,7 @@ function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
         for (inode, ξ) in zip(_c2n, coords(cshape))
             cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
             ncontributions[inode] += 1
-            values[inode, :] .+= _f(cPoint)
+            values[inode, :] .+= materialize(_f, cPoint)
         end
     end
 
@@ -64,7 +64,7 @@ function _codim_and_type(f::AbstractLazy, mesh::Mesh)
 
     # Evaluate the function on the center of the cell
     cPoint = CellPoint(center(shape(celltype(cInfo))), cInfo, ReferenceDomain())
-    value = _f(cPoint)
+    value = materialize(_f, cPoint)
 
     # Codim and type
     N = value isa Number ? (1,) : size(value)
