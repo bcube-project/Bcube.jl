@@ -381,7 +381,7 @@ end
         Γ = BoundaryFaceDomain(mesh, "boundary")
         dΓ = Measure(Γ, 2)
         nΓ = get_face_normals(dΓ)
-        val = sum(values(compute(∫(side_n(u) ⋅ side_n(nΓ))dΓ)))
+        val = sum(compute(∫(side_n(u) ⋅ side_n(nΓ))dΓ))
         @test isapprox(val, 0.0, atol = 1e-15)
     end
 
@@ -420,7 +420,7 @@ end
         Γ = BoundaryFaceDomain(mesh, "boundary")
         dΓ = Measure(Γ, 2)
         nΓ = get_face_normals(dΓ)
-        val = sum(values(compute(∫(side_n(u) ⋅ side_n(nΓ))dΓ)))
+        val = sum(compute(∫(side_n(u) ⋅ side_n(nΓ))dΓ))
         @test isapprox(val, 0.0, atol = 1e-14)
     end
 
@@ -463,7 +463,7 @@ end
         Γ = BoundaryFaceDomain(mesh, "boundary")
         dΓ = Measure(Γ, 2)
         nΓ = get_face_normals(dΓ)
-        val = sum(values(compute(∫(side_n(u) ⋅ side_n(nΓ))dΓ)))
+        val = sum(compute(∫(side_n(u) ⋅ side_n(nΓ))dΓ))
         @test isapprox(val, 0.0, atol = 1e-15)
     end
 
@@ -471,7 +471,7 @@ end
         mesh = translate(one_cell_mesh(:line), [1.0])
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 2 * x[1])
-        b = collect(values(compute(∫(g)dΩ)))
+        b = compute(∫(g)dΩ)
         @test b[1] == 4.0
     end
 
@@ -521,10 +521,10 @@ end
         @test Bcube.integrate(x -> 1, ctype, cnodes, Quadrature(1)) ≈ 4
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)
-        b = collect(values(compute(∫(g)dΩ)))
+        b = compute(∫(g)dΩ)
         @test b[1] ≈ 4
         gref = ReferenceFunction(x -> 1)
-        b = collect(values(compute(∫(gref)dΩ)))
+        b = compute(∫(gref)dΩ)
         @test b[1] ≈ 4
 
         lx = 2.0
@@ -548,8 +548,9 @@ end
         surface_ref = (s(-e12, e23), s(-e12, e24), s(e24, e23), s(e13, e14))
         for i in 1:4
             dΓ = Measure(BoundaryFaceDomain(mesh, "F$i"), 1)
-            b = collect(values(compute(∫(side⁻(g))dΓ)))
-            @test b[1] ≈ surface_ref[i]
+            b = compute(∫(side⁻(g))dΓ)
+            I, = findnz(b)
+            @test b[I[1]] ≈ surface_ref[i]
         end
     end
 
@@ -571,7 +572,7 @@ end
         @test Bcube.integrate(x -> 1, ctype, cnodes, Quadrature(1)) == 0.75
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)
-        b = collect(values(compute(∫(g)dΩ)))
+        b = compute(∫(g)dΩ)
         @test b[1] ≈ 0.75
 
         # Whole cylinder : build a cylinder of radius 1 and length 1, and compute its volume
@@ -581,7 +582,7 @@ end
 
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)
-        b = values(compute(∫(g)dΩ))
+        b = compute(∫(g)dΩ)
         @test sum(b) ≈ 3.1365484905459
     end
 end
