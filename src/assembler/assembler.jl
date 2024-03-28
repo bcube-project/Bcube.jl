@@ -734,17 +734,18 @@ Base.repeat(a::SVector, ::Val{N}) where {N} = reduce(vcat, ntuple(i -> a, Val(N)
 
 Compute an integral, independently from a FEM/DG framework (i.e without FESpace)
 
-Return a dict (same size of the domain of integration) <elt mesh-index> => <integral evaluated over the elt>.
+Return a `SparseVector`. The indices of the domain elements are used to store
+the result of the integration in this sparse vector.
 
 # Example
 Compute volume of each cell and each face.
 ```julia
 mesh = rectangle_mesh(2, 3)
 dΩ = Measure(CellDomain(mesh), 1)
-∂Ω = Measure(BoundaryFaceDomain(mesh), 1)
+dΓ = Measure(BoundaryFaceDomain(mesh), 1)
 f = PhysicalFunction(x -> 1)
 @show Bcube.compute(∫(f)dΩ)
-@show Bcube.compute(∫(side⁻(f))∂Ω)
+@show Bcube.compute(∫(side⁻(f))dΓ)
 ```
 """
 function compute(integration::Integration)
@@ -758,8 +759,11 @@ function compute(integration::Integration)
         _integrate_on_ref_element(_f, elementInfo, quadrature)
     end
 
-    return Dict(indices(domain) .=> values)
+    return SparseVector(_domain_to_mesh_nelts(domain), collect(indices(domain)), values)
 end
+
+_domain_to_mesh_nelts(domain::AbstractCellDomain) = ncells(get_mesh(domain))
+_domain_to_mesh_nelts(domain::AbstractFaceDomain) = nfaces(get_mesh(domain))
 
 """
     AbstractFaceSidePair{A} <: AbstractLazyWrap{A}

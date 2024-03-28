@@ -5,6 +5,7 @@ using LinearAlgebra
 using DelimitedFiles
 using ForwardDiff
 using SHA: sha1
+using SparseArrays
 
 # from :
 # https://discourse.julialang.org/t/what-general-purpose-commands-do-you-usually-end-up-adding-to-your-projects/4889
