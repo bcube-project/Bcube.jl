@@ -55,8 +55,7 @@
         translate!(mesh, SA[-0.5, 1.0]) # the translation vector can be anything
         scale!(mesh, 2.0)
         dΩ = Measure(CellDomain(mesh), 1)
-        @test collect(values(compute(∫(∇(PhysicalFunction(x -> x[1])) ⋅ [1, 1])dΩ)))[1] ==
-              16.0
+        @test compute(∫(∇(PhysicalFunction(x -> x[1])) ⋅ [1, 1])dΩ)[1] == 16.0
 
         # Gradient of a vector PhysicalFunction
         mesh = one_cell_mesh(:quad)
