@@ -495,7 +495,7 @@ function one_line_mesh(::Val{2}, xmin, xmax)
     return Mesh(nodes, celltypes, cell2node; bc_names, bc_nodes)
 end
 
-function one_line_bnd(ileft = 1, iright = 2, names = ("LEFT", "RIGHT"))
+function one_line_bnd(ileft = 1, iright = 2, names = ("xmin", "xmax"))
     bc_names = Dict(1 => names[1], 2 => names[2])
     bc_nodes = Dict(1 => [ileft], 2 => [iright])
     return bc_names, bc_nodes
@@ -529,7 +529,10 @@ function one_quad_mesh(::Val{1}, xmin, xmax, ymin, ymax)
     nodes = [Node([xmin, ymin]), Node([xmax, ymin]), Node([xmax, ymax]), Node([xmin, ymax])]
     celltypes = [Quad4_t()]
     cell2node = Connectivity([4], [1, 2, 3, 4])
-    return Mesh(nodes, celltypes, cell2node)
+    bc_names =
+        Dict(tag => name for (tag, name) in enumerate(("xmin", "xmax", "ymin", "ymax")))
+    bc_nodes = Dict(1 => [1, 4], 2 => [2, 3], 3 => [1, 2], 4 => [3, 4])
+    return Mesh(nodes, celltypes, cell2node; bc_names, bc_nodes)
 end
 
 function one_quad_mesh(::Val{2}, xmin, xmax, ymin, ymax)
