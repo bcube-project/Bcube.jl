@@ -9,18 +9,13 @@
         data = collect(1:ncells(mesh))
         d = Bcube.MeshCellData(data)
         integ = ∫(d)dΩ
-        vals = compute(integ)
-        @test vals[1] == 0.5
-        @test vals[2] == 1.0
+        @test compute(integ) == [0.5, 1.0]
 
         # tensor data
         # data = [[1,2,3,4], [5,6,7,8], ...]
         data = collect(reinterpret(SVector{4, Int}, collect(1:(4 * ncells(mesh)))))
         d = Bcube.MeshCellData(data)
-        integ = ∫(d ⋅ [0, 1, 0, 0])dΩ
-        vals = compute(integ)
-        @test vals[1] == 1.0
-        @test vals[2] == 3.0
+        @test compute(∫(d ⋅ [0, 1, 0, 0])dΩ) == [1.0, 3.0]
 
         #--- Test 2
         mesh = line_mesh(3)
@@ -60,8 +55,8 @@
 
         ∂Ω = Measure(BoundaryFaceDomain(mesh), 3)
 
-        a = collect(values(Bcube.compute(∫(side⁻(D))∂Ω)))
-        l = collect(values(Bcube.compute(∫(side⁻(PhysicalFunction(x -> 1.0)))∂Ω)))
+        a = compute(∫(side⁻(D))∂Ω)
+        l = compute(∫(side⁻(PhysicalFunction(x -> 1.0)))∂Ω)
         @test isapprox_arrays(a, l .^ 2 ./ 2; rtol = 1e-15)
     end
 end
