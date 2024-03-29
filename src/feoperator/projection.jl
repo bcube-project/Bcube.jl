@@ -52,7 +52,9 @@ function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
 end
 
 """
-Evaluate codimension of `f` and returned type. The returned codimension
+    _codim_and_type(f::AbstractLazy, mesh::Mesh)
+
+Evaluate the codimension of `f` and returned type. The returned codimension
 is always a Tuple of codimension(s), even for a scalar.
 """
 function _codim_and_type(f::AbstractLazy, mesh::Mesh)
