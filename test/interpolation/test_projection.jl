@@ -1,19 +1,3 @@
-import Bcube:
-    CellDomain,
-    Measure,
-    DomainIterator,
-    materialize,
-    shape,
-    celltype,
-    coords,
-    ReferenceDomain,
-    CellPoint,
-    CellInfo,
-    _codim_and_type,
-    nodes,
-    center,
-    PhysicalDomain
-
 @testset "projection" begin
     @testset "1D_Line" begin
         mesh = line_mesh(11; xmin = -1.0, xmax = 1.0)
@@ -101,13 +85,13 @@ import Bcube:
 
     @testset "misc" begin
         mesh = one_cell_mesh(:quad)
-        N, T = _codim_and_type(PhysicalFunction(x -> x[1]), mesh)
+        N, T = Bcube._codim_and_type(PhysicalFunction(x -> x[1]), mesh)
         @test N == (1,)
         @test T == Float64
-        N, T = _codim_and_type(PhysicalFunction(x -> 1), mesh)
+        N, T = Bcube._codim_and_type(PhysicalFunction(x -> 1), mesh)
         @test N == (1,)
         @test T == Int
-        N, T = _codim_and_type(PhysicalFunction(x -> x), mesh)
+        N, T = Bcube._codim_and_type(PhysicalFunction(x -> x), mesh)
         @test N == (2,)
         @test T == Float64
     end
