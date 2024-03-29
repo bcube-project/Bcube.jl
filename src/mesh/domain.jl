@@ -287,11 +287,13 @@ end
 @inline cell2nodes(c::CellSide) = c.c2n
 
 """
-    FaceInfo{CN<:CellInfo,CP<:CellInfo,FT,FN,F2N}
+    FaceInfo{CN<:CellInfo,CP<:CellInfo,FT,FN,F2N,I}
 
 Type describing a face as the common side of two adjacent cells.
 `CellInfo` of cells from both sides is stored with
 the local side index of the face relative to each adjacent cell.
+
+`iface` is the mesh-face-index (and not the domain-face-index).
 
 # Remark:
 - For boundary face with no periodic condition, positive cell side info
@@ -300,7 +302,7 @@ are duplicate from the negative ones.
 is stored explicitely in `FaceInfo` even if it could have been
 computed by collecting info from the side of the negative or positive cells.
 """
-struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N}
+struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N, I}
     cellinfo_n::CN
     cellinfo_p::CP
     cellside_n::Int
@@ -308,6 +310,7 @@ struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N}
     faceType::FT
     faceNodes::FN
     f2n::F2N
+    iface::I
 end
 
 """
@@ -321,6 +324,7 @@ function FaceInfo(
     faceType,
     faceNodes,
     f2n::AbstractVector,
+    iface,
 )
     cellside_n = cell_side(celltype(cellinfo_n), get_nodes_index(cellinfo_n), f2n)
     cellside_p = cell_side(celltype(cellinfo_p), get_nodes_index(cellinfo_p), f2n)
@@ -337,7 +341,16 @@ function FaceInfo(
         @show f2n
         error("Invalid cellside in `FaceInfo`")
     end
-    FaceInfo(cellinfo_n, cellinfo_p, cellside_n, cellside_p, faceType, faceNodes, f2n)
+    FaceInfo(
+        cellinfo_n,
+        cellinfo_p,
+        cellside_n,
+        cellside_p,
+        faceType,
+        faceNodes,
+        f2n,
+        iface,
+    )
 end
 
 """
@@ -355,11 +368,12 @@ function FaceInfo(mesh::Mesh, kface::Int)
     cellinfo_n = CellInfo(mesh, f2c[kface][1])
     cellinfo_p = CellInfo(mesh, f2c[kface][2])
 
-    return FaceInfo(cellinfo_n, cellinfo_p, ftype, fnodes, _f2n)
+    return FaceInfo(cellinfo_n, cellinfo_p, ftype, fnodes, _f2n, kface)
 end
 
 nodes(faceInfo::FaceInfo) = faceInfo.faceNodes
 facetype(faceInfo::FaceInfo) = faceInfo.faceType
+faceindex(faceInfo::FaceInfo) = faceInfo.iface
 get_cellinfo_n(faceInfo::FaceInfo) = faceInfo.cellinfo_n
 get_cellinfo_p(faceInfo::FaceInfo) = faceInfo.cellinfo_p
 @inline get_nodes_index(faceInfo::FaceInfo) = faceInfo.f2n
@@ -378,6 +392,7 @@ function opposite_side(fInfo::FaceInfo)
         facetype(fInfo),
         nodes(fInfo),
         get_nodes_index(fInfo),
+        faceindex(fInfo),
     )
 end
 
@@ -433,7 +448,7 @@ function _get_index(domain::AbstractFaceDomain, i::Integer)
     n_fnodes = Val(nnodes(ftype))
     _f2n = f2n[iface, n_fnodes]
     fnodes = get_nodes(mesh, _f2n)
-    FaceInfo(cellinfo1, cellinfo2, ftype, fnodes, _f2n)
+    FaceInfo(cellinfo1, cellinfo2, ftype, fnodes, _f2n, iface)
 end
 
 function _get_face_cellinfo(domain::InteriorFaceDomain, i)
@@ -474,6 +489,7 @@ end
 function _get_index(domain::BoundaryFaceDomain{M, <:PeriodicBCType}, i::Integer) where {M}
     mesh = get_mesh(domain)
     c2n = connectivities_indices(mesh, :c2n)
+    iface = indices(domain)[i]
 
     # TODO : add a specific API for the domain cache:
     perio_cache = get_cache(domain)
@@ -501,5 +517,5 @@ function _get_index(domain::BoundaryFaceDomain{M, <:PeriodicBCType}, i::Integer)
     cside_j = cell_side(celltype(cellinfo2), _c2n_j, bnd_f2n2[i])
     _f2n = bnd_f2n1[i]
 
-    return FaceInfo(cellinfo1, cellinfo2, cside_i, cside_j, ftype, fnodes, _f2n)
+    return FaceInfo(cellinfo1, cellinfo2, cside_i, cside_j, ftype, fnodes, _f2n, iface)
 end
