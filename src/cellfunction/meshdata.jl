@@ -29,7 +29,7 @@ get_location(::MeshData{L}) where {L} = L()
 
 function LazyOperators.materialize(data::MeshData{CellData}, cInfo::CellInfo)
     value = get_values(data)[cellindex(cInfo)]
-    return wrap_value(value)
+    return _wrap_value(value)
 end
 
 function LazyOperators.materialize(
@@ -37,11 +37,12 @@ function LazyOperators.materialize(
     side::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
 )
     fInfo = get_args(side)[1]
-    return get_values(data)[faceindex(fInfo)]
+    value = get_values(data)[faceindex(fInfo)]
+    return _wrap_value(value)
 end
 
-wrap_value(value) = value
-wrap_value(value::Union{Number, AbstractArray}) = ReferenceFunction(ξ -> value)
+_wrap_value(value) = value
+_wrap_value(value::Union{Number, AbstractArray}) = ReferenceFunction(ξ -> value)
 
 MeshCellData(values::AbstractVector) = MeshData(CellData(), values)
 MeshFaceData(values::AbstractVector) = MeshData(FaceData(), values)
