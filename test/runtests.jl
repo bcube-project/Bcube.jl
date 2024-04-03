@@ -5,6 +5,7 @@ using LinearAlgebra
 using DelimitedFiles
 using ForwardDiff
 using SHA: sha1
+using SparseArrays
 
 # from :
 # https://discourse.julialang.org/t/what-general-purpose-commands-do-you-usually-end-up-adding-to-your-projects/4889
@@ -55,6 +56,7 @@ import Bcube:
     cell_side,
     center,
     change_domain,
+    compute,
     connectivities,
     connectivities_indices,
     Connectivity,
@@ -64,6 +66,7 @@ import Bcube:
     Cube,
     dof,
     DofHandler,
+    DomainIterator,
     edges2nodes,
     FaceInfo,
     FacePoint,
@@ -95,6 +98,7 @@ import Bcube:
     mapping_inv,
     mapping_jacobian,
     mapping_jacobian_inv,
+    materialize,
     maxsize,
     max_ndofs,
     Mesh,

@@ -1,9 +1,10 @@
 abstract type AbstractMeshDataLocation end
 struct CellData <: AbstractMeshDataLocation end
+struct FaceData <: AbstractMeshDataLocation end
 struct PointData <: AbstractMeshDataLocation end
 
 """
-Represent a data whose values are known inside each cell (or on each node) of the mesh.
+Represent a data whose values are known inside each cell/node/face of the mesh.
 
 Note that the "values" can be anything : an vector of scalar (conductivity by cell), an array
 of functions, etc.
@@ -13,7 +14,7 @@ of functions, etc.
 n = 10
 mesh = line_mesh(n)
 data = MeshCellData(rand(n))
-data = MeshCellData([x -> i*x for i in 1:n])
+data = MeshCellData([PhysicalFunction(x -> i*x) for i in 1:n])
 ```
 """
 struct MeshData{L <: AbstractMeshDataLocation, T <: AbstractVector} <: AbstractLazy
@@ -27,11 +28,22 @@ set_values!(data::MeshData, values::Union{Number, AbstractVector}) = data.values
 get_location(::MeshData{L}) where {L} = L()
 
 function LazyOperators.materialize(data::MeshData{CellData}, cInfo::CellInfo)
-    PhysicalFunction(x -> _make_callable(get_values(data)[cellindex(cInfo)], x))
+    value = get_values(data)[cellindex(cInfo)]
+    return _wrap_value(value)
 end
 
-_make_callable(f, x) = f(x)
-_make_callable(a::Union{Number, AbstractArray}, x) = a
+function LazyOperators.materialize(
+    data::MeshData{FaceData},
+    side::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    fInfo = get_args(side)[1]
+    value = get_values(data)[faceindex(fInfo)]
+    return _wrap_value(value)
+end
+
+_wrap_value(value) = value
+_wrap_value(value::Union{Number, AbstractArray}) = ReferenceFunction(ξ -> value)
 
 MeshCellData(values::AbstractVector) = MeshData(CellData(), values)
+MeshFaceData(values::AbstractVector) = MeshData(FaceData(), values)
 MeshPointData(values::AbstractVector) = MeshData(PointData(), values)

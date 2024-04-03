@@ -264,8 +264,8 @@
         sys = Bcube.AffineFESystem(a, l, U, V)
         uh = Bcube.solve(sys)
 
-        l2(u) = sqrt(sum(Bcube.compute(∫(u ⋅ u)dΩ)))
-        h1(u) = sqrt(sum(Bcube.compute(∫(u ⋅ u + ∇(u) ⋅ ∇(u))dΩ)))
+        l2(u) = sqrt(sum(compute(∫(u ⋅ u)dΩ)))
+        h1(u) = sqrt(sum(compute(∫(u ⋅ u + ∇(u) ⋅ ∇(u))dΩ)))
         e = uref - uh
 
         el2 = l2(e)
@@ -313,7 +313,7 @@
 
         int_val = 4.0 / 3.0
 
-        volume = sum(Bcube.compute(∫(PhysicalFunction(x -> 1.0))dΩ))
+        volume = sum(compute(∫(PhysicalFunction(x -> 1.0))dΩ))
 
         # Define bilinear and linear forms
         function a((u, λᵤ), (v, λᵥ))
@@ -339,7 +339,7 @@
         u_ref = PhysicalFunction(x -> -0.5 * (x[1] - 1.0)^2 + 1.0)
         error = u_ref - u
 
-        l2(u) = sqrt(sum(Bcube.compute(∫(u ⋅ u)dΩ)))
+        l2(u) = sqrt(sum(compute(∫(u ⋅ u)dΩ)))
         el2 = l2(error)
         tol = 1.e-15
         @test el2 < tol
