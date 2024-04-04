@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - '1.8'
+          - '1.10'
         os:
           - ubuntu-latest
         arch:
