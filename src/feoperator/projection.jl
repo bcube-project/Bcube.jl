@@ -46,7 +46,7 @@ function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
     end
 
     # Arithmetic mean
-    for ic in 1:size(values, 2)
+    for ic in axes(values, 2)
         values[:, ic] .= values[:, ic] ./ ncontributions
     end
 end
