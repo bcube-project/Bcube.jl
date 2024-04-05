@@ -46,7 +46,7 @@ function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
     end
 
     # Arithmetic mean
-    for ic in size(values, 2)
+    for ic in axes(values, 2)
         values[:, ic] .= values[:, ic] ./ ncontributions
     end
 end
@@ -64,7 +64,7 @@ function _codim_and_type(f::AbstractLazy, mesh::Mesh)
 
     # Evaluate the function on the center of the cell
     cPoint = CellPoint(center(shape(celltype(cInfo))), cInfo, ReferenceDomain())
-    value = _f(cPoint)
+    value = materialize(_f, cPoint)
 
     # Codim and type
     N = value isa Number ? (1,) : size(value)
@@ -101,7 +101,7 @@ function _var_on_centers!(values, f::AbstractLazy, mesh::AbstractMesh)
 
         ξc = center(shape(celltypes[icell]))
         cPoint = CellPoint(ξc, cInfo, ReferenceDomain())
-        values[icell, :] .= _f(cPoint)
+        values[icell, :] .= materialize(_f, cPoint)
     end
 end
 

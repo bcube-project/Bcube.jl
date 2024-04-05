@@ -95,4 +95,40 @@
         @test N == (2,)
         @test T == Float64
     end
+
+    @testset "var_on_vertices" begin
+        mesh = line_mesh(3)
+
+        # Test 1
+        fs = FunctionSpace(:Lagrange, 0)
+        U = TrialFESpace(fs, mesh)
+
+        x = [1.0, 1.0]
+        u = FEFunction(U, x)
+
+        values = var_on_vertices(u, mesh)
+        @test values == [1.0, 1.0, 1.0]
+
+        # Test 2
+        fs = FunctionSpace(:Lagrange, 1)
+        U = TrialFESpace(fs, mesh)
+
+        x = [1.0, 2.0, 3.0]
+        u = FEFunction(U, x)
+
+        values = var_on_vertices(u, mesh)
+        @test values == x
+
+        # Test 3
+        fs = FunctionSpace(:Lagrange, 1)
+        U = TrialFESpace(fs, mesh; size = 2)
+
+        f = PhysicalFunction(x -> [x[1], -1.0 - 2 * x[1]])
+        u = FEFunction(U)
+        projection_l2!(u, f, mesh)
+
+        values = var_on_vertices(u, mesh)
+        @test isapprox_arrays(values[:, 1], [0.0, 0.5, 1.0]; rtol = 1e-15)
+        @test isapprox_arrays(values[:, 2], [-1.0, -2.0, -3.0]; rtol = 1e-15)
+    end
 end
