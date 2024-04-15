@@ -12,6 +12,12 @@ on:
   pull_request:
     types: [unlabeled, opened, synchronize, reopened]
 
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 # Only trigger the job when `draft` label is not assigned to the PR
 jobs:
   format:
