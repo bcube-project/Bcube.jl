@@ -114,7 +114,7 @@ function assemble_bilinear!(
     for elementInfo in DomainIterator(domain)
         λu, λv = blockmap_bilinear_shape_functions(U, V, elementInfo)
         g1 = materialize(f(λu, λv), elementInfo)
-        values = _integrate_on_ref_element(g1, elementInfo, quadrature)
+        values = integrate_on_ref_element(g1, elementInfo, quadrature)
         _append_contribution!(X, I, J, U, V, values, elementInfo, domain)
     end
 
@@ -254,7 +254,7 @@ function __assemble_linear!(b, f, V, measure::Measure)
         # Materialize the operation to perform on the current element
         vₑ = blockmap_shape_functions(V, elementInfo)
         fᵥ = materialize(f(vₑ), elementInfo)
-        values = _integrate_on_ref_element(fᵥ, elementInfo, quadrature)
+        values = integrate_on_ref_element(fᵥ, elementInfo, quadrature)
         _update_b!(b, V, values, elementInfo, domain)
     end
     nothing
@@ -270,13 +270,6 @@ For `AbstractMultiTestFESpace`, it creates a Tuple (of views) of the different
 _may_reshape_b(b::AbstractVector, V::TestFESpace) = b
 function _may_reshape_b(b::AbstractVector, V::AbstractMultiTestFESpace)
     ntuple(i -> view(b, get_mapping(V, i)), Val(get_n_fespace(V)))
-end
-
-function _integrate_on_ref_element(f, elementInfo::CellInfo, quadrature)
-    integrate_on_ref(f, elementInfo, quadrature)
-end
-function _integrate_on_ref_element(f, elementInfo::FaceInfo, quadrature)
-    integrate_face_ref(f, elementInfo, quadrature)
 end
 
 """
@@ -756,7 +749,7 @@ function compute(integration::Integration)
 
     values = map(DomainIterator(domain)) do elementInfo
         _f = materialize(f, elementInfo)
-        _integrate_on_ref_element(_f, elementInfo, quadrature)
+        integrate_on_ref_element(_f, elementInfo, quadrature)
     end
 
     return SparseVector(_domain_to_mesh_nelts(domain), collect(indices(domain)), values)
