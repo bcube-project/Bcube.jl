@@ -47,18 +47,31 @@ mapping is not known explicitely (hence only ``\\hat{lambda}`` are known, not ``
 
 If the last argument is given, computation is optimized according to the given concrete type `T<:AbstractComputeQuadratureStyle`.
 """
-function integrate_on_ref_element(g, cInfo::CellInfo, quadrature::AbstractQuadrature)
-    integrate_on_ref_element(
-        g,
-        celltype(cInfo),
-        nodes(cInfo),
-        quadrature,
-        ComputeQuadratureStyle(g),
-    )
+function integrate_on_ref_element(g, eltInfo, quadrature::AbstractQuadrature)
+    integrate_on_ref_element(g, eltInfo, quadrature, ComputeQuadratureStyle(g))
 end
 function integrate_on_ref_element(
     g,
-    cellinfo::CellInfo,
+    cInfo::CellInfo,
+    quadrature::AbstractQuadrature,
+    mapstyle::MapComputeQuadratureStyle,
+)
+    _g = ξ -> g(CellPoint(ξ, cInfo, ReferenceDomain()))
+    integrate_on_ref_element(_g, celltype(cInfo), nodes(cInfo), quadrature, mapstyle)
+end
+function integrate_on_ref_element(
+    g,
+    fInfo::FaceInfo,
+    quadrature::AbstractQuadrature,
+    mapstyle::MapComputeQuadratureStyle,
+)
+    _g = ξ -> g(FacePoint(ξ, fInfo, ReferenceDomain()))
+    integrate_on_ref_element(_g, celltype(cInfo), nodes(cInfo), quadrature, mapstyle)
+end
+function integrate_on_ref_element(
+    g,
+    ctype,
+    cnodes,
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
 )
@@ -67,13 +80,11 @@ function integrate_on_ref_element(
     return int
 end
 
-function _apply_metric(g_and_c::T, x::T1) where {T, T1}
-    g, cellinfo = g_and_c
-    ctype = celltype(cellinfo)
-    cnodes = nodes(cellinfo)
-    m = mapping_det_jacobian(topology_style(ctype, cnodes), ctype, cnodes, get_coord(x))
-    cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
-    m * g(cellpoint)
+function _apply_metric(g_and_c::T, qnode::T1) where {T, T1}
+    g, ctype, cnodes = g_and_c
+    ξ = get_coord(qnode)
+    m = mapping_det_jacobian(topology_style(ctype, cnodes), ctype, cnodes, ξ)
+    m * g(ξ)
 end
 
 struct Integrand{N, F}
