@@ -51,6 +51,8 @@ function one_cell_mesh(
         return one_quad_mesh(Val(order), xmin, xmax, ymin, ymax)
     elseif (type == :tri || type == :triangle)
         return one_tri_mesh(Val(order), xmin, xmax, ymin, ymax)
+    elseif (type == :tetra)
+        return one_tetra_mesh(Val(order), xmin, xmax, ymin, ymax, zmin, zmax)
     elseif (type == :hexa || type == :cube)
         return one_hexa_mesh(Val(order), xmin, xmax, ymin, ymax, zmin, zmax)
     elseif (type == :prism || type == :penta)
@@ -70,22 +72,25 @@ Generate either a line mesh, a rectangle mesh, a cubic mesh... depending on the 
 
 # Example
 ```julia-repl
-mesh_of_a_line   = ncube_mesh([10])
+mesh_of_a_line = ncube_mesh([10])
 mesh_of_a_square = ncube_mesh([4, 5])
+mesh_of_a_hexa = ncube_mesh([4, 5, 6])
 ```
 """
 function ncube_mesh(n::Vector{Int}; order = 1)
     if (length(n) == 1)
         return line_mesh(n[1]; order = order)
     elseif (length(n) == 2)
-        return rectangle_mesh(n[1], n[2]; order = order)
+        return rectangle_mesh(n...; order = order)
+    elseif (length(n) == 3)
+        return hexa_mesh(n...; order = order)
     else
         throw(ArgumentError("mesh not available for R^" * string(length(n))))
     end
 end
 
 """
-    line_mesh(n; xmin = 0., xmax = 1., order = 1, names = ("LEFT", "RIGHT"))
+    line_mesh(n; xmin = 0., xmax = 1., order = 1, names = ("xmin", "xmax"))
 
 Generate a mesh of a line of `n` vertices.
 
@@ -94,7 +99,7 @@ Generate a mesh of a line of `n` vertices.
 julia> mesh = line_mesh(5)
 ```
 """
-function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("LEFT", "RIGHT"))
+function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"))
     l = xmax - xmin # line length
     nelts = n - 1 # Number of cells
 
@@ -190,7 +195,7 @@ end
         ymin = 0.0,
         ymax = 1.0,
         order = 1,
-        bnd_names = ("north", "south", "east", "west"),
+        bnd_names = ("xmin", "xmax", "ymin", "ymax"),
     )
 
 Generate a 2D mesh of a rectangle with `nx` and `ny` vertices in the x and y directions respectively.
@@ -209,7 +214,7 @@ function rectangle_mesh(
     ymin = 0.0,
     ymax = 1.0,
     order = 1,
-    bnd_names = ("north", "south", "east", "west"),
+    bnd_names = ("xmin", "xmax", "ymin", "ymax"),
 )
     @assert (nx > 1 && ny > 1) "`nx` and `ny`, the number of nodes, must be greater than 1 (nx=$nx, ny=$ny)"
 
@@ -252,15 +257,10 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_name
             nodes[(iy - 1) * nx + ix] = Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy])
 
             # Boundary conditions
-            if ix == 1 # West
-                push!(tag2nodes[4], iglob)
-            elseif ix == nx # East
-                push!(tag2nodes[3], iglob)
-            elseif iy == 1
-                push!(tag2nodes[2], iglob)
-            elseif iy == ny
-                push!(tag2nodes[1], iglob)
-            end
+            (ix == 1) && push!(tag2nodes[1], iglob)
+            (ix == nx) && push!(tag2nodes[2], iglob)
+            (iy == 1) && push!(tag2nodes[3], iglob)
+            (iy == ny) && push!(tag2nodes[4], iglob)
 
             iglob += 1
         end
@@ -279,10 +279,10 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_name
     end
 
     # Cell type is constant
-    celltypes = [Quad4_t() for ielt in 1:nelts]
+    celltypes = fill(Quad4_t(), nelts)
 
     # Number of nodes of each cell : always 4
-    cell2nnodes = 4 * ones(Int, nelts)
+    cell2nnodes = fill(4, nelts)
 
     return Mesh(
         nodes,
@@ -320,13 +320,26 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     Δx = lx / (nx - 1) / 2
     Δy = ly / (ny - 1) / 2
 
+    # Prepare boundary nodes
+    tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
+    tag2nodes = Dict(tag => Int[] for tag in 1:length(bnd_names))
+
     # Nodes
     # we override some nodes multiple times, but it is easier this way
     nodes = Array{Node{2, Float64}}(undef, nnodes)
+    iglob = 1
     for iy in 1:(ny + (ny - 1))
         for ix in 1:(nx + (nx - 1))
             nodes[(iy - 1) * (nx + (nx - 1)) + ix] =
                 Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy])
+
+            # Boundary conditions
+            (ix == 1) && push!(tag2nodes[1], iglob)
+            (ix == nx + (nx - 1)) && push!(tag2nodes[2], iglob)
+            (iy == 1) && push!(tag2nodes[3], iglob)
+            (iy == ny + (ny - 1)) && push!(tag2nodes[4], iglob)
+
+            iglob += 1
         end
     end
 
@@ -354,12 +367,116 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     end
 
     # Cell type is constant
-    celltypes = [Quad9_t() for ielt in 1:nelts]
+    celltypes = fill(Quad9_t(), nelts)
 
-    # Number of nodes of each cell : always 4
-    cell2nnodes = 9 * ones(Int, nelts)
+    # Number of nodes of each cell : always 9
+    cell2nnodes = fill(9, nelts)
 
-    return Mesh(nodes, celltypes, Connectivity(cell2nnodes, cell2node))
+    return Mesh(
+        nodes,
+        celltypes,
+        Connectivity(cell2nnodes, cell2node);
+        bc_names = tag2name,
+        bc_nodes = tag2nodes,
+    )
+end
+
+function hexa_mesh(
+    nx,
+    ny,
+    nz;
+    xmin = 0.0,
+    xmax = 1.0,
+    ymin = 0.0,
+    ymax = 1.0,
+    zmin = 0.0,
+    zmax = 1.0,
+    order = 1,
+    bnd_names = ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"),
+)
+    @assert order == 1 "Not implemented for order = $order"
+
+    lx = xmax - xmin
+    ly = ymax - ymin
+    lz = zmax - zmin
+    nelts = (nx - 1) * (ny - 1) * (nz - 1)
+    Δx = lx / (nx - 1)
+    Δy = ly / (ny - 1)
+    Δz = lz / (nz - 1)
+
+    # Prepare boundary nodes
+    tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
+    tag2nodes = Dict(tag => Int[] for tag in 1:length(bnd_names))
+
+    # Nodes
+    iglob = 1
+    nodes = Array{Node{3, Float64}}(undef, nx * ny * nz)
+    for iz in 1:nz
+        for iy in 1:ny
+            for ix in 1:nx
+                nodes[(iz - 1) * nx * ny + (iy - 1) * nx + ix] =
+                    Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy, zmin + (iz - 1) * Δz])
+
+                # Boundary conditions
+                if ix == 1
+                    push!(tag2nodes[1], iglob)
+                elseif ix == nx
+                    push!(tag2nodes[2], iglob)
+                elseif iy == 1
+                    push!(tag2nodes[3], iglob)
+                elseif iy == ny
+                    push!(tag2nodes[4], iglob)
+                elseif iz == 1
+                    push!(tag2nodes[5], iglob)
+                elseif iz == ny
+                    push!(tag2nodes[6], iglob)
+                end
+
+                iglob += 1
+            end
+        end
+    end
+
+    # Cell -> node connectivity
+    cell2node = zeros(Int, 8 * nelts)
+    for iz in 1:(nz - 1)
+        for iy in 1:(ny - 1)
+            for ix in 1:(nx - 1)
+                ielt = (iz - 1) * (nx - 1) * (ny - 1) + (iy - 1) * (nx - 1) + ix
+
+                cell2node[8 * ielt - 7] =
+                    (iz - 1 + 0) * nx * ny + (iy - 1 + 0) * nx + ix + 0
+                cell2node[8 * ielt - 6] =
+                    (iz - 1 + 0) * nx * ny + (iy - 1 + 0) * nx + ix + 1
+                cell2node[8 * ielt - 5] =
+                    (iz - 1 + 0) * nx * ny + (iy - 1 + 1) * nx + ix + 1
+                cell2node[8 * ielt - 4] =
+                    (iz - 1 + 0) * nx * ny + (iy - 1 + 1) * nx + ix + 0
+                cell2node[8 * ielt - 3] =
+                    (iz - 1 + 1) * nx * ny + (iy - 1 + 0) * nx + ix + 0
+                cell2node[8 * ielt - 2] =
+                    (iz - 1 + 1) * nx * ny + (iy - 1 + 0) * nx + ix + 1
+                cell2node[8 * ielt - 1] =
+                    (iz - 1 + 1) * nx * ny + (iy - 1 + 1) * nx + ix + 1
+                cell2node[8 * ielt - 0] =
+                    (iz - 1 + 1) * nx * ny + (iy - 1 + 1) * nx + ix + 0
+            end
+        end
+    end
+
+    # Cell type is constant
+    celltypes = fill(Hexa8_t(), nelts)
+
+    # Number of nodes of each cell : always 8
+    cell2nnodes = fill(8, nelts)
+
+    return Mesh(
+        nodes,
+        celltypes,
+        Connectivity(cell2nnodes, cell2node);
+        bc_names = tag2name,
+        bc_nodes = tag2nodes,
+    )
 end
 
 function one_line_mesh(::Val{1}, xmin, xmax)
@@ -378,7 +495,7 @@ function one_line_mesh(::Val{2}, xmin, xmax)
     return Mesh(nodes, celltypes, cell2node; bc_names, bc_nodes)
 end
 
-function one_line_bnd(ileft = 1, iright = 2, names = ("LEFT", "RIGHT"))
+function one_line_bnd(ileft = 1, iright = 2, names = ("xmin", "xmax"))
     bc_names = Dict(1 => names[1], 2 => names[2])
     bc_nodes = Dict(1 => [ileft], 2 => [iright])
     return bc_names, bc_nodes
@@ -412,7 +529,10 @@ function one_quad_mesh(::Val{1}, xmin, xmax, ymin, ymax)
     nodes = [Node([xmin, ymin]), Node([xmax, ymin]), Node([xmax, ymax]), Node([xmin, ymax])]
     celltypes = [Quad4_t()]
     cell2node = Connectivity([4], [1, 2, 3, 4])
-    return Mesh(nodes, celltypes, cell2node)
+    bc_names =
+        Dict(tag => name for (tag, name) in enumerate(("xmin", "xmax", "ymin", "ymax")))
+    bc_nodes = Dict(1 => [1, 4], 2 => [2, 3], 3 => [1, 2], 4 => [3, 4])
+    return Mesh(nodes, celltypes, cell2node; bc_names, bc_nodes)
 end
 
 function one_quad_mesh(::Val{2}, xmin, xmax, ymin, ymax)
@@ -460,6 +580,32 @@ function one_quad_mesh(::Val{3}, xmin, xmax, ymin, ymax)
     return Mesh(nodes, celltypes, cell2node)
 end
 
+function one_tetra_mesh(::Val{1}, xmin, xmax, ymin, ymax, zmin, zmax)
+    nodes = [
+        Node([xmin, ymin, zmin]),
+        Node([xmax, ymin, zmin]),
+        Node([xmin, ymax, zmin]),
+        Node([xmin, ymin, zmax]),
+    ]
+    celltypes = [Tetra4_t()]
+    cell2node = Connectivity([4], collect(1:4))
+
+    # Prepare boundary nodes
+    bnd_names = ("F1", "F2", "F3", "F4")
+    tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
+    tag2nodes = Dict(tag => [faces2nodes(Tetra4_t)[tag]...] for tag in 1:length(bnd_names))
+    tag2bfaces = Dict(tag => [tag] for tag in 1:length(bnd_names))
+
+    return Mesh(
+        nodes,
+        celltypes,
+        cell2node;
+        bc_names = tag2name,
+        bc_nodes = tag2nodes,
+        bc_faces = tag2bfaces,
+    )
+end
+
 function one_hexa_mesh(::Val{1}, xmin, xmax, ymin, ymax, zmin, zmax)
     nodes = [
         Node([xmin, ymin, zmin]),
@@ -472,7 +618,7 @@ function one_hexa_mesh(::Val{1}, xmin, xmax, ymin, ymax, zmin, zmax)
         Node([xmin, ymax, zmax]),
     ]
     celltypes = [Hexa8_t()]
-    cell2node = Connectivity([8], [1, 2, 3, 4, 5, 6, 7, 8])
+    cell2node = Connectivity([8], collect(1:8))
     return Mesh(nodes, celltypes, cell2node)
 end
 

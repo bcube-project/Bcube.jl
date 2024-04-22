@@ -31,7 +31,7 @@ export BoundaryCondition, PeriodicBCType
 
 include("./mesh/entity.jl")
 export Node_t, Bar2_t, Bar3_t, Tri3_t, Quad4_t, Quad9_t, Tetra4_t, Hexa8_t, Poly2_t, Poly3_t
-export Node
+export Node, coords
 
 include("./mesh/shape.jl")
 
@@ -57,6 +57,7 @@ export basic_mesh,
     one_cell_mesh,
     line_mesh,
     rectangle_mesh,
+    hexa_mesh,
     ncube_mesh,
     circle_mesh,
     scale,
@@ -90,7 +91,7 @@ include("./cellfunction/cellfunction.jl")
 export PhysicalFunction, ReferenceFunction, side_p, side_n, side⁺, side⁻, jump
 
 include("./cellfunction/meshdata.jl")
-export MeshCellData, MeshPointData, get_values, set_values!
+export MeshCellData, MeshFaceData, MeshPointData, get_values, set_values!
 
 include("./fespace/dofhandler.jl")
 

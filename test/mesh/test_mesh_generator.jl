@@ -24,6 +24,13 @@
     @test nnodes(m) == nx * ny
     @test ncells(m) == (nx - 1) * (ny - 1)
 
+    nx = 3
+    ny = 4
+    nz = 5
+    mesh = hexa_mesh(3, 4, 5)
+    @test nnodes(mesh) == nx * ny * nz
+    @test ncells(mesh) == (nx - 1) * (ny - 1) * (nz - 1)
+
     # Not working (maybe the structure comparison is too hard,
     # or maybe it does not compare object properties but objects themselves)
     #@test ncube_mesh([n]) == line_mesh(n)

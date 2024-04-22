@@ -589,6 +589,27 @@ function _cross_product_matrix(a)
     ]
 end
 
+"""
+Normal of a facet of a hypersurface.
+
+See [`cell_normal`]@ref for the computation method.
+"""
+struct CellNormal <: AbstractLazy
+    function CellNormal(mesh::AbstractMesh)
+        @assert topodim(mesh) < spacedim(mesh) "CellNormal has only sense when dealing with hypersurface, maybe you confused it with FaceNormal?"
+        return new()
+    end
+end
+
+LazyOperators.materialize(ν::CellNormal, ::CellInfo) = ν
+
+function LazyOperators.materialize(::CellNormal, cPoint::CellPoint{ReferenceDomain})
+    ctype = get_celltype(cPoint)
+    cnodes = get_cellnodes(cPoint)
+    ξ = get_coord(cPoint)
+    return cell_normal(ctype, cnodes, ξ)
+end
+
 LazyOperators.materialize(f::Function, ::CellInfo) = f
 LazyOperators.materialize(f::Function, ::CellPoint) = f
 LazyOperators.materialize(f::Function, ::FaceInfo) = f

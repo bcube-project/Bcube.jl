@@ -4,6 +4,12 @@ on:
   pull_request:
     types: [unlabeled, opened, synchronize, reopened]
 
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 # Only trigger the benchmark job when `draft` label is not assigned to the PR
 jobs:
   benchmark:
@@ -16,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v1
         with:
-          version: '1.8'
+          version: '1.10'
       - uses: julia-actions/julia-buildpkg@latest
       - name: Install dependencies
         run: julia -e 'using Pkg; pkg"add PkgBenchmark BenchmarkCI@0.1"'

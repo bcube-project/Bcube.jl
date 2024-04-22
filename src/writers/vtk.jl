@@ -184,7 +184,7 @@ function write_vtk_bnd_discontinuous(
 end
 
 """
-write_vtk(basename::String, mesh::AbstractMesh{topoDim,spaceDim}) where{topoDim,spaceDim}
+    write_vtk(basename::String, mesh::AbstractMesh{topoDim,spaceDim}) where{topoDim,spaceDim}
 
 Write the mesh to a VTK file.
 
@@ -216,23 +216,23 @@ vtk_entity(::Bar2_t) = VTKCellTypes.VTK_LINE
 vtk_entity(::Bar3_t) = VTKCellTypes.VTK_LAGRANGE_CURVE
 vtk_entity(::Bar4_t) = VTKCellTypes.VTK_LAGRANGE_CURVE
 #vtk_entity(::Bar5_t)    = error("undefined")
-vtk_entity(::Tri3_t)  = VTKCellTypes.VTK_TRIANGLE
-vtk_entity(::Tri6_t)  = VTKCellTypes.VTK_LAGRANGE_TRIANGLE #VTK_QUADRATIC_TRIANGLE
-vtk_entity(::Tri9_t)  = error("undefined")
+vtk_entity(::Tri3_t) = VTKCellTypes.VTK_TRIANGLE
+vtk_entity(::Tri6_t) = VTKCellTypes.VTK_LAGRANGE_TRIANGLE #VTK_QUADRATIC_TRIANGLE
+vtk_entity(::Tri9_t) = error("undefined")
 vtk_entity(::Tri10_t) = VTKCellTypes.VTK_LAGRANGE_TRIANGLE
 #vtk_entity(::Tri12_t)   = error("undefined")
-vtk_entity(::Quad4_t)   = VTKCellTypes.VTK_QUAD
-vtk_entity(::Quad8_t)   = VTKCellTypes.VTK_QUADRATIC_QUAD
-vtk_entity(::Quad9_t)   = VTKCellTypes.VTK_BIQUADRATIC_QUAD
-vtk_entity(::Quad16_t)  = VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL
-vtk_entity(::Tetra4_t)  = VTKCellTypes.VTK_TETRA
+vtk_entity(::Quad4_t) = VTKCellTypes.VTK_QUAD
+vtk_entity(::Quad8_t) = VTKCellTypes.VTK_QUADRATIC_QUAD
+vtk_entity(::Quad9_t) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+vtk_entity(::Quad16_t) = VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL
+vtk_entity(::Tetra4_t) = VTKCellTypes.VTK_TETRA
 vtk_entity(::Tetra10_t) = VTKCellTypes.VTK_QUADRATIC_TETRA
-vtk_entity(::Penta6_t)  = VTKCellTypes.VTK_WEDGE
-vtk_entity(::Hexa8_t)   = VTKCellTypes.VTK_HEXAHEDRON
+vtk_entity(::Penta6_t) = VTKCellTypes.VTK_WEDGE
+vtk_entity(::Hexa8_t) = VTKCellTypes.VTK_HEXAHEDRON
 #vtk_entity(::Hexa27_t) = VTK_TRIQUADRATIC_HEXAHEDRON # NEED TO CHECK NODE NUMBERING : https://vtk.org/doc/nightly/html/classvtkTriQuadraticHexahedron.html
 
-vtk_entity(::Line, ::Val{Degree}) where {Degree}     = VTKCellTypes.VTK_LAGRANGE_CURVE
-vtk_entity(::Square, ::Val{Degree}) where {Degree}   = VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL
+vtk_entity(::Line, ::Val{Degree}) where {Degree} = VTKCellTypes.VTK_LAGRANGE_CURVE
+vtk_entity(::Square, ::Val{Degree}) where {Degree} = VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL
 vtk_entity(::Triangle, ::Val{Degree}) where {Degree} = VTKCellTypes.VTK_LAGRANGE_TRIANGLE
 
 get_vtk_name(c::VTKCellType) = Val(Symbol(c.vtk_name))
@@ -378,16 +378,12 @@ function write_vtk_lagrange(
     dhl_export = Bcube._get_dhl(U_export)
     nd = ndofs(dhl_export)
 
-    # Find the number of components of each variable by evaluating it on the
-    # center of the first cell of the mesh
-    cinfo = CellInfo(mesh, 1)
-    ξ = center(shape(celltype(cinfo)))
-    cpoint = CellPoint(ξ, cinfo, ReferenceDomain())
-    ncomps = [length(materialize(var, cinfo)(cpoint)) for var in values(vars)]
+    # Get ncomps and type of each variable
+    dimtype = map(var -> _codim_and_type(var, mesh), values(vars))
 
     # VTK stuff
     coords_vtk = zeros(spacedim(mesh), nd)
-    values_vtk = ntuple(i -> zeros(ncomps[i], nd), length(_vars))
+    values_vtk = map(_dimtype -> zeros(last(_dimtype), first(_dimtype)..., nd), dimtype)
     cells_vtk = MeshCell[]
     sizehint!(cells_vtk, ncells(mesh))
 
@@ -418,7 +414,7 @@ function write_vtk_lagrange(
             # Evaluate all vars on this node
             for (ivar, var) in enumerate(_vars)
                 _var = materialize(var, cinfo)
-                values_vtk[ivar][:, iglob] .= _var(cpoint)
+                values_vtk[ivar][:, iglob] .= materialize(_var, cpoint)
             end
         end
 

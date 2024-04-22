@@ -1157,15 +1157,29 @@ function _gen_2cubes_mesh(output)
 end
 
 """
+    gen_cylinder_shell_mesh(
+        output,
+        nθ,
+        nz;
+        radius = 1.0,
+        lz = 1.0,
+        lc = 1e-1,
+        order = 1,
+        n_partitions = 0,
+        recombine = false,
+        transfinite = false,
+        kwargs...,
+    )
+
 # Implementation
 Extrusion is not used to enable "random" tri filling (whereas with extrusion we can at worse obtain regular rectangle triangle)
 """
 function gen_cylinder_shell_mesh(
     output,
     nθ,
-    nz,
-    Lz;
+    nz;
     radius = 1.0,
+    lz = 1.0,
     lc = 1e-1,
     order = 1,
     n_partitions = 0,
@@ -1179,15 +1193,15 @@ function gen_cylinder_shell_mesh(
 
     # Points
     O1 = gmsh.model.geo.addPoint(0, 0, 0, lc)
-    O2 = gmsh.model.geo.addPoint(0, 0, Lz, lc)
+    O2 = gmsh.model.geo.addPoint(0, 0, lz, lc)
 
     A1 = gmsh.model.geo.addPoint(radius, 0, 0, lc)
     B1 = gmsh.model.geo.addPoint(radius * cos(2π / 3), radius * sin(2π / 3), 0, lc)
     C1 = gmsh.model.geo.addPoint(radius * cos(4π / 3), radius * sin(4π / 3), 0, lc)
 
-    A2 = gmsh.model.geo.addPoint(radius, 0, Lz, lc)
-    B2 = gmsh.model.geo.addPoint(radius * cos(2π / 3), radius * sin(2π / 3), Lz, lc)
-    C2 = gmsh.model.geo.addPoint(radius * cos(4π / 3), radius * sin(4π / 3), Lz, lc)
+    A2 = gmsh.model.geo.addPoint(radius, 0, lz, lc)
+    B2 = gmsh.model.geo.addPoint(radius * cos(2π / 3), radius * sin(2π / 3), lz, lc)
+    C2 = gmsh.model.geo.addPoint(radius * cos(4π / 3), radius * sin(4π / 3), lz, lc)
 
     # Lines
     AOB1 = gmsh.model.geo.addCircleArc(A1, O1, B1)
@@ -1228,8 +1242,8 @@ function gen_cylinder_shell_mesh(
     domain = gmsh.model.addPhysicalGroup(2, surfs)
     bottom = gmsh.model.addPhysicalGroup(1, [AOB1, BOC1, COA1])
     top = gmsh.model.addPhysicalGroup(1, [AOB2, BOC2, COA2])
-    gmsh.model.setPhysicalName(1, bottom, "bottom")
-    gmsh.model.setPhysicalName(1, top, "top")
+    gmsh.model.setPhysicalName(1, bottom, "zmin")
+    gmsh.model.setPhysicalName(1, top, "zmax")
     gmsh.model.setPhysicalName(2, domain, "domain")
 
     # Gen mesh
