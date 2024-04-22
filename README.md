@@ -22,7 +22,7 @@ Browse the [documentation](https://bcube-project.github.io/Bcube.jl) for more in
 Bcube can be added to your Julia environment with this simple line :
 
 ```julia-repl
-pkg> add https://github.com/bcube-project/Bcube.jl
+pkg> add Bcube
 ```
 
 ## Alternatives
