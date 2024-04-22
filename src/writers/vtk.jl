@@ -184,7 +184,7 @@ function write_vtk_bnd_discontinuous(
 end
 
 """
-write_vtk(basename::String, mesh::AbstractMesh{topoDim,spaceDim}) where{topoDim,spaceDim}
+    write_vtk(basename::String, mesh::AbstractMesh{topoDim,spaceDim}) where{topoDim,spaceDim}
 
 Write the mesh to a VTK file.
 
