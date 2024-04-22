@@ -31,7 +31,7 @@ export BoundaryCondition, PeriodicBCType
 
 include("./mesh/entity.jl")
 export Node_t, Bar2_t, Bar3_t, Tri3_t, Quad4_t, Quad9_t, Tetra4_t, Hexa8_t, Poly2_t, Poly3_t
-export Node
+export Node, coords
 
 include("./mesh/shape.jl")
 
