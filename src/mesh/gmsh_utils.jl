@@ -1162,6 +1162,8 @@ Extrusion is not used to enable "random" tri filling (whereas with extrusion we 
 """
 function gen_cylinder_shell_mesh(
     output,
+    nθ,
+    nz,
     Lz;
     radius = 1.0,
     lc = 1e-1,
@@ -1169,8 +1171,6 @@ function gen_cylinder_shell_mesh(
     n_partitions = 0,
     recombine = false,
     transfinite = false,
-    nz = 10,
-    nθ = 45,
     kwargs...,
 )
     gmsh.initialize()
