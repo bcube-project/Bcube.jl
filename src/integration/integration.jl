@@ -50,6 +50,7 @@ If the last argument is given, computation is optimized according to the given c
 function integrate_on_ref_element(g, eltInfo, quadrature::AbstractQuadrature)
     integrate_on_ref_element(g, eltInfo, quadrature, ComputeQuadratureStyle(g))
 end
+
 function integrate_on_ref_element(
     g,
     cInfo::CellInfo,
@@ -59,6 +60,7 @@ function integrate_on_ref_element(
     _g = ξ -> g(CellPoint(ξ, cInfo, ReferenceDomain()))
     integrate_on_ref_element(_g, celltype(cInfo), nodes(cInfo), quadrature, mapstyle)
 end
+
 function integrate_on_ref_element(
     g,
     fInfo::FaceInfo,
@@ -66,8 +68,9 @@ function integrate_on_ref_element(
     mapstyle::MapComputeQuadratureStyle,
 )
     _g = ξ -> g(FacePoint(ξ, fInfo, ReferenceDomain()))
-    integrate_on_ref_element(_g, celltype(cInfo), nodes(cInfo), quadrature, mapstyle)
+    integrate_on_ref_element(_g, facetype(fInfo), nodes(fInfo), quadrature, mapstyle)
 end
+
 function integrate_on_ref_element(
     g,
     ctype,
@@ -76,7 +79,7 @@ function integrate_on_ref_element(
     mapstyle::MapComputeQuadratureStyle,
 )
     f = Base.Fix1(_apply_metric, (g, ctype, cnodes))
-    int = apply_quadrature(f, shape(celltype(cellinfo)), quadrature, mapstyle)
+    int = apply_quadrature(f, shape(ctype), quadrature, mapstyle)
     return int
 end
 
@@ -85,6 +88,19 @@ function _apply_metric(g_and_c::T, qnode::T1) where {T, T1}
     ξ = get_coord(qnode)
     m = mapping_det_jacobian(topology_style(ctype, cnodes), ctype, cnodes, ξ)
     m * g(ξ)
+end
+
+# Integration on a node is immediate
+function integrate_on_ref_element(
+    g,
+    ::AbstractEntityType{0},
+    cnodes,
+    ::AbstractQuadrature,
+    ::MapComputeQuadratureStyle,
+)
+    # Whatever the "reference coordinate" ξ that we choose, it will always map to the correct
+    # node physical coordinate. So we chose to evaluate in ξ = 0.
+    return g(0.0)
 end
 
 struct Integrand{N, F}

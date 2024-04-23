@@ -18,6 +18,6 @@
 
     #- new api
     cInfo = CellInfo(mesh, 1)
-    res = Bcube.integrate_on_ref(PhysicalFunction(x -> 2 * x), cInfo, Quadrature(Val(2)))
+    res = integrate_on_ref_element(PhysicalFunction(x -> 2 * x), cInfo, Quadrature(Val(2)))
     @test res[1] == 1.0
 end

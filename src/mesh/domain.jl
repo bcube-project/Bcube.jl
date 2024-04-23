@@ -366,7 +366,7 @@ function FaceInfo(mesh::Mesh, kface::Int)
     ftype = faces(mesh)[kface]
 
     cellinfo_n = CellInfo(mesh, f2c[kface][1])
-    cellinfo_p = CellInfo(mesh, f2c[kface][2])
+    cellinfo_p = length(f2c[kface]) > 1 ? CellInfo(mesh, f2c[kface][2]) : cellinfo_n
 
     return FaceInfo(cellinfo_n, cellinfo_p, ftype, fnodes, _f2n, kface)
 end

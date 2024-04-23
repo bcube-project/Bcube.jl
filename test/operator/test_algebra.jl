@@ -34,7 +34,7 @@
         g = ReferenceFunction(f1)
 
         _g = Bcube.materialize(∇(g), cInfo)
-        res = Bcube.integrate_on_ref(_g, cInfo, Quadrature(qDegree))
+        res = integrate_on_ref_element(_g, cInfo, Quadrature(qDegree))
         @test all(isapprox.(res ./ convex_quad_area(cnodes), [1.0, 2.0]))
 
         # Vector test : gradient of vector `f` in physical coordinates is [[1,2],[3,4]]
@@ -45,7 +45,7 @@
         g = ReferenceFunction(f2)
 
         _g = Bcube.materialize(∇(g), cInfo)
-        res = Bcube.integrate_on_ref(_g, cInfo, Quadrature(qDegree))
+        res = integrate_on_ref_element(_g, cInfo, Quadrature(qDegree))
         @test all(isapprox.(res ./ convex_quad_area(cnodes), [1.0 2.0; 3.0 4.0]))
 
         # Gradient of scalar PhysicalFunction
