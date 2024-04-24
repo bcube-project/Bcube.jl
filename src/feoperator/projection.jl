@@ -41,7 +41,7 @@ function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
         for (inode, ξ) in zip(_c2n, coords(cshape))
             cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
             ncontributions[inode] += 1
-            values[inode, :] .+= _f(cPoint)
+            values[inode, :] .+= materialize(_f, cPoint)
         end
     end
 
@@ -52,7 +52,9 @@ function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
 end
 
 """
-Evaluate codimension of `f` and returned type. The returned codimension
+    _codim_and_type(f::AbstractLazy, mesh::Mesh)
+
+Evaluate the codimension of `f` and returned type. The returned codimension
 is always a Tuple of codimension(s), even for a scalar.
 """
 function _codim_and_type(f::AbstractLazy, mesh::Mesh)
@@ -106,34 +108,33 @@ function _var_on_centers!(values, f::AbstractLazy, mesh::AbstractMesh)
 end
 
 """
-    var_on_nodes_discontinuous(
-        f::AbstractFEFunction,
-        mesh::AbstractMesh,
-        degree::Integer = max(1, get_degree(get_function_space(get_fespace(f)))),
-    )
+    var_on_nodes_discontinuous(f::AbstractLazy, mesh::AbstractMesh, degree::Integer)
+    var_on_nodes_discontinuous(f::AbstractFEFunction, mesh::AbstractMesh)
 
 Returns an array containing the values of `f` interpolated to new DoFs.
 The DoFs correspond to those of a discontinuous cell variable with a `:Lagrange` function space of selected `degree`.
+
+If `f` is an `AbstractFEFunction` and no degree is provided, the degree is deduced from the associated space.
 """
-function var_on_nodes_discontinuous(
-    f::AbstractFEFunction,
-    mesh::AbstractMesh,
-    degree::Integer = max(1, get_degree(get_function_space(get_fespace(f)))),
-)
+function var_on_nodes_discontinuous(f::AbstractLazy, mesh::AbstractMesh, degree::Integer)
     @assert degree ≥ 1 "degree must be ≥ 1"
     fs = FunctionSpace(:Lagrange, degree) # here, we suppose that the mesh is composed of Lagrange elements only
     _var_on_nodes_discontinuous(f, mesh, fs)
 end
 
+function var_on_nodes_discontinuous(f::AbstractFEFunction, mesh::AbstractMesh)
+    var_on_nodes_discontinuous(
+        f,
+        mesh,
+        max(1, get_degree(get_function_space(get_fespace(f)))),
+    )
+end
+
 """
-Apply the FEFunction on the nodes of the mesh using the `FunctionSpace` representation
+Apply the AbstractLazy on the nodes of the mesh using the `FunctionSpace` representation
 for the cells.
 """
-function _var_on_nodes_discontinuous(
-    f::AbstractFEFunction,
-    mesh::AbstractMesh,
-    fs::FunctionSpace,
-)
+function _var_on_nodes_discontinuous(f::AbstractLazy, mesh::AbstractMesh, fs::FunctionSpace)
     celltypes = cells(mesh)
     c2n = connectivities_indices(mesh, :c2n)
 
@@ -153,28 +154,37 @@ function _var_on_nodes_discontinuous(
 end
 
 """
-    var_on_bnd_nodes_discontinuous(f::AbstractFEFunction, fdomain::BoundaryFaceDomain, degree::Integer=max(1, get_degree(get_function_space(get_fespace(f)))))
+    var_on_bnd_nodes_discontinuous(f::AbstractLazy, fdomain::BoundaryFaceDomain, degree::Integer)
+    var_on_bnd_nodes_discontinuous(f::AbstractFEFunction, fdomain::BoundaryFaceDomain)
 
 Returns an array containing the values of `f` interpolated to new DoFs on `fdomain`.
 The DoFs locations on `fdomain` correspond to those of a discontinuous `FESpace`
 with a `:Lagrange` function space of selected `degree`.
 """
 function var_on_bnd_nodes_discontinuous(
-    f::AbstractFEFunction,
+    f::AbstractLazy,
     fdomain::BoundaryFaceDomain,
-    degree::Integer = max(1, get_degree(get_function_space(get_fespace(f)))),
+    degree::Integer,
 )
     @assert degree ≥ 1 "degree must be ≥ 1"
     fs = FunctionSpace(:Lagrange, degree) # here, we suppose that the mesh is composed of Lagrange elements only
     _var_on_bnd_nodes_discontinuous(f, fdomain, fs)
 end
 
+function var_on_bnd_nodes_discontinuous(f::AbstractFEFunction, fdomain::BoundaryFaceDomain)
+    var_on_bnd_nodes_discontinuous(
+        f,
+        fdomain,
+        max(1, get_degree(get_function_space(get_fespace(f)))),
+    )
+end
+
 """
-Apply the FEFunction on the nodes of the `fdomain` using the `FunctionSpace` representation
+Apply the AbstractLazy on the nodes of the `fdomain` using the `FunctionSpace` representation
 for the cells.
 """
 function _var_on_bnd_nodes_discontinuous(
-    f::AbstractFEFunction,
+    f::AbstractLazy,
     fdomain::BoundaryFaceDomain,
     fs::FunctionSpace,
 )
