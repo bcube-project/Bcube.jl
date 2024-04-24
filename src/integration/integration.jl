@@ -5,45 +5,13 @@ ComputeQuadratureStyle(::Type{<:Any}) = MapComputeQuadratureStyle() #default
 ComputeQuadratureStyle(op) = ComputeQuadratureStyle(typeof(op))
 
 """
-    apply_quadrature(g_ref, shape::AbstractShape, quadrature::AbstractQuadrature, ::T) where{N,T<:AbstractComputeQuadratureStyle}
-
-Apply quadrature rule to function `g_ref` expressed on reference shape `shape`.
-Computation is optimized according to the given concrete type `T<:AbstractComputeQuadratureStyle`.
-"""
-function apply_quadrature(
-    g_ref,
-    shape::AbstractShape,
-    quadrature::AbstractQuadrature,
-    ::MapComputeQuadratureStyle,
-)
-    quadrule = QuadratureRule(shape, quadrature)
-    # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
-    quadnodes = map(get_coord, get_quadnodes(quadrule))
-    # <-- TEMPORARY:
-    _apply_quadrature(g_ref, get_weights(quadrule), quadnodes, g_ref(quadnodes[1]))
-end
-# splitting the previous function to have function barrier...
-@inline function _apply_quadrature(g_ref, ω, xq::SVector{N}, ::T) where {N, T}
-    u = map(g_ref, xq)::SVector{N, T}
-    _apply_quadrature1(ω, u)
-end
-@inline function _apply_quadrature1(ω, u)
-    wu = map(_mapquad, ω, u)
-    _apply_quadrature2(wu)
-end
-_apply_quadrature2(wu) = reduce(_mapsum, wu)
-_mapsum(a, b) = map(+, a, b)
-_mapquad(ω, u) = map(Base.Fix1(*, ω), u)
-
-"""
     integrate_on_ref_element(g, cellinfo::CellInfo, quadrature::AbstractQuadrature, [::T]) where {N,[T<:AbstractComputeQuadratureStyle]}
     integrate_on_ref_element(g, faceinfo::FaceInfo, quadrature::AbstractQuadrature, [::T]) where {N,[T<:AbstractComputeQuadratureStyle]}
 
-Integrate a function `g` over a cell/face described by `cellinfo`/`faceinfo`. The function `g` can be expressed in the reference or
-the physical space corresponding to the cell, both cases are automatically handled by applying necessary mapping when needed.
+Integrate a function `g` over a cell/face described by `cellinfo`/`faceinfo`.
 
-This function is helpfull to integrate shape functions (for instance ``\\int \\lambda_i \\lambda_j``) when the inverse
-mapping is not known explicitely (hence only ``\\hat{lambda}`` are known, not ``\\lambda``).
+The function `g` can be expressed in the reference or the physical space corresponding to the cell,
+both cases are automatically handled by applying necessary mapping when needed.
 
 If the last argument is given, computation is optimized according to the given concrete type `T<:AbstractComputeQuadratureStyle`.
 """
@@ -79,15 +47,8 @@ function integrate_on_ref_element(
     mapstyle::MapComputeQuadratureStyle,
 )
     f = Base.Fix1(_apply_metric, (g, ctype, cnodes))
-    int = apply_quadrature(f, shape(ctype), quadrature, mapstyle)
+    int = apply_quadrature(f, ctype, cnodes, quadrature, mapstyle)
     return int
-end
-
-function _apply_metric(g_and_c::T, qnode::T1) where {T, T1}
-    g, ctype, cnodes = g_and_c
-    ξ = get_coord(qnode)
-    m = mapping_det_jacobian(topology_style(ctype, cnodes), ctype, cnodes, ξ)
-    m * g(ξ)
 end
 
 # Integration on a node is immediate
@@ -101,6 +62,119 @@ function integrate_on_ref_element(
     # Whatever the "reference coordinate" ξ that we choose, it will always map to the correct
     # node physical coordinate. So we chose to evaluate in ξ = 0.
     return g(0.0)
+end
+
+function _apply_metric(g_and_c::T, qnode::T1) where {T, T1}
+    g, ctype, cnodes = g_and_c
+    ξ = get_coord(qnode)
+    m = mapping_det_jacobian(topology_style(ctype, cnodes), ctype, cnodes, ξ)
+    m * g(ξ)
+end
+
+"""
+    apply_quadrature(
+        g_ref,
+        shape::AbstractShape,
+        quadrature::AbstractQuadrature,
+        ::MapComputeQuadratureStyle,
+    )
+
+Apply quadrature rule to function `g_ref` expressed on reference shape `shape`.
+Computation is optimized according to the given concrete type `T<:AbstractComputeQuadratureStyle`.
+"""
+function apply_quadrature(
+    g_ref,
+    shape::AbstractShape,
+    quadrature::AbstractQuadrature,
+    ::MapComputeQuadratureStyle,
+)
+    quadrule = QuadratureRule(shape, quadrature)
+    # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
+    quadnodes = map(get_coord, get_quadnodes(quadrule))
+    # <-- TEMPORARY:
+    _apply_quadrature(g_ref, get_weights(quadrule), quadnodes, g_ref(quadnodes[1]))
+end
+# splitting the previous function to have function barrier...
+@inline function _apply_quadrature(g_ref, ω, xq::SVector{N}, ::T) where {N, T}
+    u = map(g_ref, xq)::SVector{N, T}
+    _apply_quadrature1(ω, u)
+end
+@inline function _apply_quadrature1(ω, u)
+    wu = map(_mapquad, ω, u)
+    _apply_quadrature2(wu)
+end
+_apply_quadrature2(wu) = reduce(_mapsum, wu)
+_mapsum(a, b) = map(+, a, b)
+_mapquad(ω, u) = map(Base.Fix1(*, ω), u)
+
+"""
+    apply_quadrature_v2(
+        g_ref,
+        shape::AbstractShape,
+        quadrature::AbstractQuadrature,
+        ::MapComputeQuadratureStyle,
+    )
+
+Alternative version of `apply_quadrature` thats seems to be more efficient
+for face integration (this observation is not really understood)
+"""
+function apply_quadrature_v2(
+    g_ref,
+    shape::AbstractShape,
+    quadrature::AbstractQuadrature,
+    ::MapComputeQuadratureStyle,
+)
+    quadrule = QuadratureRule(shape, quadrature)
+    # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
+    quadnodes = map(get_coord, get_quadnodes(quadrule))
+    # <-- TEMPORARY:
+    _apply_quadrature_v2(g_ref, get_weights(quadrule), quadnodes)
+end
+# splitting the previous function to have function barrier...
+function _apply_quadrature_v2(g_ref, ω, xq)
+    fquad = (w, x) -> _mapquad(w, g_ref(x))
+    mapreduce(fquad, _mapsum, ω, xq)
+end
+
+# Below are "dispatch functions" to select the more appropriate quadrature function
+function apply_quadrature(
+    g,
+    ctype::AbstractEntityType,
+    cnodes,
+    quadrature::AbstractQuadrature,
+    qStyle::AbstractComputeQuadratureStyle,
+)
+    apply_quadrature(topology_style(ctype, cnodes), g, shape(ctype), quadrature, qStyle)
+end
+
+function apply_quadrature(
+    ::isVolumic,
+    g,
+    shape::AbstractShape,
+    quadrature::AbstractQuadrature,
+    qStyle::MapComputeQuadratureStyle,
+)
+    apply_quadrature(g, shape, quadrature, qStyle)
+end
+
+function apply_quadrature(
+    ::isSurfacic,
+    g,
+    shape::AbstractShape,
+    quadrature::AbstractQuadrature,
+    qStyle::MapComputeQuadratureStyle,
+)
+    apply_quadrature_v2(g, shape, quadrature, qStyle)
+end
+
+function apply_quadrature(
+    ::isCurvilinear,
+    g,
+    shape::AbstractShape,
+    quadrature::AbstractQuadrature,
+    qStyle::MapComputeQuadratureStyle,
+)
+    apply_quadrature_v2(g, shape, quadrature, qStyle)
 end
 
 struct Integrand{N, F}
