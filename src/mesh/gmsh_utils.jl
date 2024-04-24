@@ -24,7 +24,12 @@ Read a .msh file designated by its `path`.
 
 See `read_msh()` for more details.
 """
-function read_msh(path::String, spaceDim::Int = 0; verbose::Bool = false)
+function read_msh(
+    path::String,
+    spaceDim::Int = 0;
+    verbose::Bool = false,
+    permutBackNode::Bool = false,
+)
     isfile(path) ? nothing : error("File does not exist ", path)
 
     # Read file using gmsh lib
@@ -33,7 +38,7 @@ function read_msh(path::String, spaceDim::Int = 0; verbose::Bool = false)
     gmsh.open(path)
 
     # build mesh
-    mesh = _read_msh(spaceDim, verbose)
+    mesh = _read_msh(spaceDim, verbose, permutBackNode)
 
     # free gmsh
     gmsh.finalize()
@@ -55,7 +60,7 @@ If `spaceDim` is set to a positive number, this number is used as the number of 
 Global use of `gmsh` module. Do not try to improve this function by passing an argument
 such as `gmsh` or `gmsh.model` : it leads to problems.
 """
-function _read_msh(spaceDim::Int, verbose::Bool)
+function _read_msh(spaceDim::Int, verbose::Bool, permutBackNode = false)
     # Spatial dimension of the mesh
     dim = gmsh.model.getDimension()
 
@@ -79,7 +84,8 @@ function _read_msh(spaceDim::Int, verbose::Bool)
     _, glo2loc_cell_indices = densify(absolute_cell_indices; permute_back = true)
 
     # Read boundary conditions
-    bc_tags = gmsh.model.getPhysicalGroups(-1)
+    bc_tags = gmsh.model.getPhysicalGroups(1)
+    verbose && @show bc_tags, gmsh.model.getPhysicalName(1, 2)
     bc_names = [gmsh.model.getPhysicalName(_dim, _tag) for (_dim, _tag) in bc_tags]
     # keep only physical groups of dimension "dim-1" with none-empty names.
     # bc is a vector of (tag,name) for all valid boundary conditions
@@ -113,7 +119,11 @@ function _read_msh(spaceDim::Int, verbose::Bool)
     mesh = Mesh(nodes, celltypes, c2n; bc_names = bc_names, bc_nodes = bc_nodes)
     add_absolute_indices!(mesh, :node, absolute_node_indices)
     add_absolute_indices!(mesh, :cell, absolute_cell_indices)
-    return mesh
+    if permutBackNode
+        return mesh, glo2loc_node_indices
+    else
+        return mesh
+    end
 end
 
 """
@@ -355,6 +365,9 @@ function gen_rectangle_mesh(
     order = 1,
     bnd_names = ("North", "South", "East", "West"),
     n_partitions = 0,
+    write_geo = false,
+    transfinite_lines = true,
+    lc = 1e-1,
     kwargs...,
 )
     #         North
@@ -366,7 +379,6 @@ function gen_rectangle_mesh(
     #         South
     gmsh.initialize()
     _apply_gmsh_options(; kwargs...)
-    lc = 1e-1
 
     # Points
     A = gmsh.model.geo.addPoint(xc - lx / 2, yc - ly / 2, 0, lc)
@@ -385,12 +397,15 @@ function gen_rectangle_mesh(
 
     # Surface
     surf = gmsh.model.geo.addPlaneSurface([ABCD])
+    # gmsh.model.geo.synchronize()
 
     # Mesh settings
-    gmsh.model.geo.mesh.setTransfiniteCurve(AB, nx)
-    gmsh.model.geo.mesh.setTransfiniteCurve(BC, ny)
-    gmsh.model.geo.mesh.setTransfiniteCurve(CD, nx)
-    gmsh.model.geo.mesh.setTransfiniteCurve(DA, ny)
+    if transfinite_lines
+        gmsh.model.geo.mesh.setTransfiniteCurve(AB, nx)
+        gmsh.model.geo.mesh.setTransfiniteCurve(BC, ny)
+        gmsh.model.geo.mesh.setTransfiniteCurve(CD, nx)
+        gmsh.model.geo.mesh.setTransfiniteCurve(DA, ny)
+    end
 
     (transfinite || type == :quad) && gmsh.model.geo.mesh.setTransfiniteSurface(surf)
 
@@ -417,7 +432,13 @@ function gen_rectangle_mesh(
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
+    rm(output; force = true)
     gmsh.write(output)
+    if write_geo
+        output_geo = output[1:(end - 3)] * "geo_unrolled"
+        rm(output_geo; force = true)
+        gmsh.write(output_geo)
+    end
 
     # End
     gmsh.finalize()
@@ -1340,6 +1361,7 @@ nodes_gmsh2cgns(e::Type{Tri12_t}) = nodes(e) #same numbering between CGNS and Gm
 nodes_gmsh2cgns(e::Type{Quad4_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Quad8_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Quad9_t}) = nodes(e) #same numbering between CGNS and Gmsh
+nodes_gmsh2cgns(e::Type{Quad16_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Tetra4_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Tetra10_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Hexa8_t}) = nodes(e) #same numbering between CGNS and Gmsh
