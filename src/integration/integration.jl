@@ -25,7 +25,7 @@ function integrate_on_ref_element(
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
 )
-    _g = ξ -> g(CellPoint(ξ, cInfo, ReferenceDomain()))
+    _g(ξ) = g(CellPoint(ξ, cInfo, ReferenceDomain()))
     integrate_on_ref_element(_g, celltype(cInfo), nodes(cInfo), quadrature, mapstyle)
 end
 
@@ -35,7 +35,7 @@ function integrate_on_ref_element(
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
 )
-    _g = ξ -> g(FacePoint(ξ, fInfo, ReferenceDomain()))
+    _g(ξ) = g(FacePoint(ξ, fInfo, ReferenceDomain()))
     integrate_on_ref_element(_g, facetype(fInfo), nodes(fInfo), quadrature, mapstyle)
 end
 
