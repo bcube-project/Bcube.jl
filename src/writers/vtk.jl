@@ -409,7 +409,7 @@ function write_vtk_lagrange(
             cpoint = CellPoint(ξ, cinfo, ReferenceDomain())
 
             # Map it to the physical domain and assign to VTK
-            coords_vtk[:, iglob] .= get_coord(change_domain(cpoint, PhysicalDomain()))
+            coords_vtk[:, iglob] .= get_coords(change_domain(cpoint, PhysicalDomain()))
 
             # Evaluate all vars on this node
             for (ivar, var) in enumerate(_vars)

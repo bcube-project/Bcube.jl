@@ -104,7 +104,7 @@ function gradient(
     gs::AbstractGradientStyle,
 )
     f(_ξ) = op(CellPoint(_ξ, get_cellinfo(cPoint), ReferenceDomain()))
-    ξ = get_coord(cPoint)
+    ξ = get_coords(cPoint)
     valS = _size_codomain(f, ξ)
     cInfo = get_cellinfo(cPoint)
     cnodes = nodes(cInfo)
@@ -115,8 +115,8 @@ function gradient(
     # the inverse mapping is not always known.
     # cPoint_phys = change_domain(cPoint, PhysicalDomain())
     # f(ξ) = op(CellPoint(ξ, get_cellinfo(cPoint_phys), PhysicalDomain()))
-    # fx = f(get_coord(cPoint_phys))
-    # return _gradient_or_jacobian(Val(length(fx)), f, get_coord(cPoint_phys))
+    # fx = f(get_coords(cPoint_phys))
+    # return _gradient_or_jacobian(Val(length(fx)), f, get_coords(cPoint_phys))
 end
 
 ∂fξ_∂x(::VolumicGradientStyle, args...) = ∂fξ_∂x(args...)
@@ -133,8 +133,8 @@ function gradient(
     # Fow now this version is "almost" never used because we never evaluate functions
     # in the physical domain (at least in (bi)linear forms).
     f(x) = op(CellPoint(x, cPoint.cellinfo, PhysicalDomain()))
-    valS = _size_codomain(f, get_coord(cPoint))
-    return _gradient_or_jacobian(valS, f, get_coord(cPoint))
+    valS = _size_codomain(f, get_coords(cPoint))
+    return _gradient_or_jacobian(valS, f, get_coords(cPoint))
 end
 
 # dispatch on codomain size (this is only used for functions evaluated on the physical domain)
@@ -148,7 +148,7 @@ function gradient(
 )
     cnodes = get_cellnodes(cPoint)
     ctype = get_celltype(cPoint)
-    ξ = get_coord(cPoint)
+    ξ = get_coords(cPoint)
     fs = get_function_space(cellFunction)
     n = Val(get_size(cellFunction))
     MapOver(_grad_shape_functions(gs, fs, n, ctype, cnodes, ξ))

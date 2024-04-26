@@ -255,7 +255,7 @@ end
 Return node coordinates in the reference space for associated function space and shape.
 """
 function get_coords(fs::AbstractFunctionSpace, ::AbstractShape)
-    error("Function 'coords' is not defined")
+    error("Function 'get_coords' is not defined")
 end
 
 abstract type AbtractBasisFunctionsStyle end

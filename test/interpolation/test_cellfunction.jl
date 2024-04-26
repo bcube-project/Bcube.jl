@@ -211,11 +211,11 @@ end
         cInfo_n = Bcube.get_cellinfo_n(fInfo)
         cnodes_n = Bcube.nodes(cInfo_n)
         ctype_n = Bcube.celltype(cInfo_n)
-        ξ_n = get_coord(side_n(fPoint))
+        ξ_n = get_coords(side_n(fPoint))
         cInfo_p = Bcube.get_cellinfo_p(fInfo)
         cnodes_p = Bcube.nodes(cInfo_p)
         ctype_p = Bcube.celltype(cInfo_p)
-        ξ_p = get_coord(side_p(fPoint))
+        ξ_p = get_coords(side_p(fPoint))
 
         R = Bcube.CoplanarRotation()
 
@@ -263,11 +263,11 @@ end
         cInfo_n = Bcube.get_cellinfo_n(fInfo)
         cnodes_n = Bcube.nodes(cInfo_n)
         ctype_n = Bcube.celltype(cInfo_n)
-        ξ_n = get_coord(side_n(fPoint))
+        ξ_n = get_coords(side_n(fPoint))
         cInfo_p = Bcube.get_cellinfo_p(fInfo)
         cnodes_p = Bcube.nodes(cInfo_p)
         ctype_p = Bcube.celltype(cInfo_p)
-        ξ_p = get_coord(side_p(fPoint))
+        ξ_p = get_coords(side_p(fPoint))
 
         R = Bcube.CoplanarRotation()
 

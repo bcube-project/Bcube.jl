@@ -23,8 +23,9 @@
         i == 3 ? (@test (i, _c, _c2n) == (3, Tri3_t(), [3, 4, 7])) : nothing
     end
 
-    #test coords
-    @test coords.(get_nodes(m, c2n[2])) == [[1.0, 1.0], [2.0, 1.0], [2.0, 0.0], [1.0, 0.0]]
+    #test get_coords
+    @test get_coords.(get_nodes(m, c2n[2])) ==
+          [[1.0, 1.0], [2.0, 1.0], [2.0, 0.0], [1.0, 0.0]]
 
     # test cell->face connectivities
     c2f = indices(connectivities(m, :c2f))

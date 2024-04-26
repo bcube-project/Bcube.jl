@@ -427,11 +427,11 @@
                 cpt_phy_i = change_domain(cpt_ref_i, PhysicalDomain())
                 cpt_phy_j = change_domain(cpt_ref_j, PhysicalDomain())
 
-                @test isapprox(get_coord(fpt_phy), fnode.x)
-                @test isapprox(get_coord(cpt_ref_i), fpᵢ(ξface))
-                @test isapprox(get_coord(cpt_ref_j), fpⱼ(ξface))
-                @test isapprox(get_coord(cpt_phy_i), Fᵢ(fpᵢ(ξface)))
-                @test isapprox(get_coord(cpt_phy_j), Fⱼ(fpⱼ(ξface)))
+                @test isapprox(get_coords(fpt_phy), fnode.x)
+                @test isapprox(get_coords(cpt_ref_i), fpᵢ(ξface))
+                @test isapprox(get_coords(cpt_ref_j), fpⱼ(ξface))
+                @test isapprox(get_coords(cpt_phy_i), Fᵢ(fpᵢ(ξface)))
+                @test isapprox(get_coords(cpt_phy_j), Fⱼ(fpⱼ(ξface)))
             end
         end
     end

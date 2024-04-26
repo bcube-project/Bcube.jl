@@ -66,15 +66,15 @@ common_target_domain(a::PhysicalDomain, b::ReferenceDomain) = PhysicalDomain()
 Abstract type to represent a point defined in a cell.
 
 # Subtypes should implement :
-* `get_coord(p::AbstractCellPoint)`
+* `get_coords(p::AbstractCellPoint)`
 * `change_domain(p::AbstractCellPoint, ds::DomainStyle)`
 """
 abstract type AbstractCellPoint{DS} end
 
 DomainStyle(p::AbstractCellPoint{DS}) where {DS} = DS()
 
-function get_coord(p::AbstractCellPoint)
-    error("`get_coord` is not defined for $(typeof(p))")
+function get_coords(p::AbstractCellPoint)
+    error("`get_coords` is not defined for $(typeof(p))")
 end
 
 change_domain(p::AbstractCellPoint{DS}, ::DS) where {DS <: DomainStyle} = p
@@ -99,20 +99,20 @@ function CellPoint(x::T, c::C, ds::DS) where {T, C <: CellInfo, DS <: DomainStyl
     CellPoint{DS, T, C}(x, c)
 end
 
-get_coord(p::CellPoint) = p.x
+get_coords(p::CellPoint) = p.x
 get_cellinfo(p::CellPoint) = p.cellinfo
 get_cellnodes(p::CellPoint) = nodes(get_cellinfo(p))
 get_celltype(p::CellPoint) = celltype(get_cellinfo(p))
 
 function change_domain(p::CellPoint{ReferenceDomain}, target_domain::PhysicalDomain)
     m(x) = mapping(celltype(p.cellinfo), nodes(p.cellinfo), x)
-    x_phy = _apply_mapping(m, get_coord(p))
+    x_phy = _apply_mapping(m, get_coords(p))
     CellPoint(x_phy, p.cellinfo, target_domain)
 end
 
 function change_domain(p::CellPoint{PhysicalDomain}, target_domain::ReferenceDomain)
     m(x) = mapping_inv(celltype(p.cellinfo), nodes(p.cellinfo), x)
-    x_ref = _apply_mapping(m, get_coord(p))
+    x_ref = _apply_mapping(m, get_coords(p))
     CellPoint(x_ref, p.cellinfo, target_domain)
 end
 
@@ -124,7 +124,7 @@ _apply_mapping(f, x) = f(x)
 _apply_mapping(f, x::AbstractArray{<:AbstractArray}) = map(f, x)
 _apply_mapping(f, x::Tuple{Vararg{AbstractArray}}) = map(f, x)
 
-evaluate_at_cellpoint(f::Function, x::CellPoint) = _evaluate_at_cellpoint(f, get_coord(x))
+evaluate_at_cellpoint(f::Function, x::CellPoint) = _evaluate_at_cellpoint(f, get_coords(x))
 _evaluate_at_cellpoint(f, x) = f(x)
 _evaluate_at_cellpoint(f, x::AbstractArray{<:AbstractArray}) = map(f, x)
 _evaluate_at_cellpoint(f, x::Tuple{Vararg{AbstractArray}}) = map(f, x)
@@ -139,7 +139,7 @@ struct FacePoint{DS, T, F} <: AbstractCellPoint{DS}
     x::T
     faceInfo::F
 end
-get_coord(facePoint::FacePoint) = facePoint.x
+get_coords(facePoint::FacePoint) = facePoint.x
 get_faceinfo(facePoint::FacePoint) = facePoint.faceInfo
 
 """ Constructor """
@@ -154,7 +154,7 @@ function side_n(facePoint::FacePoint{ReferenceDomain})
     faceInfo = get_faceinfo(facePoint)
     cellinfo_n = get_cellinfo_n(faceInfo)
     f = mapping_face(shape(celltype(cellinfo_n)), get_cell_side_n(faceInfo))
-    return CellPoint(f(get_coord(facePoint)), cellinfo_n, ReferenceDomain())
+    return CellPoint(f(get_coords(facePoint)), cellinfo_n, ReferenceDomain())
 end
 
 """
@@ -191,19 +191,19 @@ function side_p(facePoint::FacePoint{ReferenceDomain})
 
     f = mapping_face(cshape_p, cside_p, permut)
 
-    return CellPoint(f(get_coord(facePoint)), cellinfo_p, ReferenceDomain())
+    return CellPoint(f(get_coords(facePoint)), cellinfo_p, ReferenceDomain())
 end
 
 function side_n(facePoint::FacePoint{PhysicalDomain})
     return CellPoint(
-        get_coord(facePoint),
+        get_coords(facePoint),
         get_cellinfo_n(get_faceinfo(facePoint)),
         PhysicalDomain(),
     )
 end
 function side_p(facePoint::FacePoint{PhysicalDomain})
     return CellPoint(
-        get_coord(facePoint),
+        get_coords(facePoint),
         get_cellinfo_p(get_faceinfo(facePoint)),
         PhysicalDomain(),
     )
@@ -213,6 +213,6 @@ end
 function change_domain(p::FacePoint{ReferenceDomain}, ::PhysicalDomain)
     faceInfo = get_faceinfo(p)
     m(x) = mapping(facetype(faceInfo), nodes(faceInfo), x)
-    x_phy = _apply_mapping(m, get_coord(p))
+    x_phy = _apply_mapping(m, get_coords(p))
     FacePoint(x_phy, faceInfo, PhysicalDomain())
 end
