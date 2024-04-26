@@ -241,31 +241,6 @@ function _∂λξ_∂x_hypersurface(fs, ctype, cnodes, ξ)
     return ∇λ
 end
 
-"""
-    mapping_jacobian_hypersurface(ctype, cnodes, ξ)
-
-"Augmented" jacobian matrix of the mapping.
-
-Let's consider a ``\\mathbb{R}^2`` surface in ``\\mathbb{R}^3``. The mapping
-``F_\\Gamma(\\xi, \\eta)`` maps the reference coordinate system to the physical coordinate
-system. It's jacobian ``J_\\Gamma`` is not squared. We can 'extend' this mapping to reach any point in
-``\\mathbb{R}^3`` (and not only the surface) using
-```math
-F(\\xi, \\eta, \\zeta) = F_\\Gamma(\\xi, \\eta) + \\zeta \\nu
-```
-where ``\\nu`` is the conormal. Then the restriction of the squared jacobian of ``F``
-to the surface is simply
-```math
-J|_\\Gamma = (J_\\Gamma~~\\nu)
-```
-"""
-function mapping_jacobian_hypersurface(ctype, cnodes, ξ)
-    Jref = mapping_jacobian(ctype, cnodes, ξ)
-    ν = cell_normal(ctype, cnodes, ξ)
-    J = hcat(Jref, ν)
-    return J
-end
-
 function ∂λξ_∂x_hypersurface(
     ::AbstractFunctionSpace,
     ::AbstractEntityType{1},

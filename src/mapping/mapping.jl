@@ -231,11 +231,18 @@ end
 
 """
     mapping_det_jacobian(ctype::AbstractEntityType, cnodes, ξ)
+    mapping_det_jacobian(::TopologyStyle, ctype::AbstractEntityType, cnodes, ξ)
 
 Absolute value of the determinant of the mapping Jacobian matrix, expressed in the reference element.
 
 # Implementation
-Default version using `mapping_jacobian`, but can be specified for each shape.
+For a volumic cell (line in 1D, quad in 2D, cube in 3D), the default version uses `mapping_jacobian`,
+but the function can be specified for each shape.
+
+For a curvilinear cell (line in 2D, or in 3D), the formula is always J = ||F'|| where F is the mapping.
+Hence we always fallback to the "standard" version, like for the volumic case.
+
+Finally, the surfacic cell (quad in 3D) needs a special treatment, see [`mapping_jacobian_hypersurface`](@ref).
 
 # `::Bar2_t`
 Absolute value of the determinant of the mapping Jacobian matrix for the
@@ -246,17 +253,44 @@ reference 2-nodes bar [-1,1] to the local bar mapping.
 Absolute value of the determinant of the mapping Jacobian matrix for the
 the reference 3-nodes Triangle [0,1] x [0,1] to the local triangle mapping.
 
-`` |J| = |(x_2 - x_1) (y_3 - y_1) - (x_3 - x_1) (y_2 - y_1)|``
+``|J| = |(x_2 - x_1) (y_3 - y_1) - (x_3 - x_1) (y_2 - y_1)|``
 """
 function mapping_det_jacobian(ctype::AbstractEntityType, cnodes, ξ)
     abs(det(mapping_jacobian(ctype, cnodes, ξ)))
 end
 
-mapping_det_jacobian(::isVolumic, ctype, cnodes, ξ) = mapping_det_jacobian(ctype, cnodes, ξ)
-
-function mapping_det_jacobian(::Union{isCurvilinear, isSurfacic}, ctype, cnodes, ξ)
+function mapping_det_jacobian(::isSurfacic, ctype, cnodes, ξ)
     jac = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
     return abs(det(jac))
+end
+
+function mapping_det_jacobian(::Union{isCurvilinear, isVolumic}, ctype, cnodes, ξ)
+    mapping_det_jacobian(ctype, cnodes, ξ)
+end
+
+"""
+    mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+
+"Augmented" jacobian matrix of the mapping.
+
+Let's consider a ``\\mathbb{R}^2`` surface in ``\\mathbb{R}^3``. The mapping
+``F_\\Gamma(\\xi, \\eta)`` maps the reference coordinate system to the physical coordinate
+system. It's jacobian ``J_\\Gamma`` is not squared. We can 'extend' this mapping to reach any point in
+``\\mathbb{R}^3`` (and not only the surface) using
+```math
+F(\\xi, \\eta, \\zeta) = F_\\Gamma(\\xi, \\eta) + \\zeta \\nu
+```
+where ``\\nu`` is the conormal. Then the restriction of the squared jacobian of ``F``
+to the surface is simply
+```math
+J|_\\Gamma = (J_\\Gamma~~\\nu)
+```
+"""
+function mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+    Jref = mapping_jacobian(ctype, cnodes, ξ)
+    ν = cell_normal(ctype, cnodes, ξ)
+    J = hcat(Jref, ν)
+    return J
 end
 
 """
