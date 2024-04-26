@@ -9,7 +9,7 @@ function test_lagrange_shape_function(shape, degree)
     @testset "Degree=$degree" begin
         fs = FunctionSpace(:Lagrange, degree)
         expected = zeros(ndofs(fs, shape))
-        for (i, ξ) in enumerate(coords(fs, shape))
+        for (i, ξ) in enumerate(get_coords(fs, shape))
             expected .= 0.0
             expected[i] = 1.0
             result = shape_functions(fs, shape, ξ)
@@ -48,9 +48,9 @@ end
     @testset "Line" begin
         shape = Line()
 
-        @test coords(FunctionSpace(:Lagrange, 0), shape) == (SA[0.0],)
-        @test coords(FunctionSpace(:Lagrange, 1), shape) == (SA[-1.0], SA[1.0])
-        @test coords(FunctionSpace(:Lagrange, 2), shape) == (SA[-1.0], SA[0.0], SA[1.0])
+        @test get_coords(FunctionSpace(:Lagrange, 0), shape) == (SA[0.0],)
+        @test get_coords(FunctionSpace(:Lagrange, 1), shape) == (SA[-1.0], SA[1.0])
+        @test get_coords(FunctionSpace(:Lagrange, 2), shape) == (SA[-1.0], SA[0.0], SA[1.0])
 
         for deg in 0:2
             test_lagrange_shape_function(shape, deg)
@@ -113,10 +113,10 @@ end
 
     @testset "Triangle" begin
         shape = Triangle()
-        @test coords(FunctionSpace(:Lagrange, 0), shape) ≈ (SA[1.0 / 3, 1.0 / 3],)
-        @test coords(FunctionSpace(:Lagrange, 1), shape) ==
+        @test get_coords(FunctionSpace(:Lagrange, 0), shape) ≈ (SA[1.0 / 3, 1.0 / 3],)
+        @test get_coords(FunctionSpace(:Lagrange, 1), shape) ==
               (SA[0.0, 0.0], SA[1.0, 0.0], SA[0.0, 1.0])
-        @test coords(FunctionSpace(:Lagrange, 2), shape) == (
+        @test get_coords(FunctionSpace(:Lagrange, 2), shape) == (
             SA[0.0, 0.0],
             SA[1.0, 0.0],
             SA[0.0, 1.0],
@@ -124,7 +124,7 @@ end
             SA[0.5, 0.5],
             SA[0.0, 0.5],
         )
-        @test coords(FunctionSpace(:Lagrange, 3), shape) == (
+        @test get_coords(FunctionSpace(:Lagrange, 3), shape) == (
             SA[0.0, 0.0],
             SA[1.0, 0.0],
             SA[0.0, 1.0],
@@ -227,10 +227,10 @@ end
 
     @testset "Square" begin
         shape = Square()
-        @test coords(FunctionSpace(:Lagrange, 0), shape) == (SA[0.0, 0.0],)
-        @test coords(FunctionSpace(:Lagrange, 1), shape) ==
+        @test get_coords(FunctionSpace(:Lagrange, 0), shape) == (SA[0.0, 0.0],)
+        @test get_coords(FunctionSpace(:Lagrange, 1), shape) ==
               (SA[-1.0, -1.0], SA[1.0, -1.0], SA[-1.0, 1.0], SA[1.0, 1.0])
-        @test coords(FunctionSpace(:Lagrange, 2), shape) == (
+        @test get_coords(FunctionSpace(:Lagrange, 2), shape) == (
             SA[-1.0, -1.0],
             SA[0.0, -1.0],
             SA[1.0, -1.0],

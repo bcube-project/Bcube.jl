@@ -86,15 +86,15 @@ end
         R = Bcube.CoplanarRotation()
 
         _R = Bcube.materialize(side_n(R), fPoint)
-        u1 = normalize(coords(B) - coords(A))
-        v2 = normalize(coords(C) - coords(B)) * 2
+        u1 = normalize(get_coords(B) - get_coords(A))
+        v2 = normalize(get_coords(C) - get_coords(B)) * 2
         v2_in_1 = _R * v2
         @test abs(cross_2D(u1, v2_in_1)) < 1e-15
         @test norm(v2_in_1) ≈ norm(v2)
 
         _R = Bcube.materialize(side_p(R), fPoint)
-        u2 = normalize(coords(C) - coords(B))
-        v1 = normalize(coords(B) - coords(A)) * 2
+        u2 = normalize(get_coords(C) - get_coords(B))
+        v1 = normalize(get_coords(B) - get_coords(A)) * 2
         v1_in_2 = _R * v1
         @test abs(cross_2D(u2, v1_in_2)) < 1e-15
         @test norm(v1_in_2) ≈ norm(v1)
@@ -116,15 +116,15 @@ end
         R = Bcube.CoplanarRotation()
 
         _R = Bcube.materialize(side_n(R), fPoint)
-        u1 = normalize(coords(B) - coords(A))
-        v2 = normalize(coords(C) - coords(B)) * 2
+        u1 = normalize(get_coords(B) - get_coords(A))
+        v2 = normalize(get_coords(C) - get_coords(B)) * 2
         v2_in_1 = _R * v2
         @test abs(cross_2D(u1, v2_in_1)) < 1e-15
         @test norm(v2_in_1) ≈ norm(v2)
 
         _R = Bcube.materialize(side_p(R), fPoint)
-        u2 = normalize(coords(C) - coords(B))
-        v1 = normalize(coords(B) - coords(A)) * 2
+        u2 = normalize(get_coords(C) - get_coords(B))
+        v1 = normalize(get_coords(B) - get_coords(A)) * 2
         v1_in_2 = _R * v1
         @test abs(cross_2D(u2, v1_in_2)) < 1e-15
         @test norm(v1_in_2) ≈ norm(v1)
@@ -146,15 +146,15 @@ end
         R = Bcube.CoplanarRotation()
 
         _R = Bcube.materialize(side_n(R), fPoint)
-        u1 = normalize(coords(B) - coords(A))
-        v2 = -normalize(coords(C) - coords(B)) * 2
+        u1 = normalize(get_coords(B) - get_coords(A))
+        v2 = -normalize(get_coords(C) - get_coords(B)) * 2
         v2_in_1 = _R * v2
         @test abs(cross_2D(u1, v2_in_1)) < 1e-15
         @test norm(v2_in_1) ≈ norm(v2)
 
         _R = Bcube.materialize(side_p(R), fPoint)
-        u2 = normalize(coords(C) - coords(B))
-        v1 = -normalize(coords(B) - coords(A)) * 2
+        u2 = normalize(get_coords(C) - get_coords(B))
+        v1 = -normalize(get_coords(B) - get_coords(A)) * 2
         v1_in_2 = _R * v1
         @test abs(cross_2D(u2, v1_in_2)) < 1e-15
         @test norm(v1_in_2) ≈ norm(v1)
@@ -176,15 +176,15 @@ end
         R = Bcube.CoplanarRotation()
 
         _R = Bcube.materialize(side_n(R), fPoint)
-        u1 = normalize(coords(B) - coords(A))
-        v2 = -normalize(coords(C) - coords(B)) * 2
+        u1 = normalize(get_coords(B) - get_coords(A))
+        v2 = -normalize(get_coords(C) - get_coords(B)) * 2
         v2_in_1 = _R * v2
         @test abs(cross_2D(u1, v2_in_1)) < 1e-15
         @test norm(v2_in_1) ≈ norm(v2)
 
         _R = Bcube.materialize(side_p(R), fPoint)
-        u2 = normalize(coords(C) - coords(B))
-        v1 = -normalize(coords(B) - coords(A)) * 2
+        u2 = normalize(get_coords(C) - get_coords(B))
+        v1 = -normalize(get_coords(B) - get_coords(A)) * 2
         v1_in_2 = _R * v1
         @test abs(cross_2D(u2, v1_in_2)) < 1e-15
         @test norm(v1_in_2) ≈ norm(v1)
@@ -220,16 +220,16 @@ end
         R = Bcube.CoplanarRotation()
 
         _R = Bcube.materialize(side_n(R), fPoint)
-        v2 = normalize(coords(F) - coords(E)) * 2
-        u = normalize(coords(C) - coords(B))
+        v2 = normalize(get_coords(F) - get_coords(E)) * 2
+        u = normalize(get_coords(C) - get_coords(B))
         v2_in_1 = _R * v2
         ν1 = Bcube.cell_normal(ctype_n, cnodes_n, ξ_n)
         @test v2 ⋅ u ≈ v2_in_1 ⋅ u
         @test abs(ν1 ⋅ v2_in_1) < 1e-16
 
         _R = Bcube.materialize(side_p(R), fPoint)
-        v1 = normalize(coords(D) - coords(B)) * 2
-        u = normalize(coords(C) - coords(B))
+        v1 = normalize(get_coords(D) - get_coords(B)) * 2
+        u = normalize(get_coords(C) - get_coords(B))
         v1_in_2 = _R * v1
         ν2 = Bcube.cell_normal(ctype_p, cnodes_p, ξ_p)
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u
@@ -272,16 +272,16 @@ end
         R = Bcube.CoplanarRotation()
 
         _R = Bcube.materialize(side_n(R), fPoint)
-        v2 = rot * normalize(coords(F) - coords(E)) * 2
-        u = rot * normalize(coords(C) - coords(B))
+        v2 = rot * normalize(get_coords(F) - get_coords(E)) * 2
+        u = rot * normalize(get_coords(C) - get_coords(B))
         v2_in_1 = _R * v2
         ν1 = Bcube.cell_normal(ctype_n, cnodes_n, ξ_n)
         @test v2 ⋅ u ≈ v2_in_1 ⋅ u
         @test abs(ν1 ⋅ v2_in_1) < 2e-15
 
         _R = Bcube.materialize(side_p(R), fPoint)
-        v1 = rot * normalize(coords(D) - coords(B)) * 2
-        u = rot * normalize(coords(C) - coords(B))
+        v1 = rot * normalize(get_coords(D) - get_coords(B)) * 2
+        u = rot * normalize(get_coords(C) - get_coords(B))
         v1_in_2 = _R * v1
         ν2 = Bcube.cell_normal(ctype_p, cnodes_p, ξ_p)
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u

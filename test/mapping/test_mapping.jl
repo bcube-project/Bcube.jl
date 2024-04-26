@@ -34,9 +34,9 @@
         #c2n = connectivities_indices(mesh,:c2n)
         #ct = cells(mesh)[icell]
         #n = get_nodes(mesh, c2n[icell])
-        #@test mapping(n, ct, [-1.]) == coords(n[1])
-        #@test mapping(n, ct, [ 1.]) == coords(n[2])
-        #@test mapping(n, ct, [ 0.]) == coords(n[3])
+        #@test mapping(n, ct, [-1.]) == get_coords(n[1])
+        #@test mapping(n, ct, [ 1.]) == get_coords(n[2])
+        #@test mapping(n, ct, [ 0.]) == get_coords(n[3])
 
         # Triangle order 1
         xmin, ymin = -rand(2)
@@ -295,20 +295,29 @@
         icell = 2
         cnodes = get_nodes(mesh, c2n[icell])
         ctype = cells(mesh)[icell]
-        center = sum(y -> coords(y), cnodes) / length(cnodes)
-        @test isapprox_arrays(mapping(ctype, cnodes, [-1.0, -1.0]), coords(cnodes[1]))
-        @test isapprox_arrays(mapping(ctype, cnodes, [1.0, -1.0]), coords(cnodes[2]))
-        @test isapprox_arrays(mapping(ctype, cnodes, [1.0, 1.0]), coords(cnodes[3]))
-        @test isapprox_arrays(mapping(ctype, cnodes, [-1.0, 1.0]), coords(cnodes[4]))
+        center = sum(y -> get_coords(y), cnodes) / length(cnodes)
+        @test isapprox_arrays(mapping(ctype, cnodes, [-1.0, -1.0]), get_coords(cnodes[1]))
+        @test isapprox_arrays(mapping(ctype, cnodes, [1.0, -1.0]), get_coords(cnodes[2]))
+        @test isapprox_arrays(mapping(ctype, cnodes, [1.0, 1.0]), get_coords(cnodes[3]))
+        @test isapprox_arrays(mapping(ctype, cnodes, [-1.0, 1.0]), get_coords(cnodes[4]))
         @test isapprox_arrays(mapping(ctype, cnodes, [0.0, 0.0]), center)
         @test isapprox(mapping_det_jacobian(ctype, cnodes, rand(2)), 0.25, rtol = eps())
 
-        @test isapprox_arrays(mapping_inv(ctype, cnodes, coords(cnodes[1])), [-1.0, -1.0])
-        @test isapprox_arrays(mapping_inv(ctype, cnodes, coords(cnodes[2])), [1.0, -1.0])
-        @test isapprox_arrays(mapping_inv(ctype, cnodes, coords(cnodes[3])), [1.0, 1.0])
-        @test isapprox_arrays(mapping_inv(ctype, cnodes, coords(cnodes[4])), [-1.0, 1.0])
+        @test isapprox_arrays(
+            mapping_inv(ctype, cnodes, get_coords(cnodes[1])),
+            [-1.0, -1.0],
+        )
+        @test isapprox_arrays(
+            mapping_inv(ctype, cnodes, get_coords(cnodes[2])),
+            [1.0, -1.0],
+        )
+        @test isapprox_arrays(mapping_inv(ctype, cnodes, get_coords(cnodes[3])), [1.0, 1.0])
+        @test isapprox_arrays(
+            mapping_inv(ctype, cnodes, get_coords(cnodes[4])),
+            [-1.0, 1.0],
+        )
         @test isapprox_arrays(mapping_inv(ctype, cnodes, center), [0.0, 0.0])
-        x = coords(cnodes[1])
+        x = get_coords(cnodes[1])
         @test isapprox(
             mapping(ctype, cnodes, mapping_inv(ctype, cnodes, x)),
             x,
@@ -319,10 +328,10 @@
         icell = 3
         cnodes = get_nodes(mesh, c2n[icell])
         ctype = cells(mesh)[icell]
-        center = sum(y -> coords(y), cnodes) / length(cnodes)
-        @test isapprox_arrays(mapping(ctype, cnodes, [0.0, 0.0]), coords(cnodes[1]))
-        @test isapprox_arrays(mapping(ctype, cnodes, [1.0, 0.0]), coords(cnodes[2]))
-        @test isapprox_arrays(mapping(ctype, cnodes, [0.0, 1.0]), coords(cnodes[3]))
+        center = sum(y -> get_coords(y), cnodes) / length(cnodes)
+        @test isapprox_arrays(mapping(ctype, cnodes, [0.0, 0.0]), get_coords(cnodes[1]))
+        @test isapprox_arrays(mapping(ctype, cnodes, [1.0, 0.0]), get_coords(cnodes[2]))
+        @test isapprox_arrays(mapping(ctype, cnodes, [0.0, 1.0]), get_coords(cnodes[3]))
         @test isapprox(
             mapping(ctype, cnodes, [1 / 3, 1 / 3]),
             center,
@@ -330,15 +339,15 @@
         )
         @test isapprox(mapping_det_jacobian(ctype, cnodes, 0.0), 1.0, rtol = eps())
 
-        @test isapprox_arrays(mapping_inv(ctype, cnodes, coords(cnodes[1])), [0.0, 0.0])
-        @test isapprox_arrays(mapping_inv(ctype, cnodes, coords(cnodes[2])), [1.0, 0.0])
-        @test isapprox_arrays(mapping_inv(ctype, cnodes, coords(cnodes[3])), [0.0, 1.0])
+        @test isapprox_arrays(mapping_inv(ctype, cnodes, get_coords(cnodes[1])), [0.0, 0.0])
+        @test isapprox_arrays(mapping_inv(ctype, cnodes, get_coords(cnodes[2])), [1.0, 0.0])
+        @test isapprox_arrays(mapping_inv(ctype, cnodes, get_coords(cnodes[3])), [0.0, 1.0])
         @test isapprox(
             mapping_inv(ctype, cnodes, center),
             [1 / 3, 1 / 3],
             rtol = 10 * eps(eltype(x)),
         )
-        x = coords(cnodes[1])
+        x = get_coords(cnodes[1])
         @test isapprox(
             mapping(ctype, cnodes, mapping_inv(ctype, cnodes, x)),
             x,
@@ -403,7 +412,7 @@
             faceInfo = FaceInfo(mesh, kface)
 
             for (i, fnode) in enumerate(fnodes)
-                ξface = coords(fshape)[i]
+                ξface = get_coords(fshape)[i]
                 @test isapprox(Fface(ξface), fnode.x)
                 @test isapprox(Fᵢ(fpᵢ(ξface)), fnode.x)
                 @test isapprox(Fⱼ(fpⱼ(ξface)), fnode.x)

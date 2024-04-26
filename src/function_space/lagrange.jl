@@ -747,8 +747,8 @@ function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
 end
 
 # Generic versions for Lagrange 0 and 1 (any shape)
-coords(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape) = (center(shape),)
-coords(::FunctionSpace{<:Lagrange, 1}, shape::AbstractShape) = coords(shape)
+get_coords(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape) = (center(shape),)
+get_coords(::FunctionSpace{<:Lagrange, 1}, shape::AbstractShape) = get_coords(shape)
 
 # Line, Square, Cube
 function _make_staticvector(x)
@@ -770,7 +770,7 @@ end
 ) where {Shape <: AbstractShape, Quad <: AbstractQuadrature}
     _coords_gen_impl(Shape(), Quad())
 end
-function _coords(
+function _get_coords(
     fs::FunctionSpace{<:Lagrange, D},
     shape::Union{Line, Square, Cube},
 ) where {D}
@@ -778,35 +778,37 @@ function _coords(
     quad = Quadrature(quadtype, Val(D))
     _coords_gen(shape, quad)
 end
-coords(::FunctionSpace{<:Lagrange, 0}, shape::Line) = (center(shape),)
-coords(::FunctionSpace{<:Lagrange, 0}, shape::Square) = (center(shape),)
-coords(::FunctionSpace{<:Lagrange, 0}, shape::Cube) = (center(shape),)
-coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Line) = _coords(fs, shape)
-coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Square) = _coords(fs, shape)
-coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Cube) = _coords(fs, shape)
-coords(fs::FunctionSpace{<:Lagrange, D}, shape::Line) where {D} = _coords(fs, shape)
-coords(fs::FunctionSpace{<:Lagrange, D}, shape::Square) where {D} = _coords(fs, shape)
-coords(fs::FunctionSpace{<:Lagrange, D}, shape::Cube) where {D} = _coords(fs, shape)
+get_coords(::FunctionSpace{<:Lagrange, 0}, shape::Line) = (center(shape),)
+get_coords(::FunctionSpace{<:Lagrange, 0}, shape::Square) = (center(shape),)
+get_coords(::FunctionSpace{<:Lagrange, 0}, shape::Cube) = (center(shape),)
+get_coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Line) = _get_coords(fs, shape)
+get_coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Square) = _get_coords(fs, shape)
+get_coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Cube) = _get_coords(fs, shape)
+get_coords(fs::FunctionSpace{<:Lagrange, D}, shape::Line) where {D} = _get_coords(fs, shape)
+function get_coords(fs::FunctionSpace{<:Lagrange, D}, shape::Square) where {D}
+    _get_coords(fs, shape)
+end
+get_coords(fs::FunctionSpace{<:Lagrange, D}, shape::Cube) where {D} = _get_coords(fs, shape)
 
 # Triangle
-function coords(::FunctionSpace{<:Lagrange, 2}, shape::Triangle)
+function get_coords(::FunctionSpace{<:Lagrange, 2}, shape::Triangle)
     (
-        coords(shape)...,
-        sum(coords(shape, [1, 2])) / 2,
-        sum(coords(shape, [2, 3])) / 2,
-        sum(coords(shape, [3, 1])) / 2,
+        get_coords(shape)...,
+        sum(get_coords(shape, [1, 2])) / 2,
+        sum(get_coords(shape, [2, 3])) / 2,
+        sum(get_coords(shape, [3, 1])) / 2,
     )
 end
 
-function coords(::FunctionSpace{<:Lagrange, 3}, shape::Triangle)
+function get_coords(::FunctionSpace{<:Lagrange, 3}, shape::Triangle)
     (
-        coords(shape)...,
-        (2 / 3) * coords(shape, 1) + (1 / 3) * coords(shape, 2),
-        (1 / 3) * coords(shape, 1) + (2 / 3) * coords(shape, 2),
-        (2 / 3) * coords(shape, 2) + (1 / 3) * coords(shape, 3),
-        (1 / 3) * coords(shape, 2) + (2 / 3) * coords(shape, 3),
-        (2 / 3) * coords(shape, 3) + (1 / 3) * coords(shape, 1),
-        (1 / 3) * coords(shape, 3) + (2 / 3) * coords(shape, 1),
-        sum(coords(shape)) / 3,
+        get_coords(shape)...,
+        (2 / 3) * get_coords(shape, 1) + (1 / 3) * get_coords(shape, 2),
+        (1 / 3) * get_coords(shape, 1) + (2 / 3) * get_coords(shape, 2),
+        (2 / 3) * get_coords(shape, 2) + (1 / 3) * get_coords(shape, 3),
+        (1 / 3) * get_coords(shape, 2) + (2 / 3) * get_coords(shape, 3),
+        (2 / 3) * get_coords(shape, 3) + (1 / 3) * get_coords(shape, 1),
+        (1 / 3) * get_coords(shape, 3) + (2 / 3) * get_coords(shape, 1),
+        sum(get_coords(shape)) / 3,
     )
 end

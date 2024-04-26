@@ -167,7 +167,7 @@ the given boundary of a shape and the given `degree`.
 """
 function quadrature_rule(iside::Int, shape::AbstractShape, degree::Val{N}) where {N}
     # Get coordinates of the face's nodes of the shape
-    fvertices = coords(shape, faces2nodes(shape)[iside])
+    fvertices = get_coords(shape, faces2nodes(shape)[iside])
 
     # Get barycentric quadrature
     quadBary = quadrature_rule_bary(iside, shape, degree)
@@ -372,7 +372,7 @@ _rescale_tri(x, y) = (0.5 * (x + 1), 0.5 * (y + 1))
  ref : https://www.math.umd.edu/~tadmor/references/files/Chen%20&%20Shu%20entropy%20stable%20DG%20JCP2017.pdf
 """
 function quadrature_points(tri::Triangle, ::Val{4}, ::QuadratureLobatto)
-    p1, p2, p3 = coords(tri)
+    p1, p2, p3 = get_coords(tri)
     s12_1 = 1.0 / 2
     s12_2 = 0.4384239524408185
     s12_3 = 0.1394337314154536

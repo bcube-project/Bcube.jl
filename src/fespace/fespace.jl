@@ -703,16 +703,16 @@ allocate_dofs(mfeSpace::MultiFESpace, T = Float64) = zeros(T, get_ndofs(mfeSpace
 #         end
 
 #         # Compute tolerance : cell diagonal divided by 100
-#         min_xyz = coords(cnodes_i[1])
+#         min_xyz = get_coords(cnodes_i[1])
 #         max_xyz = min_xyz
 #         for node in cnodes_i
-#             max_xyz = max.(max_xyz, coords(node))
-#             min_xyz = min.(min_xyz, coords(node))
+#             max_xyz = max.(max_xyz, get_coords(node))
+#             min_xyz = min.(min_xyz, get_coords(node))
 #         end
 #         atol = norm(max_xyz - min_xyz) * rtol
 
 #         # Coordinates of dofs in cell i for this FunctionSpace
-#         coords_i = [mapping(cnodes_i, ct_i, ξ) for ξ in coords(fs, shape_i)]
+#         coords_i = [mapping(cnodes_i, ct_i, ξ) for ξ in get_coords(fs, shape_i)]
 
 #         # Loop over neighbor cells
 #         for jcell in c2c[icell]
@@ -722,7 +722,7 @@ allocate_dofs(mfeSpace::MultiFESpace, T = Float64) = zeros(T, get_ndofs(mfeSpace
 #             shape_j = shape(ct_j)
 
 #             # Coordinates of dofs in cell j for this FunctionSpace
-#             coords_j = [mapping(cnodes_j, ct_j, ξ) for ξ in coords(fs, shape_j)]
+#             coords_j = [mapping(cnodes_j, ct_j, ξ) for ξ in get_coords(fs, shape_j)]
 
 #             # n-to-n comparison
 #             for (idof_loc, xi) in enumerate(coords_i), (jdof_loc, xj) in enumerate(coords_j)
