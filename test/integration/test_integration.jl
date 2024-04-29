@@ -270,26 +270,8 @@
             quad = Quadrature(degree)
 
             for icell in (1, 2)
-                # cinfo = CellInfo(mesh, icell)
-                c = CellInfo(mesh, icell)
-                _c2f = c2f[icell]
-
-                kface = _c2f[1]
-                _f2n = f2n[kface]
-                finfo_1 =
-                    FaceInfo(c, c, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n, kface)
-                kface = _c2f[2]
-                _f2n = f2n[kface]
-                finfo_2 =
-                    FaceInfo(c, c, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n, kface)
-                kface = _c2f[3]
-                _f2n = f2n[kface]
-                finfo_3 =
-                    FaceInfo(c, c, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n, kface)
-                kface = _c2f[4]
-                _f2n = f2n[kface]
-                finfo_4 =
-                    FaceInfo(c, c, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n, kface)
+                finfo_1, finfo_2, finfo_3, finfo_4 =
+                    map(Base.Fix1(FaceInfo, mesh), c2f[icell])
 
                 @test integrate_on_ref_element(g, finfo_1, quad) ≈ Δx
                 @test integrate_on_ref_element(g, finfo_2, quad) ≈ Δy
@@ -298,17 +280,7 @@
             end
 
             icell = 3
-            c = CellInfo(mesh, icell)
-            _c2f = c2f[icell]
-            kface = _c2f[1]
-            _f2n = f2n[kface]
-            finfo_1 = FaceInfo(c, c, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n, kface)
-            kface = _c2f[2]
-            _f2n = f2n[kface]
-            finfo_2 = FaceInfo(c, c, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n, kface)
-            kface = _c2f[3]
-            _f2n = f2n[kface]
-            finfo_3 = FaceInfo(c, c, faces(mesh)[kface], get_nodes(mesh, _f2n), _f2n, kface)
+            finfo_1, finfo_2, finfo_3 = map(Base.Fix1(FaceInfo, mesh), c2f[icell])
             @test integrate_on_ref_element(g, finfo_1, quad) ≈ Δx
             @test integrate_on_ref_element(g, finfo_2, quad) ≈ norm([Δx, Δy])
             @test integrate_on_ref_element(g, finfo_3, quad) ≈ Δy
