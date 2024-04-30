@@ -772,7 +772,7 @@ end
 function normal(::isCurvilinear, ctype::AbstractEntityType, cnodes, iside, ξ)
     # mapping face-reference-element (here, a node) to cell-reference-element (here, a Line)
     # Since a Line has always only two nodes, the node is necessary the `iside`-th
-    ξ_cell = coords(Line())[iside]
+    ξ_cell = get_coords(Line())[iside]
 
     return normalize(mapping_jacobian(ctype, cnodes, ξ_cell) .* normal(shape(ctype), iside))
 end
