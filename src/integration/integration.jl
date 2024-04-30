@@ -66,7 +66,7 @@ end
 
 function _apply_metric(g_and_c::T, qnode::T1) where {T, T1}
     g, ctype, cnodes = g_and_c
-    ξ = get_coord(qnode)
+    ξ = get_coords(qnode)
     m = mapping_det_jacobian(topology_style(ctype, cnodes), ctype, cnodes, ξ)
     m * g(ξ)
 end
@@ -90,7 +90,7 @@ function apply_quadrature(
 )
     quadrule = QuadratureRule(shape, quadrature)
     # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
-    quadnodes = map(get_coord, get_quadnodes(quadrule))
+    quadnodes = map(get_coords, get_quadnodes(quadrule))
     # <-- TEMPORARY:
     _apply_quadrature(g_ref, get_weights(quadrule), quadnodes, g_ref(quadnodes[1]))
 end
@@ -126,7 +126,7 @@ function apply_quadrature_v2(
 )
     quadrule = QuadratureRule(shape, quadrature)
     # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
-    quadnodes = map(get_coord, get_quadnodes(quadrule))
+    quadnodes = map(get_coords, get_quadnodes(quadrule))
     # <-- TEMPORARY:
     _apply_quadrature_v2(g_ref, get_weights(quadrule), quadnodes)
 end

@@ -167,7 +167,7 @@ the given boundary of a shape and the given `degree`.
 """
 function quadrature_rule(iside::Int, shape::AbstractShape, degree::Val{N}) where {N}
     # Get coordinates of the face's nodes of the shape
-    fvertices = coords(shape, faces2nodes(shape)[iside])
+    fvertices = get_coords(shape, faces2nodes(shape)[iside])
 
     # Get barycentric quadrature
     quadBary = quadrature_rule_bary(iside, shape, degree)
@@ -372,7 +372,7 @@ _rescale_tri(x, y) = (0.5 * (x + 1), 0.5 * (y + 1))
  ref : https://www.math.umd.edu/~tadmor/references/files/Chen%20&%20Shu%20entropy%20stable%20DG%20JCP2017.pdf
 """
 function quadrature_points(tri::Triangle, ::Val{4}, ::QuadratureLobatto)
-    p1, p2, p3 = coords(tri)
+    p1, p2, p3 = get_coords(tri)
     s12_1 = 1.0 / 2
     s12_2 = 0.4384239524408185
     s12_3 = 0.1394337314154536
@@ -612,7 +612,7 @@ easily a quadrature node in a quadrature rules.
 Derived types must implement the following method:
 
     - get_index(quadnode::AbstractQuadratureNode{S,Q})
-    - get_coord(quadnode::AbstractQuadratureNode)
+    - get_coords(quadnode::AbstractQuadratureNode)
 """
 abstract type AbstractQuadratureNode{S, Q} end
 
@@ -630,12 +630,12 @@ function get_index(quadnode::AbstractQuadratureNode)
 end
 
 """
-    get_coord(quadnode::AbstractQuadratureNode)
+    get_coords(quadnode::AbstractQuadratureNode)
 
 Returns the coordinates of `quadnode`.
 """
-function get_coord(quadnode::AbstractQuadratureNode)
-    error("'get_coord' is not defined for type $(typeof(quadnode))")
+function get_coords(quadnode::AbstractQuadratureNode)
+    error("'get_coords' is not defined for type $(typeof(quadnode))")
 end
 
 """
@@ -645,7 +645,7 @@ Evaluate the function `f` at the coordinates of `quadnode`.
 
 Basically, it computes:
 ```jl
-f(get_coord(quadnode))
+f(get_coords(quadnode))
 ```
 
 # Remark:
@@ -653,23 +653,23 @@ f(get_coord(quadnode))
 Optimization could be applied if `f` is a function
 based on a nodal basis such as one of the DoF and `quadnode` are collocated.
 """
-evalquadnode(f, quadnode::AbstractQuadratureNode) = f(get_coord(quadnode))
+evalquadnode(f, quadnode::AbstractQuadratureNode) = f(get_coords(quadnode))
 get_quadrature_rule(::AbstractQuadratureNode{S, Q}) where {S, Q} = QuadratureRule(S(), Q())
 
 # default rules for retro-compatibility
-get_coord(x::Number) = x
-get_coord(x::AbstractArray{T}) where {T <: Number} = x
+get_coords(x::Number) = x
+get_coords(x::AbstractArray{T}) where {T <: Number} = x
 
-Base.getindex(quadnode::AbstractQuadratureNode, i) = get_coord(quadnode)[i]
-Base.IteratorEltype(x::Bcube.AbstractQuadratureNode) = Base.IteratorEltype(get_coord(x))
-Base.IteratorSize(x::Bcube.AbstractQuadratureNode) = Base.IteratorSize(get_coord(x))
-Base.size(x::Bcube.AbstractQuadratureNode) = Base.size(get_coord(x))
-Base.iterate(x::Bcube.AbstractQuadratureNode) = Base.iterate(get_coord(x))
+Base.getindex(quadnode::AbstractQuadratureNode, i) = get_coords(quadnode)[i]
+Base.IteratorEltype(x::Bcube.AbstractQuadratureNode) = Base.IteratorEltype(get_coords(x))
+Base.IteratorSize(x::Bcube.AbstractQuadratureNode) = Base.IteratorSize(get_coords(x))
+Base.size(x::Bcube.AbstractQuadratureNode) = Base.size(get_coords(x))
+Base.iterate(x::Bcube.AbstractQuadratureNode) = Base.iterate(get_coords(x))
 function Base.iterate(x::Bcube.AbstractQuadratureNode, i::Integer)
-    Base.iterate(get_coord(x), i::Integer)
+    Base.iterate(get_coords(x), i::Integer)
 end
 function Base.Broadcast.broadcastable(x::AbstractQuadratureNode)
-    Base.Broadcast.broadcastable(get_coord(x))
+    Base.Broadcast.broadcastable(get_coords(x))
 end
 
 """
@@ -692,7 +692,7 @@ function QuadratureNode(shape, quad, i::Integer, x)
 end
 
 get_index(quadnode::QuadratureNode) = quadnode.i
-get_coord(quadnode::QuadratureNode) = quadnode.x
+get_coords(quadnode::QuadratureNode) = quadnode.x
 
 function get_quadnodes_impl(::Type{<:QuadratureRule{S, Q, N}}) where {S, Q, N}
     quad = Q()

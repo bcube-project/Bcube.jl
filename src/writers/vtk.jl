@@ -24,7 +24,7 @@ function write_vtk(
 
     # Create coordinates arrays
     vtknodes = reshape(
-        [coords(n)[idim] for n in get_nodes(mesh) for idim in 1:spaceDim],
+        [get_coords(n)[idim] for n in get_nodes(mesh) for idim in 1:spaceDim],
         spaceDim,
         nnodes(mesh),
     )
@@ -73,7 +73,7 @@ function write_vtk_discontinuous(
     fs = FunctionSpace(:Lagrange, max(1, degree)) # here, we implicitly impose that the mesh is composed of Lagrange elements only
 
     # Create coordinates arrays
-    # vtknodes = reshape([coords(n)[idim] for i in 1:ncells(mesh) for n in get_nodes(mesh,c2n[i]) for idim in 1:spaceDim],spaceDim,:)
+    # vtknodes = reshape([get_coords(n)[idim] for i in 1:ncells(mesh) for n in get_nodes(mesh,c2n[i]) for idim in 1:spaceDim],spaceDim,:)
     _coords = [
         mapping(celltypes[i], get_nodes(mesh, c2n[i]), ξ)[idim] for i in 1:ncells(mesh)
         for ξ in _vtk_coords_from_lagrange(shape(celltypes[i]), _degree) for
@@ -154,7 +154,7 @@ function write_vtk_bnd_discontinuous(
         icell = f2c[iface][1]
         sideᵢ = cell_side(celltypes[icell], c2n[icell], f2n[iface])
         localfacedofs = idof_by_face_with_bounds(fs, shape(celltypes[icell]))[sideᵢ]
-        ξ = coords(fs, shape(celltypes[icell]))[localfacedofs]
+        ξ = get_coords(fs, shape(celltypes[icell]))[localfacedofs]
         xdofs = map(_ξ -> mapping(celltypes[icell], get_nodes(mesh, c2n[icell]), _ξ), ξ)
         ftype = entity(face_shapes(shape(celltypes[icell]), sideᵢ), Val(degree))
         ftype, rawcat(xdofs)
@@ -276,7 +276,7 @@ function _point_index_from_IJK_0based(::Val{:VTK_LAGRANGE_QUADRILATERAL}, degree
 end
 
 function _vtk_lagrange_node_index_vtk_to_bcube(shape::AbstractShape, degree)
-    return 1:length(coords(FunctionSpace(Lagrange(), degree), shape))
+    return 1:length(get_coords(FunctionSpace(Lagrange(), degree), shape))
 end
 
 """
@@ -306,7 +306,7 @@ function _vtk_lagrange_node_index_vtk_to_bcube(shape::Union{Square, Cube}, degre
 end
 
 function _vtk_coords_from_lagrange(shape::AbstractShape, degree)
-    return coords(FunctionSpace(Lagrange(), degree), shape)
+    return get_coords(FunctionSpace(Lagrange(), degree), shape)
 end
 
 """
@@ -314,7 +314,7 @@ Coordinates of the nodes in the VTK cell, ordered as expected by VTK.
 """
 function _vtk_coords_from_lagrange(shape::Union{Square, Cube}, degree)
     fs = FunctionSpace(Lagrange(), degree)
-    c = coords(fs, shape)
+    c = get_coords(fs, shape)
     index = _vtk_lagrange_node_index_vtk_to_bcube(shape, degree)
     return c[index]
 end
@@ -395,7 +395,7 @@ function write_vtk_lagrange(
         _shape = shape(ctype)
 
         # Get Lagrange dofs/nodes coordinates in ref space (Bcube order)
-        coords_bcube = coords(fs_export, _shape)
+        coords_bcube = get_coords(fs_export, _shape)
 
         # Get VTK <-> BCUBE dofs/nodes mapping
         v2b = Bcube._vtk_lagrange_node_index_vtk_to_bcube(_shape, degree_export)
@@ -409,7 +409,7 @@ function write_vtk_lagrange(
             cpoint = CellPoint(ξ, cinfo, ReferenceDomain())
 
             # Map it to the physical domain and assign to VTK
-            coords_vtk[:, iglob] .= get_coord(change_domain(cpoint, PhysicalDomain()))
+            coords_vtk[:, iglob] .= get_coords(change_domain(cpoint, PhysicalDomain()))
 
             # Evaluate all vars on this node
             for (ivar, var) in enumerate(_vars)

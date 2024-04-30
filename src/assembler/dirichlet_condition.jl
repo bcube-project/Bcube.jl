@@ -265,7 +265,7 @@ function _apply_dirichlet_on_face!(
     cnodes = get_nodes(mesh, _c2n)
     side = cell_side(ctype, c2n[icell], f2n[kface])
     cshape = shape(ctype)
-    ξcell = coords(fs_V, cshape) # ref coordinates of the FunctionSpace in the cell
+    ξcell = get_coords(fs_V, cshape) # ref coordinates of the FunctionSpace in the cell
     F = mapping(ctype, cnodes)
 
     # local indices of dofs lying on the face (assuming scalar FE)

@@ -48,7 +48,7 @@
         mesh = Mesh(nodes, celltypes, cell2node; bc_names = tag2name, bc_nodes = tag2nodes)
 
         f(fnodes) = PhysicalFunction(x -> begin
-            norm(x - coords(get_nodes(mesh, fnodes[1])))
+            norm(x - get_coords(get_nodes(mesh, fnodes[1])))
         end)
         f2n = connectivities_indices(mesh, :f2n)
         D = MeshFaceData([f(fnodes) for fnodes in f2n])

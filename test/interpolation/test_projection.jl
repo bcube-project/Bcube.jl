@@ -17,7 +17,7 @@
             s = shape(celltype(cInfo))
 
             # Loop over line vertices
-            for ξ in coords(s)
+            for ξ in get_coords(s)
                 cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
                 @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
             end
@@ -76,7 +76,7 @@
             s = shape(celltype(cInfo))
 
             # Loop over triangle vertices
-            for ξ in coords(s)
+            for ξ in get_coords(s)
                 cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
                 @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
             end

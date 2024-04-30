@@ -6,7 +6,7 @@ Imagine that you want some kind of function (~operator) that has a different beh
 For the example, let's say that you want an operator whose action is to multiply `x`, the evaluated point, by the index of the cell surrounding `x`. Start importing some Bcube material and by declaring a type corresponding to this operator:
 ```julia
 using Bcube
-import Bcube: CellInfo, CellPoint, get_coord
+import Bcube: CellInfo, CellPoint, get_coords
 struct DummyOperator <: Bcube.AbstractLazy end
 ```
 
@@ -21,7 +21,7 @@ function Bcube.materialize(
     ::DummyOperator,
     cPoint::CellPoint,
 )
-    x = get_coord(cPoint)
+    x = get_coords(cPoint)
     cInfo = Bcube.get_cellinfo(cPoint)
     index = Bcube.cellindex(cInfo)
     return x * index

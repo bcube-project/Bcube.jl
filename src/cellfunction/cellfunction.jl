@@ -393,7 +393,7 @@ function LazyOperators.materialize(
 )
     fPoint, = get_args(sideFacePoint)
     fInfo = get_faceinfo(fPoint)
-    ξface = get_coord(fPoint)
+    ξface = get_coords(fPoint)
 
     cInfo = get_cellinfo_p(fInfo)
     kside = get_cell_side_p(fInfo)
@@ -409,7 +409,7 @@ function LazyOperators.materialize(
 )
     fPoint, = get_args(sideFacePoint)
     fInfo = get_faceinfo(fPoint)
-    ξface = get_coord(fPoint)
+    ξface = get_coords(fPoint)
 
     cInfo = get_cellinfo_n(fInfo)
     kside = get_cell_side_n(fInfo)
@@ -436,7 +436,7 @@ function LazyOperators.materialize(
 )
     cnodes = get_cellnodes(cPoint)
     ctype = get_celltype(cPoint)
-    ξ = get_coord(cPoint)
+    ξ = get_coords(cPoint)
     return _tangential_projector(cnodes, ctype, ξ)
 end
 
@@ -456,7 +456,7 @@ function LazyOperators.materialize(
     cInfo = get_cellinfo_n(fInfo)
     cnodes = nodes(cInfo)
     ctype = celltype(cInfo)
-    ξcell = get_coord(side_n(fPoint))
+    ξcell = get_coords(side_n(fPoint))
 
     return _tangential_projector(cnodes, ctype, ξcell)
 end
@@ -470,7 +470,7 @@ function LazyOperators.materialize(
     cInfo = get_cellinfo_p(fInfo)
     cnodes = nodes(cInfo)
     ctype = celltype(cInfo)
-    ξcell = get_coord(side_p(fPoint))
+    ξcell = get_coords(side_p(fPoint))
 
     return _tangential_projector(cnodes, ctype, ξcell)
 end
@@ -504,12 +504,12 @@ function _unpack_face_point(sideFacePoint)
     cInfo_n = get_cellinfo_n(fInfo)
     cnodes_n = nodes(cInfo_n)
     ctype_n = celltype(cInfo_n)
-    ξ_n = get_coord(side_n(fPoint))
+    ξ_n = get_coords(side_n(fPoint))
 
     cInfo_p = get_cellinfo_p(fInfo)
     cnodes_p = nodes(cInfo_p)
     ctype_p = celltype(cInfo_p)
-    ξ_p = get_coord(side_p(fPoint))
+    ξ_p = get_coords(side_p(fPoint))
 
     return cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p
 end
@@ -606,7 +606,7 @@ LazyOperators.materialize(ν::CellNormal, ::CellInfo) = ν
 function LazyOperators.materialize(::CellNormal, cPoint::CellPoint{ReferenceDomain})
     ctype = get_celltype(cPoint)
     cnodes = get_cellnodes(cPoint)
-    ξ = get_coord(cPoint)
+    ξ = get_coords(cPoint)
     return cell_normal(ctype, cnodes, ξ)
 end
 

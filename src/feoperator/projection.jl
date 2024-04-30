@@ -38,7 +38,7 @@ function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
         _f = materialize(f, cInfo)
 
         # Loop over the cell nodes (in ref element)
-        for (inode, ξ) in zip(_c2n, coords(cshape))
+        for (inode, ξ) in zip(_c2n, get_coords(cshape))
             cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
             ncontributions[inode] += 1
             values[inode, :] .+= materialize(_f, cPoint)
@@ -145,7 +145,7 @@ function _var_on_nodes_discontinuous(f::AbstractLazy, mesh::AbstractMesh, fs::Fu
         cInfo = CellInfo(icell, ctype, cnodes)
         _f = materialize(f, cInfo)
 
-        return map(coords(fs, shape(ctype))) do ξ
+        return map(get_coords(fs, shape(ctype))) do ξ
             cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
             materialize(_f, cPoint)
         end
@@ -206,7 +206,7 @@ function _var_on_bnd_nodes_discontinuous(
 
         side = cell_side(ctype, _c2n, f2n[iface])
         localfacedofs = idof_by_face_with_bounds(fs, shape(ctype))[side]
-        ξ_on_face = coords(fs, shape(ctype))[localfacedofs]
+        ξ_on_face = get_coords(fs, shape(ctype))[localfacedofs]
 
         return map(ξ_on_face) do ξ
             cPoint = CellPoint(ξ, cinfo, ReferenceDomain())
