@@ -18,7 +18,7 @@ function apply_quadrature(
 )
     quadrule = QuadratureRule(shape, quadrature)
     # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
-    quadnodes = map(get_coord, get_quadnodes(quadrule))
+    quadnodes = map(get_coords, get_quadnodes(quadrule))
     # <-- TEMPORARY:
     _apply_quadrature(g_ref, get_weights(quadrule), quadnodes, g_ref(quadnodes[1]))
 end
@@ -49,7 +49,7 @@ function apply_quadrature2(
 )
     quadrule = QuadratureRule(shape, quadrature)
     # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
-    quadnodes = map(get_coord, get_quadnodes(quadrule))
+    quadnodes = map(get_coords, get_quadnodes(quadrule))
     # <-- TEMPORARY:
     _apply_quadrature_v2(g_ref, get_weights(quadrule), quadnodes)
 end
@@ -317,7 +317,7 @@ function integrate_ref(
     # of the mapping only once,
     # and multiply all components of `gref(x)`
     f = x -> begin
-        m = mapping_det_jacobian(ctype, cnodes, get_coord(x))
+        m = mapping_det_jacobian(ctype, cnodes, get_coords(x))
         map(gx -> m * gx, g_ref(x))
     end
     int = apply_quadrature(f, shape(ctype), quadrature, mapstyle)
@@ -444,7 +444,7 @@ function integrate_on_ref(
 end
 
 function _apply_curvilinear_metric((g, cellinfo), x)
-    m = norm(mapping_jacobian(celltype(cellinfo), nodes(cellinfo), get_coord(x)))
+    m = norm(mapping_jacobian(celltype(cellinfo), nodes(cellinfo), get_coords(x)))
     cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
     m * g(cellpoint)
 end
@@ -466,7 +466,7 @@ end
 
 function _apply_volume_metric(g_and_c::T, x::T1) where {T, T1}
     g, cellinfo = g_and_c
-    m = mapping_det_jacobian(celltype(cellinfo), nodes(cellinfo), get_coord(x))
+    m = mapping_det_jacobian(celltype(cellinfo), nodes(cellinfo), get_coords(x))
     cellpoint = CellPoint(x, cellinfo, ReferenceDomain())
     m * g(cellpoint)
 end

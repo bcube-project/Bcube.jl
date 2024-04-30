@@ -250,12 +250,12 @@ function ndofs(fs::AbstractFunctionSpace, shape::AbstractShape)
 end
 
 """
-    coords(fs::AbstractFunctionSpace,::AbstractShape)
+    get_coords(fs::AbstractFunctionSpace,::AbstractShape)
 
 Return node coordinates in the reference space for associated function space and shape.
 """
-function coords(fs::AbstractFunctionSpace, ::AbstractShape)
-    error("Function 'coords' is not defined")
+function get_coords(fs::AbstractFunctionSpace, ::AbstractShape)
+    error("Function 'get_coords' is not defined")
 end
 
 abstract type AbtractBasisFunctionsStyle end

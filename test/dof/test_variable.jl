@@ -24,8 +24,8 @@ function test_setvalues!_with_function(
         ctype = cellTypes[i]
         cnodes = get_nodes(mesh, c2n[i])
         uᵢ = u[i, Val(:unstable)]
-        a = [f(Bcube.mapping(ctype, cnodes, x)) for x in coords(shape(ctype))]
-        b = [uᵢ(ξ) for ξ in coords(shape(ctype))]
+        a = [f(Bcube.mapping(ctype, cnodes, x)) for x in get_coords(shape(ctype))]
+        b = [uᵢ(ξ) for ξ in get_coords(shape(ctype))]
 
         @test all(isapprox.(a, b, rtol = 1000eps()))
     end

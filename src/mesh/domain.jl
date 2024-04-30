@@ -137,7 +137,7 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
             Mⱼ = center(fnodesⱼ)
 
             # compute image point
-            Mⱼ_bis = Node(A(coords(Mⱼ)))
+            Mⱼ_bis = Node(A(get_coords(Mⱼ)))
 
             # Centers must be identical
             if isapprox(Mᵢ, Mⱼ_bis; atol = tol * Δxᵢ)
@@ -175,7 +175,7 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
             for j in _f2n2
                 Mⱼ = get_nodes(mesh, j)
                 # compute image point
-                Mⱼ_bis = Node(A(coords(Mⱼ)))
+                Mⱼ_bis = Node(A(get_coords(Mⱼ)))
                 if isapprox(Mᵢ, Mⱼ_bis; atol = tol * Δx)
                     bnd_n2n[i] = j
                     bnd_n2n[j] = i
@@ -504,7 +504,7 @@ function _get_index(domain::BoundaryFaceDomain{M, <:PeriodicBCType}, i::Integer)
     nnodes_j = Val(nnodes(ctype_j))
     _c2n_j = c2n[icell2, nnodes_j]
     cnodes_j = get_nodes(mesh, _c2n_j) # to be removed when function barrier is used
-    cnodes_j_perio = map(node -> Node(perio_trans(coords(node))), cnodes_j)
+    cnodes_j_perio = map(node -> Node(perio_trans(get_coords(node))), cnodes_j)
     # Build c2n for cell j with nodes indices taken from cell i
     # for those that are shared on the periodic BC:
     _c2n_j_perio = map(k -> get(bnd_n2n, k, k), _c2n_j)

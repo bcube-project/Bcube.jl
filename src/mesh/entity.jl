@@ -491,15 +491,17 @@ struct Node{spaceDim, T}
     x::SVector{spaceDim, T}
 end
 Node(x::Vector{T}) where {T} = Node{length(x), T}(SVector{length(x), T}(x))
-@inline coords(n::Node) = n.x
-coords(n::Node, i) = coords(n)[i]
-coords(n::Node, i::Tuple{T, Vararg{T}}) where {T} = map(j -> coords(n, j), i)
+@inline get_coords(n::Node) = n.x
+get_coords(n::Node, i) = get_coords(n)[i]
+get_coords(n::Node, i::Tuple{T, Vararg{T}}) where {T} = map(j -> get_coords(n, j), i)
 @inline spacedim(::Node{spaceDim, T}) where {spaceDim, T} = spaceDim
 function center(nodes::AbstractVector{T}) where {T <: Node}
-    Node(sum(n -> coords(n), nodes) / length(nodes))
+    Node(sum(n -> get_coords(n), nodes) / length(nodes))
 end
-Base.isapprox(a::Node, b::Node, c...; d...) = isapprox(coords(a), coords(b), c...; d...)
-distance(a::Node, b::Node) = norm(coords(a) - coords(b))
+function Base.isapprox(a::Node, b::Node, c...; d...)
+    isapprox(get_coords(a), get_coords(b), c...; d...)
+end
+distance(a::Node, b::Node) = norm(get_coords(a) - get_coords(b))
 
 # TopologyStyle helps dealing of curve in 2D/3D space (isCurvilinear),
 # surfaces in 3D space (isSurfacic) or R^n entity in a R^n space (isVolumic)
