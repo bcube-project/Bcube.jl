@@ -207,7 +207,7 @@ function _minmax_faces_periodic!(minval, maxval, v, degquad, periodicBcDomain)
     #     # Neighbor cell j
     #     j = bnd_f2c[kface, 2]
     #     cnodesⱼ = get_nodes(mesh, c2n[j])
-    #     cnodesⱼ = map(n->Node(A(coords(n))), cnodesⱼ)
+    #     cnodesⱼ = map(n->Node(A(get_coords(n))), cnodesⱼ)
     #     ctypeⱼ = cellTypes[j]
 
     #     mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ = _minmax_on_face_periodic(v, degquad, i, j, kface, ftype, ctypeᵢ, ctypeⱼ, bnd_f2n1, bnd_f2n2, c2n, cnodesᵢ, cnodesⱼ, bnd_n2n)

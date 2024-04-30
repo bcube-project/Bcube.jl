@@ -306,14 +306,14 @@ using this permutation.
 """
 function mapping_face(cshape::AbstractShape, side)
     f2n = faces2nodes(cshape, side)
-    _coords = coords(cshape, f2n)
+    _coords = get_coords(cshape, f2n)
     fnodes = map(Node, _coords)
     return MappingFace(mapping(face_shapes(cshape, side), fnodes), nothing)
 end
 
 function mapping_face(cshape::AbstractShape, side, permutation)
     f2n = faces2nodes(cshape, side)[permutation]
-    _coords = coords(cshape, f2n)
+    _coords = get_coords(cshape, f2n)
     fnodes = Node.(_coords)
     return MappingFace(mapping(face_shapes(cshape, side), fnodes), nothing)
 end
@@ -610,7 +610,7 @@ end
 # Warning : only valid for "tensor" "Lagrange" entities
 function mapping(ctype::Union{Quad16_t}, cnodes, ξ)
     λs = _ordered_lagrange_shape_fns(ctype, ξ)
-    return sum(((λ, node),) -> λ .* coords(node), zip(λs, cnodes))
+    return sum(((λ, node),) -> λ .* get_coords(node), zip(λs, cnodes))
 end
 
 #---------------- Hexa8

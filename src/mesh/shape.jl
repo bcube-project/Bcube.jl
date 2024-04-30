@@ -83,24 +83,24 @@ Indicate how many faces a shape has.
 nfaces(::AbstractShape) = error("Function 'nfaces' is not defined")
 
 """
-    coords(::AbstractShape)
+    get_coords(::AbstractShape)
 
 Return node coordinates of the shape in the reference space.
 """
-coords(::AbstractShape) = error("Function 'coordinates' is not defined")
+get_coords(::AbstractShape) = error("Function 'coordinates' is not defined")
 
 """
-    coords(shape::AbstractShape,i)
+    get_coords(shape::AbstractShape,i)
 
 Return the coordinates of the `i`th shape vertices. `i` can be a tuple of
 indices, then the multiples vertices's coordinates are returned.
 """
-@inline coords(shape::AbstractShape, i) = coords(shape)[i]
+@inline get_coords(shape::AbstractShape, i) = get_coords(shape)[i]
 
-function coords(shape::AbstractShape, i::Tuple{T, Vararg{T}}) where {T}
-    map(j -> coords(shape, j), i)
+function get_coords(shape::AbstractShape, i::Tuple{T, Vararg{T}}) where {T}
+    map(j -> get_coords(shape, j), i)
 end
-coords(shape::AbstractShape, i::AbstractVector) = map(j -> coords(shape, j), i)
+get_coords(shape::AbstractShape, i::AbstractVector) = map(j -> get_coords(shape, j), i)
 
 """
     normals(::AbstractShape)
@@ -171,7 +171,7 @@ Center of the `AbstractShape`.
 Specialize for better performances
 """
 function center(s::AbstractShape)
-    return sum(coords(s)) / nvertices(s)
+    return sum(get_coords(s)) / nvertices(s)
 end
 
 nvertices(::Line) = nnodes(Bar2_t())
@@ -195,13 +195,13 @@ nfaces(::Tetra) = nfaces(Tetra4_t())
 nfaces(::Cube) = nfaces(Hexa8_t())
 nfaces(::Prism) = nfaces(Penta6_t())
 
-coords(::Line) = (SA[-1.0], SA[1.0])
-coords(::Triangle) = (SA[0.0, 0.0], SA[1.0, 0.0], SA[0.0, 1.0])
-coords(::Square) = (SA[-1.0, -1.0], SA[1.0, -1.0], SA[1.0, 1.0], SA[-1.0, 1.0])
-function coords(::Tetra)
+get_coords(::Line) = (SA[-1.0], SA[1.0])
+get_coords(::Triangle) = (SA[0.0, 0.0], SA[1.0, 0.0], SA[0.0, 1.0])
+get_coords(::Square) = (SA[-1.0, -1.0], SA[1.0, -1.0], SA[1.0, 1.0], SA[-1.0, 1.0])
+function get_coords(::Tetra)
     (SA[0.0, 0.0, 0.0], SA[1.0, 0.0, 0.0], SA[0.0, 1.0, 0.0], SA[0.0, 0.0, 1.0])
 end
-function coords(::Cube)
+function get_coords(::Cube)
     (
         SA[-1.0, -1.0, -1.0],
         SA[1.0, -1.0, -1.0],
@@ -213,7 +213,7 @@ function coords(::Cube)
         SA[-1.0, 1.0, 1.0],
     )
 end
-function coords(::Prism)
+function get_coords(::Prism)
     (
         SA[0.0, 0.0, -1.0],
         SA[1.0, 0.0, -1.0],

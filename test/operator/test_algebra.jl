@@ -156,7 +156,7 @@
 
             ξ = CellPoint(SA[0.5, -0.1], c, ReferenceDomain())
             x = change_domain(ξ, Bcube.PhysicalDomain())
-            ∇u = ∇u_ana(get_coord(x))
+            ∇u = ∇u_ana(get_coords(x))
             ∇u_a_ref = Bcube.materialize(∇(u_a), ξ)
             ∇u_b_ref = Bcube.materialize(∇(u_b), ξ)
             ∇u_a_phy = Bcube.materialize(∇(u_a), x)
@@ -175,8 +175,8 @@
 
             x = CellPoint(SA[0.5, -0.1], c, Bcube.PhysicalDomain())
             ξ = change_domain(x, ReferenceDomain()) # not always possible, but ok of for quad
-            ∇u = ∇u_ana(get_coord(ξ))
-            _tJinv = tJinv(get_coord(ξ))
+            ∇u = ∇u_ana(get_coords(ξ))
+            _tJinv = tJinv(get_coords(ξ))
             ∇u_a_ref = Bcube.materialize(∇(u_a), ξ)
             ∇u_b_ref = Bcube.materialize(∇(u_b), ξ)
             ∇u_a_phy = Bcube.materialize(∇(u_a), x)
@@ -193,9 +193,9 @@
 
             ξ = CellPoint(SA[0.5, -0.1], c, ReferenceDomain())
             x = change_domain(ξ, Bcube.PhysicalDomain())
-            ∇u_ref = ∇u_ana(get_coord(ξ))
-            ∇u_phy = ∇u_ana(get_coord(x))
-            _tJinv = tJinv(get_coord(ξ))
+            ∇u_ref = ∇u_ana(get_coords(ξ))
+            ∇u_phy = ∇u_ana(get_coords(x))
+            _tJinv = tJinv(get_coords(ξ))
             @test all(Bcube.materialize(∇(u_phy + u_ref), ξ) .≈ ∇u_phy + _tJinv * ∇u_ref)
             @test all(Bcube.materialize(∇(u_phy + u_ref), x) .≈ ∇u_phy + _tJinv * ∇u_ref)
         end
