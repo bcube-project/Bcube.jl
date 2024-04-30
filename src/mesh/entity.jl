@@ -518,34 +518,27 @@ struct isVolumic <: TopologyStyle end
 
 Indicate the `TopologyStyle` of an entity of topology `topoDim` living in space of dimension `spaceDim`.
 """
-@inline function topology_style(
+@inline topology_style(
     ::AbstractEntityType{topoDim},
     ::Node{spaceDim, T},
-) where {topoDim, spaceDim, T}
-    isVolumic()
-end # everything is volumic by default
-@inline function topology_style(
-    ::AbstractEntityType{0},
-    ::Node{spaceDim, T},
-) where {spaceDim, T}
+) where {topoDim, spaceDim, T} = isVolumic() # everything is volumic by default
+
+# Any "Node" is... nodal
+@inline topology_style(::AbstractEntityType{0}, ::Node{spaceDim, T}) where {spaceDim, T} =
     isNodal()
-end # Any "Node" is... nodal
-@inline function topology_style(
-    ::AbstractEntityType{1},
-    ::Node{spaceDim, T},
-) where {spaceDim, T}
-    isCurvilinear()
-end # Any "line" is curvilinear
-@inline topology_style(::AbstractEntityType{2}, ::Node{2, T}) where {T} = isVolumic() # A surface in R^2 is "volumic"
-@inline function topology_style(
-    ::AbstractEntityType{2},
-    ::Node{spaceDim, T},
-) where {spaceDim, T}
+
+# Any "line" in R^2 or R^3 is curvilinear
+@inline topology_style(::AbstractEntityType{1}, ::Node{2, T}) where {T} = isCurvilinear()
+@inline topology_style(::AbstractEntityType{1}, ::Node{3, T}) where {T} = isCurvilinear()
+
+# A surface in R^2 is "volumic"
+@inline topology_style(::AbstractEntityType{2}, ::Node{2, T}) where {T} = isVolumic()
+
+# Any other surface is "surfacic"
+@inline topology_style(::AbstractEntityType{2}, ::Node{spaceDim, T}) where {spaceDim, T} =
     isSurfacic()
-end # Any other surface is "surfacic"
-@inline function topology_style(
+
+@inline topology_style(
     etype::AbstractEntityType{topoDim},
     nodes::AbstractArray{Node{spaceDim, T}, N},
-) where {spaceDim, T, N, topoDim}
-    topology_style(etype, nodes[1])
-end
+) where {spaceDim, T, N, topoDim} = topology_style(etype, nodes[1])

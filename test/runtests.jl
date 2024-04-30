@@ -89,6 +89,7 @@ import Bcube:
     has_vertices,
     indices,
     inner_faces,
+    integrate_on_ref_element,
     interpolate,
     inverse_connectivity,
     Line,
