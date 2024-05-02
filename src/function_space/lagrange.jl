@@ -812,3 +812,62 @@ function get_coords(::FunctionSpace{<:Lagrange, 3}, shape::Triangle)
         sum(get_coords(shape)) / 3,
     )
 end
+
+# WIP
+function get_nodes(k)
+    vertices = [SA[0.0, 0.0], SA[1.0, 0.0], SA[0.0, 1.0]]
+    k == 0 && return [sum(vertices) / 3]
+
+    nodes = [SA[(kx - 1) / k, (ky - 1) / k] for ky in 1:k for kx in 1:(k + 2 - ky)]
+    push!(nodes, SA[0.0, 1.0])
+    return nodes
+end
+
+function _get_shape_func_impl(k, kx, ky)
+    # Triangle coordinates
+    A, B, C = get_coords(Triangle())
+    Δξx = B[1] - A[1]
+    Δξy = C[2] - A[2]
+
+    # Coordinates of node (kx, ky)
+    _ξx = (kx - 1) / k * Δξx
+    _ξy = (ky - 1) / k * Δξy
+
+    expr = :(1.0)
+    denom = 1.0
+    for _kx in 1:(k + 1)
+        _kx == kx && continue
+        _ξ = (_kx - 1) / k * Δξx
+        _expr = :($_ξ - ξ[1])
+        expr = Expr(:call, :*, expr, _expr)
+        denom *= _ξ - _ξx
+    end
+    for _ky in 1:(k + 1)
+        _ky == ky && continue
+        _ξ = (_ky - 1) / k * Δξy
+        _expr = :($_ξ - ξ[2])
+        expr = Expr(:call, :*, expr, _expr)
+        denom *= _ξ - _ξy
+    end
+
+    # Divide by "denom" to obtain 1. on node (kx, ky)
+    expr = Expr(:call, :/, expr, :($denom))
+
+    return expr
+end
+
+function _get_shape_func_impl(::Val{N}) where {N}
+    N == 0 && return :(SA[1.0])
+
+    funcs = [_get_shape_func_impl(N, kx, ky) for ky in 1:(N + 1) for kx in 1:(N + 2 - ky)]
+    for f in funcs
+        @show f
+    end
+    return :(SA[$(funcs...)])
+end
+
+@generated function _get_shape_func(::Val{N}, ξ::T) where {N, T}
+    _get_shape_func_impl(Val(N))
+end
+
+get_shape_func(::FunctionSpace{<:Lagrange, N}, ξ) where {N} = _get_shape_func(Val(N), ξ)
