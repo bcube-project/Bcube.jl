@@ -334,6 +334,9 @@ end
         order = 1,
         bnd_names = ("North", "South", "East", "West"),
         n_partitions = 0,
+        write_geo = false,
+        transfinite_lines = true,
+        lc = 1e-1,
         kwargs...
     )
 
@@ -355,6 +358,9 @@ function gen_rectangle_mesh(
     order = 1,
     bnd_names = ("North", "South", "East", "West"),
     n_partitions = 0,
+    write_geo = false,
+    transfinite_lines = true,
+    lc = 1e-1,
     kwargs...,
 )
     #         North
@@ -366,7 +372,6 @@ function gen_rectangle_mesh(
     #         South
     gmsh.initialize()
     _apply_gmsh_options(; kwargs...)
-    lc = 1e-1
 
     # Points
     A = gmsh.model.geo.addPoint(xc - lx / 2, yc - ly / 2, 0, lc)
@@ -387,10 +392,12 @@ function gen_rectangle_mesh(
     surf = gmsh.model.geo.addPlaneSurface([ABCD])
 
     # Mesh settings
-    gmsh.model.geo.mesh.setTransfiniteCurve(AB, nx)
-    gmsh.model.geo.mesh.setTransfiniteCurve(BC, ny)
-    gmsh.model.geo.mesh.setTransfiniteCurve(CD, nx)
-    gmsh.model.geo.mesh.setTransfiniteCurve(DA, ny)
+    if transfinite_lines
+        gmsh.model.geo.mesh.setTransfiniteCurve(AB, nx)
+        gmsh.model.geo.mesh.setTransfiniteCurve(BC, ny)
+        gmsh.model.geo.mesh.setTransfiniteCurve(CD, nx)
+        gmsh.model.geo.mesh.setTransfiniteCurve(DA, ny)
+    end
 
     (transfinite || type == :quad) && gmsh.model.geo.mesh.setTransfiniteSurface(surf)
 
@@ -417,7 +424,13 @@ function gen_rectangle_mesh(
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
+    rm(output; force = true)
     gmsh.write(output)
+    if write_geo
+        output_geo = first(splitext(output)) * ".geo_unrolled"
+        rm(output_geo; force = true)
+        gmsh.write(output_geo)
+    end
 
     # End
     gmsh.finalize()
@@ -1354,6 +1367,7 @@ nodes_gmsh2cgns(e::Type{Tri12_t}) = nodes(e) #same numbering between CGNS and Gm
 nodes_gmsh2cgns(e::Type{Quad4_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Quad8_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Quad9_t}) = nodes(e) #same numbering between CGNS and Gmsh
+nodes_gmsh2cgns(e::Type{Quad16_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Tetra4_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Tetra10_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Hexa8_t}) = nodes(e) #same numbering between CGNS and Gmsh
