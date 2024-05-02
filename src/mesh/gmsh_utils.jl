@@ -24,12 +24,7 @@ Read a .msh file designated by its `path`.
 
 See `read_msh()` for more details.
 """
-function read_msh(
-    path::String,
-    spaceDim::Int = 0;
-    verbose::Bool = false,
-    permutBackNode::Bool = false,
-)
+function read_msh(path::String, spaceDim::Int = 0; verbose::Bool = false)
     isfile(path) ? nothing : error("File does not exist ", path)
 
     # Read file using gmsh lib
@@ -38,7 +33,7 @@ function read_msh(
     gmsh.open(path)
 
     # build mesh
-    mesh = _read_msh(spaceDim, verbose, permutBackNode)
+    mesh = _read_msh(spaceDim, verbose)
 
     # free gmsh
     gmsh.finalize()
@@ -60,7 +55,7 @@ If `spaceDim` is set to a positive number, this number is used as the number of 
 Global use of `gmsh` module. Do not try to improve this function by passing an argument
 such as `gmsh` or `gmsh.model` : it leads to problems.
 """
-function _read_msh(spaceDim::Int, verbose::Bool, permutBackNode = false)
+function _read_msh(spaceDim::Int, verbose::Bool)
     # Spatial dimension of the mesh
     dim = gmsh.model.getDimension()
 
@@ -84,8 +79,7 @@ function _read_msh(spaceDim::Int, verbose::Bool, permutBackNode = false)
     _, glo2loc_cell_indices = densify(absolute_cell_indices; permute_back = true)
 
     # Read boundary conditions
-    bc_tags = gmsh.model.getPhysicalGroups(1)
-    verbose && @show bc_tags, gmsh.model.getPhysicalName(1, 2)
+    bc_tags = gmsh.model.getPhysicalGroups(-1)
     bc_names = [gmsh.model.getPhysicalName(_dim, _tag) for (_dim, _tag) in bc_tags]
     # keep only physical groups of dimension "dim-1" with none-empty names.
     # bc is a vector of (tag,name) for all valid boundary conditions
@@ -119,11 +113,7 @@ function _read_msh(spaceDim::Int, verbose::Bool, permutBackNode = false)
     mesh = Mesh(nodes, celltypes, c2n; bc_names = bc_names, bc_nodes = bc_nodes)
     add_absolute_indices!(mesh, :node, absolute_node_indices)
     add_absolute_indices!(mesh, :cell, absolute_cell_indices)
-    if permutBackNode
-        return mesh, glo2loc_node_indices
-    else
-        return mesh
-    end
+    return mesh
 end
 
 """
@@ -344,6 +334,9 @@ end
         order = 1,
         bnd_names = ("North", "South", "East", "West"),
         n_partitions = 0,
+        write_geo = false,
+        transfinite_lines = true,
+        lc = 1e-1,
         kwargs...
     )
 
@@ -397,7 +390,6 @@ function gen_rectangle_mesh(
 
     # Surface
     surf = gmsh.model.geo.addPlaneSurface([ABCD])
-    # gmsh.model.geo.synchronize()
 
     # Mesh settings
     if transfinite_lines
