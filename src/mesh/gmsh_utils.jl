@@ -427,7 +427,7 @@ function gen_rectangle_mesh(
     rm(output; force = true)
     gmsh.write(output)
     if write_geo
-        output_geo = output[1:(end - 3)] * "geo_unrolled"
+        output_geo = first(splitext(output)) * ".geo_unrolled"
         rm(output_geo; force = true)
         gmsh.write(output_geo)
     end
