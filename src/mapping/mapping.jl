@@ -44,6 +44,10 @@ Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 27-hexa.
 # `::Penta6_t`
 Map the reference 6-nodes prism [0,1] x [0,1] x [-1,1] on the 6-penta (prism).
 
+# `::Pyra5_t`
+Map the reference 5-nodes pyramid [-1,1] x [-1,1] x [0,1] on the 5-pyra.
+See https://www.math.u-bordeaux.fr/~durufle/montjoie/pyramid.php
+
 """
 function mapping(type_or_shape, cnodes, ξ)
     error("Function 'mapping' is not defined for $(typeof(type_or_shape))")
@@ -743,6 +747,26 @@ function mapping_jacobian(::Penta6_t, cnodes, ξηζ)
         (1 - ζ) * (M3 - M1) + (1 + ζ) * (M6 - M4),
         (1 - ξ - η) * (M4 - M1) + ξ * (M5 - M2) + η * (M6 - M3),
     ) ./ 2.0
+end
+
+#---------------- Pyra5
+mapping(::Pyramid, cnodes, ξ) = mapping(Pyra5_t(), cnodes, ξ)
+
+function mapping(::Pyra5_t, cnodes, ξηζ)
+    ξ = ξηζ[1]
+    η = ξηζ[2]
+    ζ = ξηζ[3]
+
+    # to avoid a singularity in z = 1, we replace (1-ζ) (which is always a
+    # positive quantity), by (1 + ε - ζ).
+    ε = eps()
+    return (
+        (1 - ξ - ζ) * (1 - η - ζ) / (4 * (1 + ε - ζ)) * cnodes[1].x +
+        (1 + ξ - ζ) * (1 - η - ζ) / (4 * (1 + ε - ζ)) * cnodes[2].x +
+        (1 + ξ - ζ) * (1 + η - ζ) / (4 * (1 + ε - ζ)) * cnodes[3].x +
+        (1 - ξ - ζ) * (1 + η - ζ) / (4 * (1 + ε - ζ)) * cnodes[4].x +
+        ζ * cnodes[5].x
+    )
 end
 
 """

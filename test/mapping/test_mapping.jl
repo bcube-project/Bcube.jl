@@ -282,6 +282,27 @@
         @test isapprox_arrays(F([0.0, 0.0, 1.0]), [1.0, 1.0, 2.0])
         @test isapprox_arrays(F([1.0, 0.0, 1.0]), [2.0, 1.0, 2.0])
         @test isapprox_arrays(F([0.0, 1.0, 1.0]), [1.0, 2.0, 2.0])
+
+        # Pyra5
+        mesh = one_cell_mesh(
+            :pyra;
+            xmin = 1.0,
+            xmax = 2.0,
+            ymin = 1.0,
+            ymax = 2.0,
+            zmin = 1.0,
+            zmax = 3.0,
+        )
+        c2n = connectivities_indices(mesh, :c2n)
+        icell = 1
+        ctype = cells(mesh)[icell]
+        cnodes = get_nodes(mesh, c2n[icell])
+        F = mapping(ctype, cnodes)
+        @test isapprox_arrays(F([-1.0, -1.0, 0.0]), [1.0, 1.0, 1.0])
+        @test isapprox_arrays(F([1.0, -1.0, 0.0]), [2.0, 1.0, 1.0])
+        @test isapprox_arrays(F([1.0, 1.0, 0.0]), [2.0, 2.0, 1.0])
+        @test isapprox_arrays(F([-1.0, 1.0, 0.0]), [1.0, 2.0, 1.0])
+        @test isapprox_arrays(F([0.0, 0.0, 1.0]), [1.5, 1.5, 3.0])
     end
 
     @testset "basic mesh" begin

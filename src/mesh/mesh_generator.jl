@@ -30,7 +30,7 @@ end
 """
     one_cell_mesh(type::Symbol, order = 1)
 
-Generate a mesh of one cell. `type` can be `:line`, `:quad`, `:tri` or `:hexa`.
+Generate a mesh of one cell. `type` can be `:line`, `:quad`, `:tri`, `:hexa`, `:penta`, `:pyra`.
 
 The argument `order` refers to the geometry order. It has the same effect
 as the `-order` parameter in gmsh.
@@ -57,6 +57,8 @@ function one_cell_mesh(
         return one_hexa_mesh(Val(order), xmin, xmax, ymin, ymax, zmin, zmax)
     elseif (type == :prism || type == :penta)
         return one_prism_mesh(Val(order), xmin, xmax, ymin, ymax, zmin, zmax)
+    elseif (type == :pyra)
+        return one_pyra_mesh(Val(order), xmin, xmax, ymin, ymax, zmin, zmax)
     else
         throw(ArgumentError("Expected type :line, :quad, :tri, :hexa"))
     end
@@ -676,6 +678,19 @@ function one_prism_mesh(::Val{1}, xmin, xmax, ymin, ymax, zmin, zmax)
     ]
     celltypes = [Penta6_t()]
     cell2node = Connectivity([6], [1, 2, 3, 4, 5, 6])
+    return Mesh(nodes, celltypes, cell2node)
+end
+
+function one_pyra_mesh(::Val{1}, xmin, xmax, ymin, ymax, zmin, zmax)
+    nodes = [
+        Node([xmin, ymin, zmin]),
+        Node([xmax, ymin, zmin]),
+        Node([xmax, ymax, zmin]),
+        Node([xmin, ymax, zmin]),
+        Node([(xmax + xmin) / 2, (ymin + ymax) / 2, zmax]),
+    ]
+    celltypes = [Pyra5_t()]
+    cell2node = Connectivity([5], [1, 2, 3, 4, 5])
     return Mesh(nodes, celltypes, cell2node)
 end
 
