@@ -845,7 +845,7 @@ end
 """
     cell_normal(ctype::AbstractEntityType, cnodes, ξ) where {T, N}
 
-Compute the cell normal vector of an entity of topology dimension equals to (d-1) in a n-D space,
+Compute the cell normal vector of an entity of topology dimension equals to (n-1) in a n-D space,
 for instance a curve in a 2D space. This vector is expressed in the cell-reference coordinate system.
 
 Do not confuse the cell normal vector with the cell-side (i.e face) normal vector.
