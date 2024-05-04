@@ -130,15 +130,16 @@ function read_msh_with_cell_names(path::String, spaceDim = 0; verbose = false)
     gmsh.open(path)
 
     # build mesh
-    mesh = _read_msh(spaceDim, verbose)
+    _spaceDim = spaceDim > 0 ? spaceDim : _compute_space_dim(verbose)
+    mesh = _read_msh(_spaceDim, verbose)
 
     #----- Read cell names
     # Read elements
-    el_tags = gmsh.model.getPhysicalGroups(spaceDim)
+    el_tags = gmsh.model.getPhysicalGroups(_spaceDim)
     _el_names = [gmsh.model.getPhysicalName(_dim, _tag) for (_dim, _tag) in el_tags]
     el = [
         (_tag, _name) for ((_dim, _tag), _name) in zip(el_tags, _el_names) if
-        _dim == spaceDim && _name ≠ ""
+        _dim == _spaceDim && _name ≠ ""
     ]
     el_names = Dict(convert(Int, _tag) => _name for (_tag, _name) in el)
     el_names_inv = Dict(_name => convert(Int, _tag) for (_tag, _name) in el)
