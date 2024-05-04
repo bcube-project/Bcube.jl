@@ -131,15 +131,16 @@ function read_msh_with_cell_names(path::String, spaceDim = 0; verbose = false)
     gmsh.open(path)
 
     # build mesh
-    mesh = _read_msh(spaceDim, verbose)
+    _spaceDim = spaceDim > 0 ? spaceDim : _compute_space_dim(verbose)
+    mesh = _read_msh(_spaceDim, verbose)
 
     #----- Read cell names
     # Read elements
-    el_tags = gmsh.model.getPhysicalGroups(spaceDim)
+    el_tags = gmsh.model.getPhysicalGroups(_spaceDim)
     _el_names = [gmsh.model.getPhysicalName(_dim, _tag) for (_dim, _tag) in el_tags]
     el = [
         (_tag, _name) for ((_dim, _tag), _name) in zip(el_tags, _el_names) if
-        _dim == spaceDim && _name ≠ ""
+        _dim == _spaceDim && _name ≠ ""
     ]
     el_names = Dict(convert(Int, _tag) => _name for (_tag, _name) in el)
     el_names_inv = Dict(_name => convert(Int, _tag) for (_tag, _name) in el)
@@ -335,6 +336,9 @@ end
         order = 1,
         bnd_names = ("North", "South", "East", "West"),
         n_partitions = 0,
+        write_geo = false,
+        transfinite_lines = true,
+        lc = 1e-1,
         kwargs...
     )
 
@@ -356,6 +360,9 @@ function gen_rectangle_mesh(
     order = 1,
     bnd_names = ("North", "South", "East", "West"),
     n_partitions = 0,
+    write_geo = false,
+    transfinite_lines = true,
+    lc = 1e-1,
     kwargs...,
 )
     #         North
@@ -367,7 +374,6 @@ function gen_rectangle_mesh(
     #         South
     gmsh.initialize()
     _apply_gmsh_options(; kwargs...)
-    lc = 1e-1
 
     # Points
     A = gmsh.model.geo.addPoint(xc - lx / 2, yc - ly / 2, 0, lc)
@@ -388,10 +394,12 @@ function gen_rectangle_mesh(
     surf = gmsh.model.geo.addPlaneSurface([ABCD])
 
     # Mesh settings
-    gmsh.model.geo.mesh.setTransfiniteCurve(AB, nx)
-    gmsh.model.geo.mesh.setTransfiniteCurve(BC, ny)
-    gmsh.model.geo.mesh.setTransfiniteCurve(CD, nx)
-    gmsh.model.geo.mesh.setTransfiniteCurve(DA, ny)
+    if transfinite_lines
+        gmsh.model.geo.mesh.setTransfiniteCurve(AB, nx)
+        gmsh.model.geo.mesh.setTransfiniteCurve(BC, ny)
+        gmsh.model.geo.mesh.setTransfiniteCurve(CD, nx)
+        gmsh.model.geo.mesh.setTransfiniteCurve(DA, ny)
+    end
 
     (transfinite || type == :quad) && gmsh.model.geo.mesh.setTransfiniteSurface(surf)
 
@@ -418,7 +426,13 @@ function gen_rectangle_mesh(
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
+    rm(output; force = true)
     gmsh.write(output)
+    if write_geo
+        output_geo = first(splitext(output)) * ".geo_unrolled"
+        rm(output_geo; force = true)
+        gmsh.write(output_geo)
+    end
 
     # End
     gmsh.finalize()
@@ -1357,6 +1371,7 @@ nodes_gmsh2cgns(e::Type{Tri12_t}) = nodes(e) #same numbering between CGNS and Gm
 nodes_gmsh2cgns(e::Type{Quad4_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Quad8_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Quad9_t}) = nodes(e) #same numbering between CGNS and Gmsh
+nodes_gmsh2cgns(e::Type{Quad16_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Tetra4_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Tetra10_t}) = nodes(e) #same numbering between CGNS and Gmsh
 nodes_gmsh2cgns(e::Type{Hexa8_t}) = nodes(e) #same numbering between CGNS and Gmsh
