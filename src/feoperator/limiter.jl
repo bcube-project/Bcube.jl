@@ -61,6 +61,14 @@ function linear_scaling_limiter_coef(
     MeshCellData(limiter), MeshCellData(mean)
 end
 
+"""
+    _mean_minmax_cells!(minval_mean, maxval_mean, mean, mesh)
+
+For each cell, compute the min and max of mean values (in the `mean` array)
+of the neighbor cells.
+
+So `minval_mean[i]` is the minimum of the mean values of cells surrounding cell `i`.
+"""
 function _mean_minmax_cells!(minval_mean, maxval_mean, mean, mesh)
     f2c = connectivities_indices(mesh, :f2c)
 
@@ -122,6 +130,11 @@ function _minmax_cells(v, mesh, quadrature)
     return val
 end
 
+"""
+    _minmax_cells!(minval, maxval, v, dω)
+
+Compute the min and max values of `v` in each cell of `dω`
+"""
 function _minmax_cells!(minval, maxval, v, dω)
     domain = get_domain(dω)
     quadrature = get_quadrature(dω)
@@ -261,6 +274,15 @@ end
 # here we assume that f is define in ref. space
 _minmax(f, quadrule::AbstractQuadratureRule) = extrema(f(ξ) for ξ in get_nodes(quadrule))
 
+"""
+    _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M)
+
+v̅ᵢ = mean
+mᵢ = minval
+Mᵢ = maxval
+m = minval_mean
+M = maxval_mean
+"""
 function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M)
     (Mᵢ - v̅ᵢ) < -10eps() && error("Invalid max value :  Mᵢ=$Mᵢ, v̅ᵢ=$v̅ᵢ")
     (v̅ᵢ - mᵢ) < -10eps() && error("Invalid min value :  mᵢ=$mᵢ, v̅ᵢ=$v̅ᵢ")

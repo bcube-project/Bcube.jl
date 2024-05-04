@@ -1,118 +1,3 @@
-
-"""
-    normal(ctype::AbstractEntityType, cnodes, iside, ξ)
-    normal(::TopologyStyle, ctype::AbstractEntityType, cnodes, iside, ξ)
-
-Normal vector of the `iside`th face of a cell, evaluated at position `ξ` in the face reference element.
-So for the normal vector of the face of triangle living in a 3D space, `ξ` will be 1D (because the face
-is a line, which 1D).
-
-Beware this function needs the nodes `cnodes` and the type `ctype` of the cell (and not of the face).
-
-TODO: If `iside` is positive, then the outward normal (with respect to the cell) is returned, otherwise
-the inward normal is returned.
-
-# `::isCurvilinear`
-Note that the "face" normal vector of a curve is the "direction" vector at the given extremity.
-
-# `::isVolumic`
-``n^{loc} = J^{-\\intercal} n^{ref}``
-
-"""
-function normal(ctype::AbstractEntityType, cnodes, iside, ξ)
-    normal(topology_style(ctype, cnodes), ctype, cnodes, iside, ξ)
-end
-
-function normal(::isCurvilinear, ctype::AbstractEntityType, cnodes, iside, ξ)
-    # mapping face-reference-element (here, a node) to cell-reference-element (here, a Line)
-    # Since a Line has always only two nodes, the node is necessary the `iside`-th
-    ξ_cell = get_coords(Line())[iside]
-
-    return normalize(mapping_jacobian(ctype, cnodes, ξ_cell) .* normal(shape(ctype), iside))
-end
-
-function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
-    # Get cell shape and face type and shape
-    cshape = shape(ctype)
-    ftype = facetypes(ctype)[iside]
-
-    # Get face nodes
-    fnodes = [cnodes[i] for i in faces2nodes(ctype)[iside]] # @ghislainb : need better solution to index
-
-    # Get face direction vector (face Jacobian)
-    u = mapping_jacobian(ftype, fnodes, ξ)
-
-    # Get face parametrization function
-    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
-
-    # Compute surface jacobian
-    J = mapping_jacobian(ctype, cnodes, fp(ξ))
-
-    # Compute vector that will help orient outward normal
-    orient = mapping(ctype, cnodes, fp(ξ)) - center(ctype, cnodes)
-
-    # Normal direction
-    n = J[:, 1] × J[:, 2] × u
-
-    # Orient normal outward and normalize
-    return normalize(orient ⋅ n .* n)
-end
-
-function normal(::isVolumic, ctype::AbstractEntityType, cnodes, iside, ξ)
-    # Cell shape
-    cshape = shape(ctype)
-
-    # Face parametrization to send ξ from ref-face-element to the ref-cell-element
-    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
-
-    # Inverse of the Jacobian matrix (but here `y` is in the cell-reference element)
-    # Warning : do not use `mapping_inv_jacobian` which requires the knowledge of `mapping_inv` (useless here)
-    Jinv(y) = mapping_jacobian_inv(ctype, cnodes, y)
-
-    return normalize(transpose(Jinv(fp(ξ))) * normal(cshape, iside))
-end
-
-"""
-    cell_normal(ctype::AbstractEntityType, cnodes, ξ) where {T, N}
-
-Compute the cell normal vector of an entity of topology dimension equals to (d-1) in a n-D space,
-for instance a curve in a 2D space. This vector is expressed in the cell-reference coordinate system.
-
-Do not confuse the cell normal vector with the cell-side (i.e face) normal vector.
-
-# Topology dimension 1
-the curve direction vector, u, is J/||J||. Then n = [-u.y, u.x].
-
-"""
-function cell_normal(
-    ctype::AbstractEntityType{1},
-    cnodes::AbstractArray{Node{2, T}, N},
-    ξ,
-) where {T, N}
-    Jref = mapping_jacobian(ctype, cnodes, ξ)
-    return normalize(SA[-Jref[2], Jref[1]])
-end
-
-function cell_normal(
-    ctype::AbstractEntityType{2},
-    cnodes::AbstractArray{Node{3, T}, N},
-    ξ,
-) where {T, N}
-    J = mapping_jacobian(ctype, cnodes, ξ)
-    return normalize(J[:, 1] × J[:, 2])
-end
-
-"""
-    center(ctype::AbstractEntityType, cnodes)
-
-Return the center of the `AbstractEntityType` by mapping the center of the corresponding `Shape`.
-
-# Warning
-Do not use this function on a face of a cell : since the face is of dimension "n-1", the mapping
-won't be appropriate.
-"""
-center(ctype::AbstractEntityType, cnodes) = mapping(ctype, cnodes, center(shape(ctype)))
-
 """
     ∂λξ_∂x(::AbstractFunctionSpace, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where N
 
@@ -241,31 +126,6 @@ function _∂λξ_∂x_hypersurface(fs, ctype, cnodes, ξ)
     return ∇λ
 end
 
-"""
-    mapping_jacobian_hypersurface(ctype, cnodes, ξ)
-
-"Augmented" jacobian matrix of the mapping.
-
-Let's consider a ``\\mathbb{R}^2`` surface in ``\\mathbb{R}^3``. The mapping
-``F_\\Gamma(\\xi, \\eta)`` maps the reference coordinate system to the physical coordinate
-system. It's jacobian ``J_\\Gamma`` is not squared. We can 'extend' this mapping to reach any point in
-``\\mathbb{R}^3`` (and not only the surface) using
-```math
-F(\\xi, \\eta, \\zeta) = F_\\Gamma(\\xi, \\eta) + \\zeta \\nu
-```
-where ``\\nu`` is the conormal. Then the restriction of the squared jacobian of ``F``
-to the surface is simply
-```math
-J|_\\Gamma = (J_\\Gamma~~\\nu)
-```
-"""
-function mapping_jacobian_hypersurface(ctype, cnodes, ξ)
-    Jref = mapping_jacobian(ctype, cnodes, ξ)
-    ν = cell_normal(ctype, cnodes, ξ)
-    J = hcat(Jref, ν)
-    return J
-end
-
 function ∂λξ_∂x_hypersurface(
     ::AbstractFunctionSpace,
     ::AbstractEntityType{1},
@@ -313,18 +173,6 @@ function ∂fξ_∂x_hypersurface(f, ::Val{N}, ctype::AbstractEntityType, cnodes
     J = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
 
     return ∇f * inv(J)
-end
-
-""" get mesh cell centers coordinates (assuming perfectly flat cells)"""
-function get_cell_centers(mesh::Mesh)
-    c2n = connectivities_indices(mesh, :c2n)
-    celltypes = cells(mesh)
-    centers = map(1:ncells(mesh)) do icell
-        ctype = celltypes[icell]
-        cnodes = get_nodes(mesh, c2n[icell])
-        center(ctype, cnodes)
-    end
-    return centers
 end
 
 """

@@ -231,11 +231,18 @@ end
 
 """
     mapping_det_jacobian(ctype::AbstractEntityType, cnodes, ξ)
+    mapping_det_jacobian(::TopologyStyle, ctype::AbstractEntityType, cnodes, ξ)
 
 Absolute value of the determinant of the mapping Jacobian matrix, expressed in the reference element.
 
 # Implementation
-Default version using `mapping_jacobian`, but can be specified for each shape.
+For a volumic cell (line in 1D, quad in 2D, cube in 3D), the default version uses `mapping_jacobian`,
+but the function can be specified for each shape.
+
+For a curvilinear cell (line in 2D, or in 3D), the formula is always J = ||F'|| where F is the mapping.
+Hence we always fallback to the "standard" version, like for the volumic case.
+
+Finally, the surfacic cell (quad in 3D) needs a special treatment, see [`mapping_jacobian_hypersurface`](@ref).
 
 # `::Bar2_t`
 Absolute value of the determinant of the mapping Jacobian matrix for the
@@ -246,17 +253,44 @@ reference 2-nodes bar [-1,1] to the local bar mapping.
 Absolute value of the determinant of the mapping Jacobian matrix for the
 the reference 3-nodes Triangle [0,1] x [0,1] to the local triangle mapping.
 
-`` |J| = |(x_2 - x_1) (y_3 - y_1) - (x_3 - x_1) (y_2 - y_1)|``
+``|J| = |(x_2 - x_1) (y_3 - y_1) - (x_3 - x_1) (y_2 - y_1)|``
 """
 function mapping_det_jacobian(ctype::AbstractEntityType, cnodes, ξ)
     abs(det(mapping_jacobian(ctype, cnodes, ξ)))
 end
 
-mapping_det_jacobian(::isVolumic, ctype, cnodes, ξ) = mapping_det_jacobian(ctype, cnodes, ξ)
-
-function mapping_det_jacobian(::Union{isCurvilinear, isSurfacic}, ctype, cnodes, ξ)
+function mapping_det_jacobian(::isSurfacic, ctype, cnodes, ξ)
     jac = mapping_jacobian_hypersurface(ctype, cnodes, ξ)
     return abs(det(jac))
+end
+
+function mapping_det_jacobian(::Union{isCurvilinear, isVolumic}, ctype, cnodes, ξ)
+    mapping_det_jacobian(ctype, cnodes, ξ)
+end
+
+"""
+    mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+
+"Augmented" jacobian matrix of the mapping.
+
+Let's consider a ``\\mathbb{R}^2`` surface in ``\\mathbb{R}^3``. The mapping
+``F_\\Gamma(\\xi, \\eta)`` maps the reference coordinate system to the physical coordinate
+system. It's jacobian ``J_\\Gamma`` is not squared. We can 'extend' this mapping to reach any point in
+``\\mathbb{R}^3`` (and not only the surface) using
+```math
+F(\\xi, \\eta, \\zeta) = F_\\Gamma(\\xi, \\eta) + \\zeta \\nu
+```
+where ``\\nu`` is the conormal. Then the restriction of the squared jacobian of ``F``
+to the surface is simply
+```math
+J|_\\Gamma = (J_\\Gamma~~\\nu)
+```
+"""
+function mapping_jacobian_hypersurface(ctype, cnodes, ξ)
+    Jref = mapping_jacobian(ctype, cnodes, ξ)
+    ν = cell_normal(ctype, cnodes, ξ)
+    J = hcat(Jref, ν)
+    return J
 end
 
 """
@@ -291,12 +325,16 @@ end
 (m::MappingFace)(x) = m.f1(x)
 CallableStyle(::Type{<:MappingFace}) = IsCallableStyle()
 
-# POINT : this may seem stupid, but it is usefull for coherence
+#---------------- POINT : this may seem stupid, but it is usefull for coherence
 mapping(::Node_t, cnodes, ξ) = cnodes[1].x
 mapping(::Point, cnodes, ξ) = mapping(Node_t(), cnodes, ξ)
 
-# LINE
+#---------------- LINE
 mapping(::Line, cnodes, ξ) = mapping(Bar2_t(), cnodes, ξ)
+
+function mapping_det_jacobian(ctype::AbstractEntityType{1}, cnodes, ξ)
+    norm(mapping_jacobian(ctype, cnodes, ξ))
+end
 
 function mapping(::Bar2_t, cnodes, ξ)
     (cnodes[2].x - cnodes[1].x) / 2.0 .* ξ + (cnodes[2].x + cnodes[1].x) / 2.0
@@ -334,7 +372,7 @@ function mapping_jacobian_inv(::Bar3_t, cnodes, ξ)
     (cnodes[1].x .* (2 .* ξ .- 1) + cnodes[2].x .* (2 .* ξ .+ 1) - cnodes[3].x .* 4 .* ξ)
 end
 
-# TRIANGLE P1
+#---------------- TRIANGLE P1
 mapping(::Triangle, cnodes, ξ) = mapping(Tri3_t(), cnodes, ξ)
 
 function mapping(::Tri3_t, cnodes, ξ)
@@ -399,7 +437,7 @@ function mapping_det_jacobian(::Tri3_t, cnodes, ξ)
     return abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
 end
 
-# Quad P1
+#---------------- Quad P1
 mapping(::Square, cnodes, ξ) = mapping(Quad4_t(), cnodes, ξ)
 
 function mapping(::Quad4_t, cnodes, ξ)
@@ -480,7 +518,7 @@ function mapping_det_jacobian(::Quad4_t, cnodes::AbstractArray{<:Node{2, T}}, ξ
     ) / 16.0
 end
 
-# TRIANGLE P2
+#---------------- TRIANGLE P2
 function mapping(::Tri6_t, cnodes, ξ)
     # Shape functions
     λ₁  = (1 - ξ[1] - ξ[2]) * (1 - 2 * ξ[1] - 2 * ξ[2])  # = (1 - x - y)(1 - 2x - 2y)
@@ -503,7 +541,7 @@ function mapping(::Tri6_t, cnodes, ξ)
     )
 end
 
-# PARAQUAD P2
+#---------------- PARAQUAD P2
 function mapping(::Quad9_t, cnodes, ξ)
     # Shape functions
     λ₁ = ξ[1] * ξ[2] * (1 - ξ[1]) * (1 - ξ[2]) / 4 # =   xy (1 - x)(1 - y) / 4
@@ -575,7 +613,7 @@ function mapping(ctype::Union{Quad16_t}, cnodes, ξ)
     return sum(((λ, node),) -> λ .* get_coords(node), zip(λs, cnodes))
 end
 
-# Hexa8
+#---------------- Hexa8
 mapping(::Cube, cnodes, ξ) = mapping(Hexa8_t(), cnodes, ξ)
 
 function mapping(::Hexa8_t, cnodes, ξηζ)
@@ -623,7 +661,7 @@ function mapping_jacobian(::Hexa8_t, cnodes, ξηζ)
     ) ./ 8.0
 end
 
-# Hexa27
+#---------------- Hexa27
 function mapping(::Hexa27_t, cnodes, ξηζ)
     ξ = ξηζ[1]
     η = ξηζ[2]
@@ -673,7 +711,7 @@ function mapping(::Tetra4_t, cnodes, ξ)
            ξ[3] .* cnodes[4].x
 end
 
-# Penta6
+#---------------- Penta6
 mapping(::Prism, cnodes, ξ) = mapping(Penta6_t(), cnodes, ξ)
 
 function mapping(::Penta6_t, cnodes, ξηζ)
@@ -705,4 +743,134 @@ function mapping_jacobian(::Penta6_t, cnodes, ξηζ)
         (1 - ζ) * (M3 - M1) + (1 + ζ) * (M6 - M4),
         (1 - ξ - η) * (M4 - M1) + ξ * (M5 - M2) + η * (M6 - M3),
     ) ./ 2.0
+end
+
+"""
+    normal(ctype::AbstractEntityType, cnodes, iside, ξ)
+    normal(::TopologyStyle, ctype::AbstractEntityType, cnodes, iside, ξ)
+
+Normal vector of the `iside`th face of a cell, evaluated at position `ξ` in the face reference element.
+So for the normal vector of the face of triangle living in a 3D space, `ξ` will be 1D (because the face
+is a line, which 1D).
+
+Beware this function needs the nodes `cnodes` and the type `ctype` of the cell (and not of the face).
+
+TODO: If `iside` is positive, then the outward normal (with respect to the cell) is returned, otherwise
+the inward normal is returned.
+
+# `::isCurvilinear`
+Note that the "face" normal vector of a curve is the "direction" vector at the given extremity.
+
+# `::isVolumic`
+``n^{loc} = J^{-\\intercal} n^{ref}``
+
+"""
+function normal(ctype::AbstractEntityType, cnodes, iside, ξ)
+    normal(topology_style(ctype, cnodes), ctype, cnodes, iside, ξ)
+end
+
+function normal(::isCurvilinear, ctype::AbstractEntityType, cnodes, iside, ξ)
+    # mapping face-reference-element (here, a node) to cell-reference-element (here, a Line)
+    # Since a Line has always only two nodes, the node is necessary the `iside`-th
+    ξ_cell = get_coords(Line())[iside]
+
+    return normalize(mapping_jacobian(ctype, cnodes, ξ_cell) .* normal(shape(ctype), iside))
+end
+
+function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
+    # Get cell shape and face type and shape
+    cshape = shape(ctype)
+    ftype = facetypes(ctype)[iside]
+
+    # Get face nodes
+    fnodes = [cnodes[i] for i in faces2nodes(ctype)[iside]] # @ghislainb : need better solution to index
+
+    # Get face direction vector (face Jacobian)
+    u = mapping_jacobian(ftype, fnodes, ξ)
+
+    # Get face parametrization function
+    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
+
+    # Compute surface jacobian
+    J = mapping_jacobian(ctype, cnodes, fp(ξ))
+
+    # Compute vector that will help orient outward normal
+    orient = mapping(ctype, cnodes, fp(ξ)) - center(ctype, cnodes)
+
+    # Normal direction
+    n = J[:, 1] × J[:, 2] × u
+
+    # Orient normal outward and normalize
+    return normalize(orient ⋅ n .* n)
+end
+
+function normal(::isVolumic, ctype::AbstractEntityType, cnodes, iside, ξ)
+    # Cell shape
+    cshape = shape(ctype)
+
+    # Face parametrization to send ξ from ref-face-element to the ref-cell-element
+    fp = mapping_face(cshape, iside) # mapping face-ref -> cell-ref
+
+    # Inverse of the Jacobian matrix (but here `y` is in the cell-reference element)
+    # Warning : do not use `mapping_inv_jacobian` which requires the knowledge of `mapping_inv` (useless here)
+    Jinv(y) = mapping_jacobian_inv(ctype, cnodes, y)
+
+    return normalize(transpose(Jinv(fp(ξ))) * normal(cshape, iside))
+end
+
+"""
+    cell_normal(ctype::AbstractEntityType, cnodes, ξ) where {T, N}
+
+Compute the cell normal vector of an entity of topology dimension equals to (d-1) in a n-D space,
+for instance a curve in a 2D space. This vector is expressed in the cell-reference coordinate system.
+
+Do not confuse the cell normal vector with the cell-side (i.e face) normal vector.
+
+# Topology dimension 1
+the curve direction vector, u, is J/||J||. Then n = [-u.y, u.x].
+
+"""
+function cell_normal(
+    ctype::AbstractEntityType{1},
+    cnodes::AbstractArray{Node{2, T}, N},
+    ξ,
+) where {T, N}
+    Jref = mapping_jacobian(ctype, cnodes, ξ)
+    return normalize(SA[-Jref[2], Jref[1]])
+end
+
+function cell_normal(
+    ctype::AbstractEntityType{2},
+    cnodes::AbstractArray{Node{3, T}, N},
+    ξ,
+) where {T, N}
+    J = mapping_jacobian(ctype, cnodes, ξ)
+    return normalize(J[:, 1] × J[:, 2])
+end
+
+"""
+    center(ctype::AbstractEntityType, cnodes)
+
+Return the center of the `AbstractEntityType` by mapping the center of the corresponding `Shape`.
+
+# Warning
+Do not use this function on a face of a cell : since the face is of dimension "n-1", the mapping
+won't be appropriate.
+"""
+center(ctype::AbstractEntityType, cnodes) = mapping(ctype, cnodes, center(shape(ctype)))
+
+"""
+    get_cell_centers(mesh::Mesh)
+
+Get mesh cell centers coordinates (assuming perfectly flat cells)
+"""
+function get_cell_centers(mesh::Mesh)
+    c2n = connectivities_indices(mesh, :c2n)
+    celltypes = cells(mesh)
+    centers = map(1:ncells(mesh)) do icell
+        ctype = celltypes[icell]
+        cnodes = get_nodes(mesh, c2n[icell])
+        center(ctype, cnodes)
+    end
+    return centers
 end
