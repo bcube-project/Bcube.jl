@@ -7,6 +7,7 @@ struct Square <: AbstractShape{2} end
 struct Tetra <: AbstractShape{3} end
 struct Prism <: AbstractShape{3} end
 struct Cube <: AbstractShape{3} end
+struct Pyramid <: AbstractShape{3} end
 
 """
     shape(::AbstractEntityType)
@@ -29,6 +30,7 @@ shape(::Quad9_t) = Square()
 shape(::Quad16_t) = Square()
 shape(::Hexa8_t) = Cube()
 shape(::Penta6_t) = Prism()
+shape(::Pyra5_t) = Pyramid()
 shape(::Tetra4_t) = Tetra()
 shape(::Tetra10_t) = Tetra()
 
@@ -180,6 +182,7 @@ nvertices(::Square) = nnodes(Quad4_t())
 nvertices(::Tetra) = nnodes(Tetra4_t())
 nvertices(::Cube) = nnodes(Hexa8_t())
 nvertices(::Prism) = nnodes(Penta6_t())
+nvertices(::Pyramid) = nnodes(Pyra5_t())
 
 nedges(::Line) = nedges(Bar2_t())
 nedges(::Triangle) = nedges(Tri3_t())
@@ -187,6 +190,7 @@ nedges(::Square) = nedges(Quad4_t())
 nedges(::Tetra) = nedges(Tetra4_t())
 nedges(::Cube) = nedges(Hexa8_t())
 nedges(::Prism) = nedges(Penta6_t())
+nedges(::Pyramid) = nedges(Pyra5_t())
 
 nfaces(::Line) = nfaces(Bar2_t())
 nfaces(::Triangle) = nfaces(Tri3_t())
@@ -194,6 +198,7 @@ nfaces(::Square) = nfaces(Quad4_t())
 nfaces(::Tetra) = nfaces(Tetra4_t())
 nfaces(::Cube) = nfaces(Hexa8_t())
 nfaces(::Prism) = nfaces(Penta6_t())
+nfaces(::Pyramid) = nfaces(Pyra5_t())
 
 get_coords(::Line) = (SA[-1.0], SA[1.0])
 get_coords(::Triangle) = (SA[0.0, 0.0], SA[1.0, 0.0], SA[0.0, 1.0])
@@ -223,6 +228,15 @@ function get_coords(::Prism)
         SA[0.0, 1.0, 1.0],
     )
 end
+function get_coords(::Pyramid)
+    (
+        SA[-1.0, -1.0, 0.0],
+        SA[1.0, -1.0, 0.0],
+        SA[1.0, 1.0, 0.0],
+        SA[-1.0, 1.0, 0.0],
+        SA[0.0, 0.0, 1.0],
+    )
+end
 
 face_area(::Line) = SA[1.0, 1.0]
 face_area(::Triangle) = SA[1.0, √(2.0), 1.0]
@@ -230,6 +244,7 @@ face_area(::Square) = SA[2.0, 2.0, 2.0, 2.0]
 face_area(::Cube) = SA[4.0, 4.0, 4.0, 4.0, 4.0, 4.0]
 face_area(::Tetra) = SA[0.5, 0.5, 0.5 * √(3.0), 0.5]
 face_area(::Prism) = SA[2.0, 2 * √(2.0), 2.0, 0.5, 0.5]
+face_area(::Pyramid) = SA[4.0, √(2.0), √(2.0), √(2.0), √(2.0)]
 
 faces2nodes(::Line) = (SA[1], SA[2])
 faces2nodes(::Triangle) = (SA[1, 2], SA[2, 3], SA[3, 1])
@@ -249,6 +264,9 @@ function faces2nodes(::Tetra)
 end
 function faces2nodes(::Prism)
     (SA[1, 2, 5, 4], SA[2, 3, 6, 5], SA[3, 1, 4, 6], SA[1, 3, 2], SA[4, 5, 6])
+end
+function faces2nodes(::Pyramid)
+    (SA[1, 4, 3, 2], SA[1, 2, 5], SA[2, 3, 5], SA[3, 4, 5], SA[4, 1, 5])
 end
 
 # Normals
@@ -277,6 +295,15 @@ function normals(::Prism)
         SA[0.0, 0.0, 1.0],
     )
 end
+function normals(::Pyramid)
+    (
+        SA[0.0, 0.0, -1.0],
+        SA[0.0, -√(2.0) / 2.0, √(2.0) / 2.0],
+        SA[√(2.0) / 2.0, 0.0, √(2.0) / 2.0],
+        SA[0.0, √(2.0) / 2.0, √(2.0) / 2.0],
+        SA[-√(2.0) / 2.0, 0.0, √(2.0) / 2.0],
+    )
+end
 
 # Centers
 center(::Line) = SA[0.0]
@@ -285,6 +312,7 @@ center(::Square) = SA[0.0, 0.0]
 center(::Cube) = SA[0.0, 0.0, 0.0]
 center(::Tetra) = SA[0.25, 0.25, 0.25]
 center(::Prism) = SA[1.0 / 3.0, 1.0 / 3.0, 0.0]
+center(::Pyramid) = SA[0.0, 0.0, 1.0 / 5.0]
 
 # Face shapes : see notes in generic function documentation
 face_shapes(::Line) = (Point(), Point())
@@ -292,6 +320,7 @@ face_shapes(shape::Union{Triangle, Square}) = ntuple(i -> Line(), nfaces(shape))
 face_shapes(shape::Cube) = ntuple(i -> Square(), nfaces(shape))
 face_shapes(shape::Tetra) = ntuple(i -> Triangle(), nfaces(shape))
 face_shapes(::Prism) = (Square(), Square(), Square(), Triangle(), Triangle())
+face_shapes(::Pyramid) = (Square(), Triangle(), Triangle(), Triangle(), Triangle())
 
 # Measure
 measure(::Line) = 2.0
@@ -300,3 +329,4 @@ measure(::Square) = 4.0
 measure(::Cube) = 8.0
 measure(::Tetra) = 1.0 / 6
 measure(::Prism) = 1.0
+measure(::Pyramid) = 4.0 / 3.0

@@ -465,6 +465,31 @@ end
 
 ndofs(::FunctionSpace{<:Lagrange, 1}, ::Prism) = 6
 
+# Pyramid
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Pyramid, ξ) = SA[1.0]
+ndofs(::FunctionSpace{<:Lagrange, 0}, ::Pyramid) = 1
+
+∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Pyramid, ξ) = SA[0.0 0.0]
+
+function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Pyramid, ξηζ)
+    ξ = ξηζ[1]
+    η = ξηζ[2]
+    ζ = ξηζ[3]
+
+    # to avoid a singularity in z = 1, we replace (1-ζ) (which is always a
+    # positive quantity), by (1 + ε - ζ).
+    ε = eps()
+    return SA[
+        (1 - ξ - ζ) * (1 - η - ζ) / (4 * (1 + ε - ζ))
+        (1 + ξ - ζ) * (1 - η - ζ) / (4 * (1 + ε - ζ))
+        (1 + ξ - ζ) * (1 + η - ζ) / (4 * (1 + ε - ζ))
+        (1 - ξ - ζ) * (1 + η - ζ) / (4 * (1 + ε - ζ))
+        ζ
+    ]
+end
+
+ndofs(::FunctionSpace{<:Lagrange, 1}, ::Pyramid) = 5
+
 # bmxam/remark : I first tried to write "generic" functions covering multiple case. But it's easy to
 # forget some case and think they are already covered. In the end, it's easier to write them all explicitely,
 # except for the one I wrote that are very intuitive (at least for me).

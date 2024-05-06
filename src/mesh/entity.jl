@@ -32,6 +32,7 @@ struct Tetra10_t <: AbstractEntityType{3} end
 struct Hexa8_t <: AbstractEntityType{3} end
 struct Hexa27_t <: AbstractEntityType{3} end
 struct Penta6_t <: AbstractEntityType{3} end
+struct Pyra5_t <: AbstractEntityType{3} end
 struct Poly2_t{N, M} <: AbstractEntityType{2} end
 struct Poly3_t{N, M} <: AbstractEntityType{3} end
 
@@ -419,6 +420,20 @@ end
     ((1, 2, 5, 4), (2, 3, 6, 5), (3, 1, 4, 6), (1, 3, 2), (4, 5, 6))
 end
 @inline facetypes(::Type{Penta6_t}) = (Quad4_t(), Quad4_t(), Quad4_t(), Tri3_t(), Tri3_t())
+
+#---- Pyra5_t ----
+@inline nnodes(::Type{Pyra5_t}) = 5
+@inline nodes(::Type{Pyra5_t}) = (1, 2, 3, 4, 5)
+@inline nedges(::Type{Pyra5_t}) = 8
+@inline function edges2nodes(::Type{Pyra5_t})
+    ((1, 2), (2, 3), (3, 4), (4, 1), (1, 5), (2, 5), (3, 5), (4, 5))
+end
+@inline edgetypes(::Type{Pyra5_t}) = ntuple(Bar2_t(), nedges(Pyra5_t()))
+@inline nfaces(::Type{Pyra5_t}) = 5
+@inline function faces2nodes(::Type{Pyra5_t})
+    ((1, 4, 3, 2), (1, 2, 5), (2, 3, 5), (3, 4, 5), (4, 1, 5))
+end
+@inline facetypes(::Type{Pyra5_t}) = (Quad4_t(), Tri3_t(), Tri3_t(), Tri3_t(), Tri3_t())
 
 #---- Poly2_t ----
 @inline nnodes(::Type{Poly2_t}) = error("Function ‘nnodes‘ is not defined for ‘Poly2_t‘")

@@ -229,6 +229,7 @@ vtk_entity(::Tetra4_t) = VTKCellTypes.VTK_TETRA
 vtk_entity(::Tetra10_t) = VTKCellTypes.VTK_QUADRATIC_TETRA
 vtk_entity(::Penta6_t) = VTKCellTypes.VTK_WEDGE
 vtk_entity(::Hexa8_t) = VTKCellTypes.VTK_HEXAHEDRON
+vtk_entity(::Pyra5_t) = VTKCellTypes.VTK_PYRAMID
 #vtk_entity(::Hexa27_t) = VTK_TRIQUADRATIC_HEXAHEDRON # NEED TO CHECK NODE NUMBERING : https://vtk.org/doc/nightly/html/classvtkTriQuadraticHexahedron.html
 
 vtk_entity(::Line, ::Val{Degree}) where {Degree} = VTKCellTypes.VTK_LAGRANGE_CURVE

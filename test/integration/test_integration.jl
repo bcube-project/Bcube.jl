@@ -562,7 +562,7 @@
             zmax = 2.5,
         )
         c2n = connectivities_indices(mesh, :c2n)
-        cInfo = Bcube.CellInfo(mesh, 1)
+        cInfo = CellInfo(mesh, 1)
         @test integrate_on_ref_element(x -> 1, cInfo, Quadrature(1)) == 0.75
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)
@@ -578,5 +578,27 @@
         g = PhysicalFunction(x -> 1)
         b = compute(∫(g)dΩ)
         @test sum(b) ≈ 3.1365484905459
+    end
+
+    @testset "Lagrange pyramid" begin
+        # One mesh cell. Volume is base_area * height / 3
+        mesh = one_cell_mesh(
+            :pyra;
+            xmin = 1.0,
+            xmax = 2.0,
+            ymin = 1.0,
+            ymax = 2.0,
+            zmin = 1.0,
+            zmax = 2.5,
+        )
+        c2n = connectivities_indices(mesh, :c2n)
+        cInfo = CellInfo(mesh, 1)
+        for d in 1:5
+            @test integrate_on_ref_element(x -> 1, cInfo, Quadrature(d)) ≈ 0.5
+        end
+        dΩ = Measure(CellDomain(mesh), 2)
+        g = PhysicalFunction(x -> 1)
+        b = compute(∫(g)dΩ)
+        @test b[1] ≈ 0.5
     end
 end

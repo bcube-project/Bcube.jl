@@ -10,6 +10,7 @@ const GMSHTYPE = Dict(
     4 => Tetra4_t(),
     5 => Hexa8_t(),
     6 => Penta6_t(),
+    7 => Pyra5_t(),
     9 => Tri6_t(),
     10 => Quad9_t(),
     21 => Tri9_t(),
@@ -1345,7 +1346,9 @@ end
 """
     nodes_gmsh2cgns(entity::AbstractEntityType, nodes::AbstractArray)
 
-Reorder `nodes` of a given `entity` from the Gmsh format to CGNS format
+Reorder `nodes` of a given `entity` from the Gmsh format to CGNS format.
+
+See https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering
 """
 function nodes_gmsh2cgns(entity::AbstractEntityType, nodes::AbstractArray)
     map(i -> nodes[i], nodes_gmsh2cgns(entity))
@@ -1404,6 +1407,7 @@ function nodes_gmsh2cgns(::Type{Hexa27_t})
     ]
 end
 nodes_gmsh2cgns(e::Type{Penta6_t}) = nodes(e) #same numbering between CGNS and Gmsh
+nodes_gmsh2cgns(e::Type{Pyra5_t}) = nodes(e) #same numbering between CGNS and Gmsh
 
 """
 Convert a cell->node connectivity with gmsh numbering convention to a cell->node connectivity
