@@ -572,7 +572,7 @@ function _coplanar_rotation(
     # u = _sin / ||_sin||
     # So we must ensure that `_sin` is not 0, otherwise we return the null vector
     norm_sin = norm(_sin)
-    u = norm_sin > eps(norm_sin) ? normalize(_sin) : _sin
+    u = norm_sin > eps(norm_sin) ? _sin ./ norm_sin : _sin
 
     _R = _cos * I + _cross_product_matrix(_sin) + (1 - _cos) * (u ⊗ u)
 
