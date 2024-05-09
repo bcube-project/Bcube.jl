@@ -420,71 +420,6 @@ function LazyOperators.materialize(
 end
 
 """
-Represent the tangential projector associated to an hypersurface. Its expression is
-```math
-    P = I - \\nu \\otimes \\nu
-```
-where ``\\nu`` is the cell normal vector.
-"""
-struct TangentialProjector <: AbstractLazy end
-
-LazyOperators.materialize(P::TangentialProjector, ::CellInfo) = P
-
-function LazyOperators.materialize(
-    ::TangentialProjector,
-    cPoint::CellPoint{ReferenceDomain},
-)
-    cnodes = get_cellnodes(cPoint)
-    ctype = get_celltype(cPoint)
-    ξ = get_coords(cPoint)
-    return _tangential_projector(cnodes, ctype, ξ)
-end
-
-function LazyOperators.materialize(
-    P::TangentialProjector,
-    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
-)
-    P
-end
-
-function LazyOperators.materialize(
-    ::TangentialProjector,
-    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
-)
-    fPoint, = get_args(sideFacePoint)
-    fInfo = get_faceinfo(fPoint)
-    cInfo = get_cellinfo_n(fInfo)
-    cnodes = nodes(cInfo)
-    ctype = celltype(cInfo)
-    ξcell = get_coords(side_n(fPoint))
-
-    return _tangential_projector(cnodes, ctype, ξcell)
-end
-
-function LazyOperators.materialize(
-    ::TangentialProjector,
-    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
-)
-    fPoint, = get_args(sideFacePoint)
-    fInfo = get_faceinfo(fPoint)
-    cInfo = get_cellinfo_p(fInfo)
-    cnodes = nodes(cInfo)
-    ctype = celltype(cInfo)
-    ξcell = get_coords(side_p(fPoint))
-
-    return _tangential_projector(cnodes, ctype, ξcell)
-end
-
-"""
-Warning : `cell_normal` is a "cell" operator, not a "face" operator.
-So ξ is expected to be in the reference domain of the cell.
-"""
-function _tangential_projector(cnodes, ctype, ξ)
-    ν = cell_normal(ctype, cnodes, ξ)
-    return I - (ν ⊗ ν)
-end
-
-"""
 Hypersurface "face" operator that rotates around the face-axis to virtually
 bring back the two adjacent cells in the same plane.
 """
@@ -609,6 +544,44 @@ function LazyOperators.materialize(::CellNormal, cPoint::CellPoint{ReferenceDoma
     ξ = get_coords(cPoint)
     return cell_normal(ctype, cnodes, ξ)
 end
+
+function LazyOperators.materialize(
+    ν::CellNormal,
+    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    ν
+end
+
+function LazyOperators.materialize(
+    ::CellNormal,
+    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+    cInfo = get_cellinfo_n(fInfo)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    ξcell = get_coords(side_n(fPoint))
+
+    return cell_normal(ctype, cnodes, ξcell)
+end
+
+function LazyOperators.materialize(
+    ::CellNormal,
+    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+    cInfo = get_cellinfo_p(fInfo)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    ξcell = get_coords(side_p(fPoint))
+
+    return cell_normal(ctype, cnodes, ξcell)
+end
+
+_tangeantial_projector(ν) = I - (ν ⊗ ν)
+tangential_projector(mesh) = _tangeantial_projector ∘ CellNormal(mesh)
 
 LazyOperators.materialize(f::Function, ::CellInfo) = f
 LazyOperators.materialize(f::Function, ::CellPoint) = f
