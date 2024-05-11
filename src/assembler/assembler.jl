@@ -186,8 +186,12 @@ julia> assemble_linear(l, V)
  0.25
 ```
 """
-function assemble_linear(l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace})
-    b = zeros(get_ndofs(V)) # TODO : specify the eltype (Float64, Dual,...)
+function assemble_linear(
+    l::Function,
+    V::Union{TestFESpace, AbstractMultiTestFESpace};
+    T = Float64,
+)
+    b = zeros(T, get_ndofs(V))
     assemble_linear!(b, l, V)
     return b
 end

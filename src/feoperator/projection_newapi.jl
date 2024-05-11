@@ -50,7 +50,7 @@ function projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass 
         A = mass
     end
     l(v) = ∫(f ⋅ v)dΩ
-    b = assemble_linear(l, V)
+    b = assemble_linear(l, V; T = get_return_type(f, dΩ))
     x = A \ b
     set_dof_values!(u, x)
     return nothing
@@ -105,7 +105,7 @@ function cell_mean(u::MultiFieldFEFunction, cache::Tuple{Vararg{CellMeanCache}})
 end
 function cell_mean(u::AbstractFEFunction, cache::CellMeanCache)
     Umean = get_fespace(cache)
-    u_mean = FEFunction(Umean)
+    u_mean = FEFunction(Umean, get_dof_type(u))
     projection_l2!(u_mean, u, get_measure(cache); mass = get_mass_matrix(cache))
     values = _reshape_cell_mean(u_mean, Val(get_size(Umean)))
     return MeshCellData(values)

@@ -637,3 +637,11 @@ LazyOperators.materialize(f::Function, ::AbstractLazy) = f
 LazyOperators.materialize(a::AbstractArray{<:Number}, ::AbstractLazy) = a
 LazyOperators.materialize(a::Number, ::AbstractLazy) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::AbstractLazy) = a
+
+# TODO : find a better place and a better granularity
+function get_return_type(f, domain::AbstractDomain)
+    f1 = materialize(f, first(DomainIterator(domain)))
+    elementPoint = get_dummy_element_point(domain)
+    value = materialize(f1, elementPoint)
+    return eltype(value)
+end

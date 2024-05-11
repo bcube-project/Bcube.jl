@@ -321,7 +321,7 @@ function linear_scaling_limiter(
     mass = nothing,
 ) where {N, Me, BC <: PeriodicBCType}
     lim_u, u̅ = linear_scaling_limiter_coef(u, dω, bounds, DMPrelax, periodicBCs)
-    u_lim = FEFunction(get_fespace(u))
+    u_lim = FEFunction(get_fespace(u), get_dof_type(u))
     projection_l2!(u_lim, u̅ + lim_u * (u - u̅), dω; mass = mass)
     lim_u, u_lim
 end

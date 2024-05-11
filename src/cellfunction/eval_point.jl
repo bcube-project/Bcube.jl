@@ -216,3 +216,23 @@ function change_domain(p::FacePoint{ReferenceDomain}, ::PhysicalDomain)
     x_phy = _apply_mapping(m, get_coords(p))
     FacePoint(x_phy, faceInfo, PhysicalDomain())
 end
+
+ElementPoint(x, elementInfo::CellInfo, ds) = CellPoint(x, elementInfo, ds)
+ElementPoint(x, elementInfo::FaceInfo, ds) = FacePoint(x, elementInfo, ds)
+
+"""
+    get_dummy_element_point(domain::AbstractDomain)
+
+Return a `CellPoint` (or a `FacePoint` depending on the
+type of `domain`) associated with the first element on the
+domain and whose coordinates correspond to the origin of
+its `ReferenceDomain`.
+This utility function can be used to easily materialize
+a `CellFunction` and know the type of the result for example.
+"""
+function get_dummy_element_point(domain::AbstractDomain)
+    mesh = get_mesh(domain)
+    elementInfo = first(DomainIterator(domain))
+    xnode1 = get_coords(get_nodes(mesh, 1))
+    ElementPoint(zero(xnode1), elementInfo, ReferenceDomain())
+end
