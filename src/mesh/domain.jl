@@ -233,6 +233,12 @@ function BoundaryFaceDomain(mesh::AbstractMesh, args...; kwargs...)
     BoundaryFaceDomain(parent(mesh), args...; kwargs...)
 end
 
+"""
+    abstract type AbstractDomainIndex
+
+## Interface :
+get_element_type(::AbstractDomainIndex)
+"""
 abstract type AbstractDomainIndex end
 
 abstract type AbstractCellInfo <: AbstractDomainIndex end
@@ -250,6 +256,7 @@ end
 @inline celltype(c::CellInfo) = c.ctype
 @inline nodes(c::CellInfo) = c.nodes
 @inline get_nodes_index(c::CellInfo) = c.c2n
+@inline get_element_type(c::CellInfo) = celltype(c)
 
 """ Legacy constructor for CellInfo : no information about node indices """
 CellInfo(icell, ctype, nodes) = CellInfo(icell, ctype, nodes, nothing)
@@ -285,7 +292,9 @@ end
 @inline celltype(c::CellSide) = c.ctype
 @inline nodes(c::CellSide) = c.nodes
 @inline cell2nodes(c::CellSide) = c.c2n
+@inline get_element_type(c::CellSide) = celltype(c)
 
+abstract type AbstractFaceInfo <: AbstractDomainIndex end
 """
     FaceInfo{CN<:CellInfo,CP<:CellInfo,FT,FN,F2N,I}
 
@@ -302,7 +311,7 @@ are duplicate from the negative ones.
 is stored explicitely in `FaceInfo` even if it could have been
 computed by collecting info from the side of the negative or positive cells.
 """
-struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N, I}
+struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N, I} <: AbstractFaceInfo
     cellinfo_n::CN
     cellinfo_p::CP
     cellside_n::Int
@@ -379,6 +388,7 @@ get_cellinfo_p(faceInfo::FaceInfo) = faceInfo.cellinfo_p
 @inline get_nodes_index(faceInfo::FaceInfo) = faceInfo.f2n
 get_cell_side_n(faceInfo::FaceInfo) = faceInfo.cellside_n
 get_cell_side_p(faceInfo::FaceInfo) = faceInfo.cellside_p
+@inline get_element_type(c::FaceInfo) = facetype(c)
 
 """
 Return the opposite side of the `FaceInfo` : cellside "n" because cellside "p"

@@ -454,60 +454,36 @@ function LazyOperators.materialize(
     sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
 )
     cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p = _unpack_face_point(sideFacePoint)
-    return _coplanar_rotation(cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p)
+
+    # We choose to use `cell_normal` instead of `normal`,
+    # but we could do the same with the latter.
+    ν_n = cell_normal(ctype_n, cnodes_n, ξ_n)
+    ν_p = cell_normal(ctype_p, cnodes_p, ξ_p)
+
+    return _coplanar_rotation(ν_n, ν_p)
 end
 
 function LazyOperators.materialize(
-    ::CoplanarRotation,
+    cr::CoplanarRotation,
     sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
 )
-    cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p = _unpack_face_point(sideFacePoint)
-    return _coplanar_rotation(cnodes_p, cnodes_n, ctype_p, ctype_n, ξ_p, ξ_n)
+    fPoint, = get_args(sideFacePoint)
+    materialize(cr, side_n(opposite_side(fPoint)))
 end
 
-function _coplanar_rotation(
-    cnodes_n::AbstractArray{Node{2, T}, N},
-    cnodes_p,
-    ctype_n::AbstractEntityType{1},
-    ctype_p,
-    ξ_n,
-    ξ_p,
-) where {T, N}
-
-    # We choose to use `cell_normal` instead of `normal`,
-    # but we could do the same with the latter.
-    ν_n = cell_normal(ctype_n, cnodes_n, ξ_n)
-    ν_p = cell_normal(ctype_p, cnodes_p, ξ_p)
-
+function _coplanar_rotation(ν_n::SVector{2}, ν_p::SVector{2})
     _cos = ν_p ⋅ ν_n
     _sin = ν_p[1] * ν_n[2] - ν_p[2] * ν_n[1] # 2D-vector cross-product
-
-    _R = SA[_cos (-_sin); _sin _cos]
-
-    return _R
+    R = SA[_cos (-_sin); _sin _cos]
+    return R
 end
 
-function _coplanar_rotation(
-    cnodes_n::AbstractArray{Node{3, T}, N},
-    cnodes_p,
-    ctype_n::AbstractEntityType{2},
-    ctype_p,
-    ξ_n,
-    ξ_p,
-) where {T, N}
-
-    # We choose to use `cell_normal` instead of `normal`,
-    # but we could do the same with the latter.
-    ν_n = cell_normal(ctype_n, cnodes_n, ξ_n)
-    ν_p = cell_normal(ctype_p, cnodes_p, ξ_p)
-
+function _coplanar_rotation(ν_n::SVector{3}, ν_p::SVector{3})
     _cos = ν_p ⋅ ν_n
     _sin = cross(ν_p, ν_n) # this is not really a 'sinus', it is (sinus x u)
     u = normalize(_sin) # WARNING, SHOULD CHECK IF NOT ZERO
-
-    _R = _cos * I + _cross_product_matrix(_sin) + (1 - _cos) * (u ⊗ u)
-
-    return _R
+    R = _cos * I + _cross_product_matrix(_sin) + (1 - _cos) * (u ⊗ u)
+    return R
 end
 
 """
