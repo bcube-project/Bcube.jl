@@ -47,5 +47,37 @@
             fname = basename * ".vtu"
             @test fname2sum[fname] == bytes2hex(open(sha1, joinpath(tempdir, fname)))
         end
+
+        # add var MeshCellData :
+        quad = Quadrature(4)
+        dΩ = Measure(CellDomain(mesh), quad)
+        vars["umean"] = Bcube.cell_mean(u, dΩ)
+        U_export = TrialFESpace(FunctionSpace(:Lagrange, 4), mesh)
+        basename = "write_vtk_lagrange_deg4_with_mean"
+        Bcube.write_vtk_lagrange(
+            joinpath(tempdir, basename),
+            vars,
+            mesh,
+            U_export;
+            vtkversion = v"1.0",
+        )
+
+        # Check
+        fname = basename * ".vtu"
+        @test fname2sum[fname] == bytes2hex(open(sha1, joinpath(tempdir, fname)))
+
+        U_export = TrialFESpace(FunctionSpace(:Lagrange, 4), mesh, :discontinuous)
+        basename = "write_vtk_lagrange_deg4_dg_with_mean"
+        Bcube.write_vtk_lagrange(
+            joinpath(tempdir, basename),
+            vars,
+            mesh,
+            U_export;
+            vtkversion = v"1.0",
+        )
+
+        # Check
+        fname = basename * ".vtu"
+        @test fname2sum[fname] == bytes2hex(open(sha1, joinpath(tempdir, fname)))
     end
 end
