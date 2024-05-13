@@ -221,18 +221,25 @@ ElementPoint(x, elementInfo::CellInfo, ds) = CellPoint(x, elementInfo, ds)
 ElementPoint(x, elementInfo::FaceInfo, ds) = FacePoint(x, elementInfo, ds)
 
 """
+    get_dummy_element_point(elementInfo::AbstractDomainIndex)
     get_dummy_element_point(domain::AbstractDomain)
 
 Return a `CellPoint` (or a `FacePoint` depending on the
-type of `domain`) associated with the first element on the
-domain and whose coordinates correspond to the origin of
-its `ReferenceDomain`.
-This utility function can be used to easily materialize
-a `CellFunction` and know the type of the result for example.
+type of `elementInfo`) whose coordinates are equals
+to the center of the reference shape of the element.
+
+For a `domain` argument, the point is built from its firt element.
+
+# Devs notes:
+These utility functions can be used to easily materialize
+a `CellFunction` and get the type of the result for example.
 """
+function get_dummy_element_point(elementInfo::AbstractDomainIndex)
+    x = center(shape(get_element_type(elementInfo)))
+    ElementPoint(x, elementInfo, ReferenceDomain())
+end
+
 function get_dummy_element_point(domain::AbstractDomain)
-    mesh = get_mesh(domain)
     elementInfo = first(DomainIterator(domain))
-    xnode1 = get_coords(get_nodes(mesh, 1))
-    ElementPoint(zero(xnode1), elementInfo, ReferenceDomain())
+    get_dummy_element_point(elementInfo)
 end

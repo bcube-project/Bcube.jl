@@ -50,7 +50,8 @@ function projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass 
         A = mass
     end
     l(v) = ∫(f ⋅ v)dΩ
-    b = assemble_linear(l, V; T = get_return_type(f, get_domain(dΩ)))
+    T, = get_return_type_and_codim(f, get_domain(dΩ))
+    b = assemble_linear(l, V; T = T)
     x = A \ b
     set_dof_values!(u, x)
     return nothing

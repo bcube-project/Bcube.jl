@@ -386,11 +386,11 @@ function write_vtk_lagrange(
     nd = ndofs(dhl_export)
 
     # Get ncomps and type of each `point` variable
-    dimtype = map(var -> _codim_and_type(var, mesh), values(vars_point))
+    type_dim = map(var -> get_return_type_and_codim(var, mesh), values(vars_point))
 
     # VTK stuff
     coords_vtk = zeros(spacedim(mesh), nd)
-    values_vtk = map(_dimtype -> zeros(last(_dimtype), first(_dimtype)..., nd), dimtype)
+    values_vtk = map(((_t, _d),) -> zeros(_t, _d..., nd), type_dim)
     cells_vtk = MeshCell[]
     sizehint!(cells_vtk, ncells(mesh))
     nodeweigth_vtk = zeros(nd)

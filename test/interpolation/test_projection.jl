@@ -85,13 +85,13 @@
 
     @testset "misc" begin
         mesh = one_cell_mesh(:quad)
-        N, T = Bcube._codim_and_type(PhysicalFunction(x -> x[1]), mesh)
+        T, N = Bcube.get_return_type_and_codim(PhysicalFunction(x -> x[1]), mesh)
         @test N == (1,)
         @test T == Float64
-        N, T = Bcube._codim_and_type(PhysicalFunction(x -> 1), mesh)
+        T, N = Bcube.get_return_type_and_codim(PhysicalFunction(x -> 1), mesh)
         @test N == (1,)
         @test T == Int
-        N, T = Bcube._codim_and_type(PhysicalFunction(x -> x), mesh)
+        T, N = Bcube.get_return_type_and_codim(PhysicalFunction(x -> x), mesh)
         @test N == (2,)
         @test T == Float64
     end
