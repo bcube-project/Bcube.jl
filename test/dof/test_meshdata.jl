@@ -35,6 +35,13 @@
             _cellFuncs = Bcube.materialize(cellFuncs, cInfo)
             @test Bcube.materialize(_cellFuncs, cPointRef) == funcs[i](cPointPhy)
         end
+
+        #--- Test 3, MeshCellData in face integration
+        mesh = rectangle_mesh(2, 2; xmin = 0, xmax = 3, ymin = -1, ymax = 1)
+        data = MeshCellData(ones(ncells(mesh)))
+        dΓ = Measure(BoundaryFaceDomain(mesh), 1)
+        values = nonzeros(Bcube.compute(∫(side_n(data))dΓ))
+        @test isapprox_arrays(values, [3.0, 2.0, 3.0, 2.0])
     end
 
     @testset "FaceData" begin
