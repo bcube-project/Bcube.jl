@@ -432,8 +432,12 @@
             # High-level API
             faceInfo = FaceInfo(mesh, kface)
 
-            for (i, fnode) in enumerate(fnodes)
-                ξface = get_coords(fshape)[i]
+            # Note that in the following for-loop :
+            # `length(fnodes) > length(get_coords(fshape))`
+            # for high-order (>1) entities. Then, high-order
+            # nodes are not tested.
+            # TODO : test high-order nodes (mid-face node, ...)
+            for (ξface, fnode) in zip(get_coords(fshape), fnodes)
                 @test isapprox(Fface(ξface), fnode.x)
                 @test isapprox(Fᵢ(fpᵢ(ξface)), fnode.x)
                 @test isapprox(Fⱼ(fpⱼ(ξface)), fnode.x)
