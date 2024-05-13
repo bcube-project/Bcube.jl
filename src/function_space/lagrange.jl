@@ -771,6 +771,21 @@ function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
     (SA[1, 2, 5, 4], SA[2, 3, 6, 5], SA[3, 1, 4, 6], SA[1, 3, 2], SA[4, 5, 6])
 end
 
+# Pyramid
+function idof_by_edge(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid)
+    ntuple(i -> SA[], nedges(shape))
+end
+function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid)
+    (SA[1, 2], SA[2, 3], SA[3, 4], SA[4, 1], SA[1, 5], SA[2, 5], SA[3, 5], SA[4, 5])
+end
+
+function idof_by_face(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid)
+    ntuple(i -> SA[], nfaces(shape))
+end
+function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid)
+    (SA[1, 4, 3, 2], SA[1, 2, 5], SA[2, 3, 5], SA[3, 4, 5], SA[4, 1, 5])
+end
+
 # Generic versions for Lagrange 0 and 1 (any shape)
 get_coords(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape) = (center(shape),)
 get_coords(::FunctionSpace{<:Lagrange, 1}, shape::AbstractShape) = get_coords(shape)
