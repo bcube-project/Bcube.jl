@@ -2,6 +2,16 @@
 """
 Abstract structure for the different types of function space, for
 instance the Lagrange function space, the Taylor function space etc.
+
+# Devs notes
+All subtypes should implement the following functions:
+* `ndofs(::AbstractFunctionSpace, ::AbstractShape)`
+* `_scalar_shape_functions(::AbstractFunctionSpace, ::AbstractShape, ξ)`
+* `idof_by_vertex(::AbstractFunctionSpace, ::AbstractShape)`
+* `idof_by_edge(::AbstractFunctionSpace, ::AbstractShape)`
+* `idof_by_edge_with_bounds(::AbstractFunctionSpace, ::AbstractShape)`
+* `idof_by_face(::AbstractFunctionSpace, ::AbstractShape)`
+* `idof_by_face_with_bounds(::AbstractFunctionSpace, ::AbstractShape)`
 """
 abstract type AbstractFunctionSpaceType end
 
