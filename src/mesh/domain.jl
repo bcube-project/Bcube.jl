@@ -435,7 +435,6 @@ end
 
 function _get_index(domain::AbstractCellDomain, i::Integer)
     icell = indices(domain)[i]
-    i ≠ icell && error("Only dense indexing is supported (i=$i  icell=$icell)")  # TODO
     mesh = get_mesh(domain)
     _get_cellinfo(mesh, icell)
 end
