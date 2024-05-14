@@ -637,3 +637,27 @@ LazyOperators.materialize(f::Function, ::AbstractLazy) = f
 LazyOperators.materialize(a::AbstractArray{<:Number}, ::AbstractLazy) = a
 LazyOperators.materialize(a::Number, ::AbstractLazy) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::AbstractLazy) = a
+
+"""
+    get_return_type_and_codim(f::AbstractLazy, elementInfo::AbstractDomainIndex)
+    get_return_type_and_codim(f::AbstractLazy, domain::AbstractDomain)
+    get_return_type_and_codim(f::AbstractLazy, mesh::AbstractMesh)
+
+Evaluate the returned type and the codimension of `materialize(f,x)` where
+`x` is a `ElementPoint` from `elementInfo` (or `domain`/`mesh`).
+The returned codimension is always a Tuple, even for a scalar.
+"""
+function get_return_type_and_codim(f::AbstractLazy, elementInfo::AbstractDomainIndex)
+    fₑ = materialize(f, elementInfo)
+    elementPoint = get_dummy_element_point(elementInfo)
+    value = materialize(fₑ, elementPoint)
+    N = value isa Number ? (1,) : size(value)
+    T = eltype(value)
+    return T, N
+end
+function get_return_type_and_codim(f::AbstractLazy, domain::AbstractDomain)
+    get_return_type_and_codim(f, first(DomainIterator(domain)))
+end
+function get_return_type_and_codim(f::AbstractLazy, mesh::AbstractMesh)
+    get_return_type_and_codim(f, CellInfo(mesh, 1))
+end

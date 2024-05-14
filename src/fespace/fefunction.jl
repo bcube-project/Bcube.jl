@@ -17,7 +17,9 @@ end
 function get_fespace(f::AbstractFEFunction)
     error("`get_fespace` is not defined for $(typeof(f))")
 end
-
+function get_dof_type(f::AbstractFEFunction)
+    error("`get_dof_type` is not defined for type $(typeof(f))")
+end
 function get_dof_values(f::AbstractFEFunction)
     error("`get_dof_values` is not defined for type $(typeof(f))")
 end
@@ -83,18 +85,24 @@ function SingleFieldFEFunction(feSpace::AbstractFESpace, dofValues)
     return SingleFieldFEFunction{size, FE, V}(feSpace, dofValues)
 end
 
-function FEFunction(feSpace::AbstractFESpace, dofValues = allocate_dofs(feSpace))
+function FEFunction(feSpace::AbstractFESpace, dofValues)
     SingleFieldFEFunction(feSpace, dofValues)
 end
 
+function FEFunction(feSpace::AbstractFESpace, T::Type{<:Number} = Float64)
+    dofValues = allocate_dofs(feSpace, T)
+    FEFunction(feSpace, dofValues)
+end
+
 function FEFunction(feSpace::AbstractFESpace, constant::Number)
-    feFunction = FEFunction(feSpace)
+    feFunction = FEFunction(feSpace, typeof(constant))
     feFunction.dofValues .= constant
     return feFunction
 end
 
 get_fespace(f::SingleFieldFEFunction) = f.feSpace
 get_ncomponents(f::SingleFieldFEFunction) = get_ncomponents(get_fespace(f))
+get_dof_type(f::SingleFieldFEFunction) = eltype(get_dof_values(f))
 get_dof_values(f::SingleFieldFEFunction) = f.dofValues
 function get_dof_values(f::SingleFieldFEFunction, icell)
     feSpace = get_fespace(f)
@@ -140,6 +148,10 @@ end
 end
 @inline _get_mfe_space(mfeFunc::MultiFieldFEFunction) = mfeFunc.mfeSpace
 
+function get_dof_type(mfeFunc::MultiFieldFEFunction)
+    mapreduce(get_dof_type, promote, (mfeFunc...,))
+end
+
 """
 Update the vector `u` with the values of each `FEFunction` composing this MultiFieldFEFunction.
 The mapping of the associated MultiFESpace is respected.
@@ -151,7 +163,7 @@ function get_dof_values!(u::AbstractVector{<:Number}, mfeFunc::MultiFieldFEFunct
 end
 
 function get_dof_values(mfeFunc::MultiFieldFEFunction)
-    u = allocate_dofs(_get_mfe_space(mfeFunc))
+    u = mapreduce(get_dof_values, vcat, (mfeFunc...,))
     get_dof_values!(u, mfeFunc)
     return u
 end
