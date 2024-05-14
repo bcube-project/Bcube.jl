@@ -33,6 +33,24 @@ function LazyOperators.materialize(data::MeshData{CellData}, cInfo::CellInfo)
 end
 
 function LazyOperators.materialize(
+    data::MeshData{CellData},
+    side::Side⁻{Nothing, <:Tuple{<:FaceInfo}},
+)
+    fInfo = get_args(side)[1]
+    cInfo_n = get_cellinfo_n(fInfo)
+    return materialize(data, cInfo_n)
+end
+
+function LazyOperators.materialize(
+    data::MeshData{CellData},
+    side::Side⁺{Nothing, <:Tuple{<:FaceInfo}},
+)
+    fInfo = get_args(side)[1]
+    cInfo_p = get_cellinfo_p(fInfo)
+    return materialize(data, cInfo_p)
+end
+
+function LazyOperators.materialize(
     data::MeshData{FaceData},
     side::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
 )

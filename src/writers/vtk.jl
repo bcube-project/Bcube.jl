@@ -332,17 +332,19 @@ end
         vtk_kwargs...,
     ) where {F <: AbstractLazy}
 
-Write the provided FEFunction on the mesh with the precision of the Lagrange FESpace provided.
+Write the provided FEFunction/MeshCellData/CellFunction on the mesh with
+the precision of the Lagrange FESpace provided.
 
-`vars` is a dictionnary of variable name => FEFunction to write.
+`vars` is a dictionnary of variable name => Union{FEFunction,MeshCellData,CellFunction} to write.
 
 # Example
 ```julia
 mesh = rectangle_mesh(6, 7; xmin = -1, xmax = 1.0, ymin = -1, ymax = 1.0)
+f_u = PhysicalFunction(x -> x[1]^2 + x[2]^2)
 u = FEFunction(TrialFESpace(FunctionSpace(:Lagrange, 4), mesh))
-projection_l2!(u, PhysicalFunction(x -> x[1]^2 + x[2]^2), mesh)
+projection_l2!(u, f_u, mesh)
 
-vars = Dict("u" => u, "grad_u" => ∇(u))
+vars = Dict("f_u" => f_u, "u" => u, "grad_u" => ∇(u))
 
 for degree_export in 1:5
     U_export = TrialFESpace(FunctionSpace(:Lagrange, degree_export), mesh)
@@ -370,7 +372,11 @@ function write_vtk_lagrange(
     collection_append = false,
     vtk_kwargs...,
 ) where {F <: AbstractLazy}
-    _vars = collect(values(vars))
+    # extract all `MeshCellData` in `vars` as this type of variable
+    # will not be interpolated to nodes and will be written with
+    # the `VTKCellData` attribute.
+    vars_cell = filter(((k, v),) -> v isa MeshData{<:CellData}, vars)
+    vars_point = filter(((k, v),) -> k ∉ keys(vars_cell), vars)
 
     # FE space stuff
     fs_export = get_function_space(U_export)
@@ -379,14 +385,15 @@ function write_vtk_lagrange(
     dhl_export = Bcube._get_dhl(U_export)
     nd = ndofs(dhl_export)
 
-    # Get ncomps and type of each variable
-    dimtype = map(var -> _codim_and_type(var, mesh), values(vars))
+    # Get ncomps and type of each `point` variable
+    type_dim = map(var -> get_return_type_and_codim(var, mesh), values(vars_point))
 
     # VTK stuff
     coords_vtk = zeros(spacedim(mesh), nd)
-    values_vtk = map(_dimtype -> zeros(last(_dimtype), first(_dimtype)..., nd), dimtype)
+    values_vtk = map(((_t, _d),) -> zeros(_t, _d..., nd), type_dim)
     cells_vtk = MeshCell[]
     sizehint!(cells_vtk, ncells(mesh))
+    nodeweigth_vtk = zeros(nd)
 
     # Loop over mesh cells
     for cinfo in DomainIterator(CellDomain(mesh))
@@ -411,11 +418,12 @@ function write_vtk_lagrange(
 
             # Map it to the physical domain and assign to VTK
             coords_vtk[:, iglob] .= get_coords(change_domain(cpoint, PhysicalDomain()))
+            nodeweigth_vtk[iglob] += 1.0
 
             # Evaluate all vars on this node
-            for (ivar, var) in enumerate(_vars)
+            for (ivar, var) in enumerate(values(vars_point))
                 _var = materialize(var, cinfo)
-                values_vtk[ivar][:, iglob] .= materialize(_var, cpoint)
+                values_vtk[ivar][:, iglob] .+= materialize(_var, cpoint)
             end
         end
 
@@ -427,13 +435,35 @@ function write_vtk_lagrange(
         )
     end
 
+    # Averaging contribution at nodes :
+    # For discontinuous variables written as a continuous
+    # field, node averaging is necessary because each adjacent
+    # cells gives different interpolated values at nodes, then
+    # a averaging step is used to define a unique node value.
+    # This step has no effect on node values for :
+    # - discontinuous variables written as a discontinous
+    #   fields as nodes are duplicated in this case and
+    #   there is one cell contribution for each duplicated
+    #   node (nodeweigth_vtk[i] is equal to 1, ∀i).
+    # - continous variables written as a continous fields
+    #   because interpolated values are all equals and
+    #   averaging gives the same value.
+    for val in values_vtk
+        for i in eachindex(nodeweigth_vtk)
+            val[:, i] .= val[:, i] ./ nodeweigth_vtk[i]
+        end
+    end
+
     # Write VTK file
     pvd = paraview_collection(basename; append = collection_append)
     new_name = _build_fname_with_iterations(basename, it)
     vtkfile = vtk_grid(new_name, coords_vtk, cells_vtk; vtk_kwargs...)
 
-    for (varname, value) in zip(keys(vars), values_vtk)
+    for (varname, value) in zip(keys(vars_point), values_vtk)
         vtkfile[varname, VTKPointData()] = value
+    end
+    for (varname, value) in zip(keys(vars_cell), values(vars_cell))
+        vtkfile[varname, VTKCellData()] = get_values(value)
     end
 
     pvd[float(time)] = vtkfile

@@ -301,9 +301,6 @@ function gen_line_mesh(
     # Mesh settings
     gmsh.model.geo.mesh.setTransfiniteCurve(AB, nx)
 
-    # Mesh order
-    gmsh.model.mesh.setOrder(order)
-
     # Define boundaries (`0` stands for 0D, i.e nodes)
     # ("-1" to create a new tag)
     gmsh.model.addPhysicalGroup(0, [A], -1, bnd_names[1])
@@ -313,6 +310,7 @@ function gen_line_mesh(
     # Gen mesh
     gmsh.model.geo.synchronize()
     gmsh.model.mesh.generate(1)
+    gmsh.model.mesh.setOrder(order) # Mesh order
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
@@ -421,8 +419,8 @@ function gen_rectangle_mesh(
     gmsh.model.setPhysicalName(2, domain, "Domain")
 
     # Gen mesh
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
@@ -536,8 +534,8 @@ function gen_mesh_around_disk(
     gmsh.model.setPhysicalName(2, domain, "Domain")
 
     # Gen mesh
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
@@ -645,8 +643,8 @@ function gen_rectangle_mesh_with_tri_and_quad(
     gmsh.model.setPhysicalName(2, domain, "Domain")
 
     # Gen mesh
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
@@ -797,8 +795,8 @@ function gen_hexa_mesh(
     gmsh.model.setPhysicalName(3, domain, "Domain")
 
     # Gen mesh
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.setOrder(order)
 
     # Write result
     gmsh.write(output)
@@ -857,8 +855,8 @@ function gen_disk_mesh(
     gmsh.model.setPhysicalName(2, domain, "Domain")
 
     # Gen mesh
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
@@ -940,8 +938,8 @@ function gen_star_disk_mesh(
     gmsh.model.setPhysicalName(2, domain, "Domain")
 
     # Gen mesh
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
@@ -1023,8 +1021,8 @@ function gen_cylinder_mesh(
     gmsh.model.setPhysicalName(3, domain, "Domain")
 
     # Gen mesh
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
@@ -1101,8 +1099,8 @@ function gen_sphere_mesh(
 
     # Gen mesh
     gmsh.model.geo.synchronize()
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result
@@ -1262,8 +1260,8 @@ function gen_cylinder_shell_mesh(
     gmsh.model.setPhysicalName(2, domain, "domain")
 
     # Gen mesh
-    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
     gmsh.model.mesh.partition(n_partitions)
 
     # Write result

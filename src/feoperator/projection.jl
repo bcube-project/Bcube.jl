@@ -10,7 +10,7 @@ all the data obtained from the neighbor cells of this node. We could use
 the surface area (among other possible choices).
 """
 function var_on_vertices(f::AbstractLazy, mesh::Mesh)
-    N, T = _codim_and_type(f, mesh)
+    T, N = get_return_type_and_codim(f, mesh)
     @assert length(N) <= 1 "N = $(length(N)) > 1 not supported yet"
     values = zeros(T, nnodes(mesh), N[1])
     _var_on_vertices!(values, f, mesh)
@@ -52,29 +52,6 @@ function _var_on_vertices!(values, f::AbstractLazy, mesh::Mesh)
 end
 
 """
-    _codim_and_type(f::AbstractLazy, mesh::Mesh)
-
-Evaluate the codimension of `f` and returned type. The returned codimension
-is always a Tuple of codimension(s), even for a scalar.
-"""
-function _codim_and_type(f::AbstractLazy, mesh::Mesh)
-    # Get info about first cell of the mesh
-    cInfo = CellInfo(mesh, 1)
-
-    # Materialize FE function on CellInfo
-    _f = materialize(f, cInfo)
-
-    # Evaluate the function on the center of the cell
-    cPoint = CellPoint(center(shape(celltype(cInfo))), cInfo, ReferenceDomain())
-    value = materialize(_f, cPoint)
-
-    # Codim and type
-    N = value isa Number ? (1,) : size(value)
-    T = eltype(value)
-    return N, T
-end
-
-"""
     var_on_centers(f::AbstractLazy, mesh::AbstractMesh)
 
 Interpolate solution on mesh centers.
@@ -82,7 +59,7 @@ Interpolate solution on mesh centers.
 The result is a (ncells, ncomps) matrix if ncomps > 1, or a (ncells) vector otherwise.
 """
 function var_on_centers(f::AbstractLazy, mesh::AbstractMesh)
-    N, T = _codim_and_type(f, mesh)
+    T, N = get_return_type_and_codim(f, mesh)
     @assert length(N) <= 1 "N = $(length(N)) > 1 not supported yet"
     values = zeros(T, ncells(mesh), N[1])
     _var_on_centers!(values, f, mesh)

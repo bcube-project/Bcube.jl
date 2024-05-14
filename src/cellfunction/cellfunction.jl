@@ -481,9 +481,15 @@ end
 function _coplanar_rotation(ν_n::SVector{3}, ν_p::SVector{3})
     _cos = ν_p ⋅ ν_n
     _sin = cross(ν_p, ν_n) # this is not really a 'sinus', it is (sinus x u)
-    u = normalize(_sin) # WARNING, SHOULD CHECK IF NOT ZERO
-    R = _cos * I + _cross_product_matrix(_sin) + (1 - _cos) * (u ⊗ u)
-    return R
+
+    # u = _sin / ||_sin||
+    # So we must ensure that `_sin` is not 0, otherwise we return the null vector
+    norm_sin = norm(_sin)
+    u = norm_sin > eps(norm_sin) ? _sin ./ norm_sin : _sin
+
+    _R = _cos * I + _cross_product_matrix(_sin) + (1 - _cos) * (u ⊗ u)
+
+    return _R
 end
 
 """
@@ -582,3 +588,27 @@ LazyOperators.materialize(f::Function, ::AbstractLazy) = f
 LazyOperators.materialize(a::AbstractArray{<:Number}, ::AbstractLazy) = a
 LazyOperators.materialize(a::Number, ::AbstractLazy) = a
 LazyOperators.materialize(a::LinearAlgebra.UniformScaling, ::AbstractLazy) = a
+
+"""
+    get_return_type_and_codim(f::AbstractLazy, elementInfo::AbstractDomainIndex)
+    get_return_type_and_codim(f::AbstractLazy, domain::AbstractDomain)
+    get_return_type_and_codim(f::AbstractLazy, mesh::AbstractMesh)
+
+Evaluate the returned type and the codimension of `materialize(f,x)` where
+`x` is a `ElementPoint` from `elementInfo` (or `domain`/`mesh`).
+The returned codimension is always a Tuple, even for a scalar.
+"""
+function get_return_type_and_codim(f::AbstractLazy, elementInfo::AbstractDomainIndex)
+    fₑ = materialize(f, elementInfo)
+    elementPoint = get_dummy_element_point(elementInfo)
+    value = materialize(fₑ, elementPoint)
+    N = value isa Number ? (1,) : size(value)
+    T = eltype(value)
+    return T, N
+end
+function get_return_type_and_codim(f::AbstractLazy, domain::AbstractDomain)
+    get_return_type_and_codim(f, first(DomainIterator(domain)))
+end
+function get_return_type_and_codim(f::AbstractLazy, mesh::AbstractMesh)
+    get_return_type_and_codim(f, CellInfo(mesh, 1))
+end
