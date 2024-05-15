@@ -5,7 +5,7 @@ instance the Lagrange function space, the Taylor function space etc.
 
 # Devs notes
 All subtypes should implement the following functions:
-* `ndofs(::AbstractFunctionSpace, ::AbstractShape)`
+* `get_ndofs(::AbstractFunctionSpace, ::AbstractShape)`
 * `_scalar_shape_functions(::AbstractFunctionSpace, ::AbstractShape, ξ)`
 * `idof_by_vertex(::AbstractFunctionSpace, ::AbstractShape)`
 * `idof_by_edge(::AbstractFunctionSpace, ::AbstractShape)`
@@ -107,7 +107,7 @@ function shape_functions_vec(
     shape::AbstractShape,
     ξ,
 ) where {N}
-    _ndofs = ndofs(fs, shape)
+    _ndofs = get_ndofs(fs, shape)
     if N == 1
         return SVector{_ndofs}(
             _scalar_shape_functions(fs, shape, ξ)[idof] for idof in 1:_ndofs
@@ -124,7 +124,7 @@ function shape_functions_vec(
     n::Val{N},
     shape::AbstractShape,
 ) where {N}
-    _ndofs = ndofs(fs, shape)
+    _ndofs = get_ndofs(fs, shape)
     if N == 1
         return SVector{_ndofs}(
             ξ -> _scalar_shape_functions(fs, shape, ξ)[idof] for idof in 1:_ndofs
@@ -249,11 +249,11 @@ function idof_by_vertex(::AbstractFunctionSpace, ::AbstractShape)
 end
 
 """
-    ndofs(fs::AbstractFunctionSpace, shape::AbstractShape)
+    get_ndofs(fs::AbstractFunctionSpace, shape::AbstractShape)
 
 Number of dofs associated to the given interpolation.
 """
-function ndofs(fs::AbstractFunctionSpace, shape::AbstractShape)
+function get_ndofs(fs::AbstractFunctionSpace, shape::AbstractShape)
     error(
         "Function 'ndofs' is not defined for the given FunctionSpace $fs and shape $shape",
     )

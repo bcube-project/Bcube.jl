@@ -128,9 +128,9 @@ function ∂λξ_∂ξ(::FunctionSpace{<:Taylor, 1}, ::Val{1}, ::Square, ξ)
 end
 
 # Number of dofs
-ndofs(::FunctionSpace{<:Taylor, N}, ::Line) where {N} = N + 1
-ndofs(::FunctionSpace{<:Taylor, 0}, ::Union{Square, Triangle}) = 1
-ndofs(::FunctionSpace{<:Taylor, 1}, ::Union{Square, Triangle}) = 3
+get_ndofs(::FunctionSpace{<:Taylor, N}, ::Line) where {N} = N + 1
+get_ndofs(::FunctionSpace{<:Taylor, 0}, ::Union{Square, Triangle}) = 1
+get_ndofs(::FunctionSpace{<:Taylor, 1}, ::Union{Square, Triangle}) = 3
 
 # For Taylor base there are never any dof on vertex, edge or face
 function idof_by_vertex(::FunctionSpace{<:Taylor, N}, shape::AbstractShape) where {N}

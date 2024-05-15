@@ -24,6 +24,9 @@ struct DofHandler
     # Number of dofs in each cell for each component. This can be computed from `offset`
     # but easily. It's faster and easier to store the information in this (ncells, ncomps)
     ndofs::Matrix{Int}
+
+    # Total number of unique DoFs
+    ndofs_tot::Int
 end
 
 """
@@ -47,7 +50,7 @@ function DofHandler(
     _ndofs = zeros(Int, ncells(mesh), ncomponents)
 
     # First we assume a "discontinuous" type
-    ndofs_tot = sum(cell -> ncomponents * ndofs(fSpace, shape(cell)), cells(mesh))
+    ndofs_tot = sum(cell -> ncomponents * get_ndofs(fSpace, shape(cell)), cells(mesh))
     iglob = collect(1:ndofs_tot)
     curr = 0 # Current offset value. Init to obtain '0' as the first element of `offset`
     next = 0 # Next offset value
@@ -56,10 +59,10 @@ function DofHandler(
             # Fill offset
             offset[icell, icomp] = curr + next
             curr = offset[icell, icomp]
-            next = ndofs(fSpace, shape(celltypes[icell]))
+            next = get_ndofs(fSpace, shape(celltypes[icell]))
 
             # Fill ndofs
-            _ndofs[icell, icomp] = ndofs(fSpace, shape(celltypes[icell]))
+            _ndofs[icell, icomp] = get_ndofs(fSpace, shape(celltypes[icell]))
         end
     end
 
@@ -148,13 +151,14 @@ function DofHandler(
 
     # Create a cell number remapping to ensure a dense numbering
     densify!(iglob)
-    return DofHandler(iglob, offset, _ndofs)
+    ndofs_tot = length(unique(iglob))
+    return DofHandler(iglob, offset, _ndofs, ndofs_tot)
 end
 
-@inline offset(dhl::DofHandler) = dhl.offset
-@inline offset(dhl::DofHandler, icell::Int, icomp::Int) = dhl.offset[icell, icomp]
-@inline iglob(dhl::DofHandler, i) = dhl.iglob[i]
-@inline iglob(dhl::DofHandler) = dhl.iglob
+@inline get_offset(dhl::DofHandler) = dhl.offset
+@inline get_offset(dhl::DofHandler, icell::Int, icomp::Int) = dhl.offset[icell, icomp]
+@inline get_iglob(dhl::DofHandler, i) = dhl.iglob[i]
+@inline get_iglob(dhl::DofHandler) = dhl.iglob
 
 """
     deal_with_dofs_on_vertices!(dict, iglob, offset, icell::Int, inodes_g, s::AbstractShape, kvar::Int, fs)
@@ -397,7 +401,7 @@ end
 #     @assert size(var) == 1 "Only SCALAR vars are supported"
 #     max_ndofs = 0
 #     for cell in cells(mesh)
-#         max_ndofs = max(max_ndofs, ndofs(function_space(var), shape(cell)))
+#         max_ndofs = max(max_ndofs, get_ndofs(function_space(var), shape(cell)))
 #     end
 #     return max_ndofs
 # end
@@ -411,7 +415,7 @@ Count maximum number of dofs per cell, all components mixed
 max_ndofs(dhl::DofHandler) = maximum(dhl.ndofs)
 
 """
-    ndofs(dhl, icell, kvar::Int)
+    get_ndofs(dhl, icell, kvar::Int)
 
 Number of dofs for a given variable in a given cell.
 
@@ -419,13 +423,13 @@ Number of dofs for a given variable in a given cell.
 ```julia
 mesh = one_cell_mesh(:line)
 dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show ndofs(dhl, 1, 1)
+@show get_ndofs(dhl, 1, 1)
 ```
 """
-@inline ndofs(dhl::DofHandler, icell, kvar::Int) = dhl.ndofs[icell, kvar]
+@inline get_ndofs(dhl::DofHandler, icell, kvar::Int) = dhl.ndofs[icell, kvar]
 
 """
-    ndofs(dhl, icell, icomp::Vector{Int})
+    get_ndofs(dhl, icell, icomp::Vector{Int})
 
 Number of dofs for a given set of components in a given cell.
 
@@ -434,18 +438,18 @@ Number of dofs for a given set of components in a given cell.
 ```julia
 mesh = one_cell_mesh(:line)
 dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1); size = 2))
-@show ndofs(dhl, 1, [1, 2])
+@show get_ndofs(dhl, 1, [1, 2])
 ```
 """
-@inline function ndofs(dhl::DofHandler, icell, icomp::AbstractVector{Int})
+@inline function get_ndofs(dhl::DofHandler, icell, icomp::AbstractVector{Int})
     sum(dhl.ndofs[icell, icomp])
 end
-@inline function ndofs(dhl::DofHandler, icell, icomp::UnitRange{Int})
+@inline function get_ndofs(dhl::DofHandler, icell, icomp::UnitRange{Int})
     sum(view(dhl.ndofs, icell:icell, icomp))
 end
 
 """
-    ndofs(dhl::DofHandler, icell)
+    get_ndofs(dhl::DofHandler, icell)
 
 Number of dofs for a given cell.
 
@@ -455,13 +459,13 @@ Note that for a vector variable, the total (accross all components) number of do
 ```julia
 mesh = one_cell_mesh(:line)
 dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show ndofs(dhl, 1, :u)
+@show get_ndofs(dhl, 1, :u)
 ```
 """
-ndofs(dhl::DofHandler, icell) = sum(view(dhl.ndofs, icell, :))
+get_ndofs(dhl::DofHandler, icell) = sum(view(dhl.ndofs, icell, :))
 
 """
-    ndofs(dhl::DofHandler)
+    get_ndofs(dhl::DofHandler)
 
 Total number of dofs. This function takes into account that dofs can be shared by multiple cells.
 
@@ -469,13 +473,13 @@ Total number of dofs. This function takes into account that dofs can be shared b
 ```julia
 mesh = one_cell_mesh(:line)
 dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show ndofs(dhl::DofHandler)
+@show get_ndofs(dhl::DofHandler)
 ```
 """
-ndofs(dhl::DofHandler) = length(unique(dhl.iglob))
+get_ndofs(dhl::DofHandler) = dhl.ndofs_tot
 
 """
-    dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
+    get_dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
 
 Global index of the `idof` local degree of freedom of component `icomp` in cell `icell`.
 
@@ -483,15 +487,15 @@ Global index of the `idof` local degree of freedom of component `icomp` in cell 
 ```julia
 mesh = one_cell_mesh(:line)
 dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show dof(dhl, 1, 1, 1)
+@show get_dof(dhl, 1, 1, 1)
 ```
 """
-function dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
+function get_dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
     dhl.iglob[dhl.offset[icell, icomp] + idof]
 end
 
 """
-    dof(dhl::DofHandler, icell, icomp::Int)
+    get_dof(dhl::DofHandler, icell, icomp::Int)
 
 Global indices of all the dofs of a given component in a given cell
 
@@ -499,25 +503,27 @@ Global indices of all the dofs of a given component in a given cell
 ```julia
 mesh = one_cell_mesh(:line)
 dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show dof(dhl, 1, 1)
+@show get_dof(dhl, 1, 1)
 ```
 """
-function dof(dhl::DofHandler, icell, icomp::Int)
-    view(dhl.iglob, dhl.offset[icell, icomp] .+ (1:ndofs(dhl, icell, icomp)))
+function get_dof(dhl::DofHandler, icell, icomp::Int)
+    view(dhl.iglob, dhl.offset[icell, icomp] .+ (1:get_ndofs(dhl, icell, icomp)))
 end
-dof(dhl::DofHandler, icell) = view(dhl.iglob, dhl.offset[icell, 1] .+ (1:ndofs(dhl, icell)))
-function dof(dhl::DofHandler, icell, ::Val{N}) where {N}
+function get_dof(dhl::DofHandler, icell)
+    view(dhl.iglob, dhl.offset[icell, 1] .+ (1:get_ndofs(dhl, icell)))
+end
+function get_dof(dhl::DofHandler, icell, ::Val{N}) where {N}
     dhl.iglob[dhl.offset[icell, 1] .+ SVector{N}(1:N)]
 end
-function dof(dhl::DofHandler, icell::UnitRange)
+function get_dof(dhl::DofHandler, icell::UnitRange)
     view(
         dhl.iglob,
         dhl.offset[first(icell), 1] .+
-        (1:(dhl.offset[last(icell), 1] + ndofs(dhl, last(icell)))),
+        (1:(dhl.offset[last(icell), 1] + get_ndofs(dhl, last(icell)))),
     )
 end
-function dof(dhl::DofHandler, icell, icomp::Int, ::Val{N}) where {N}
-    @assert N == ndofs(dhl, icell, icomp) "error N ≠ ndofs"
+function get_dof(dhl::DofHandler, icell, icomp::Int, ::Val{N}) where {N}
+    @assert N == get_ndofs(dhl, icell, icomp) "error N ≠ ndofs"
     dhl.iglob[dhl.offset[icell, icomp] .+ SVector{N}(1:N)]
 end
 

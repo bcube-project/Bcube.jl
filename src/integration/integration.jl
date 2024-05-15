@@ -132,7 +132,7 @@ function apply_quadrature_v2(
 end
 # splitting the previous function to have function barrier...
 function _apply_quadrature_v2(g_ref, ω, xq)
-    fquad = (w, x) -> _mapquad(w, g_ref(x))
+    fquad(w, x) = _mapquad(w, g_ref(x))
     mapreduce(fquad, _mapsum, ω, xq)
 end
 

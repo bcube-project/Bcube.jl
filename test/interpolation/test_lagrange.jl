@@ -8,7 +8,7 @@ Test if the lagrange shape functions are zeros on all nodes except on "their" co
 function test_lagrange_shape_function(shape, degree)
     @testset "Degree=$degree" begin
         fs = FunctionSpace(:Lagrange, degree)
-        expected = zeros(ndofs(fs, shape))
+        expected = zeros(get_ndofs(fs, shape))
         for (i, ξ) in enumerate(get_coords(fs, shape))
             expected .= 0.0
             expected[i] = 1.0
