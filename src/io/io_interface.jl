@@ -1,4 +1,6 @@
 abstract type AbstractIoHandler end
+struct CGNSIoHandler <: AbstractIoHandler end
+struct GMSHIoHandler <: AbstractIoHandler end
 
 """
     read_file([handler::AbstractIoHandler,] filepath::String; domainNames = nothing, varnames = nothing, kwargs...,)
@@ -30,7 +32,9 @@ function read_file(
     domainNames = String[],
     varnames = nothing,
     kwargs...,
-) end
+)
+    error("'read_file' is not implemented for $(typeof(handler))")
+end
 
 function read_file(filepath::String; domainNames = String[], varnames = nothing, kwargs...)
     read_file(_filename_to_handler(filepath), filepath; domainNames, varnames, kwargs...)
@@ -73,7 +77,9 @@ function write_file(
     time::Real = 0.0;
     collection_append = false,
     kwargs...,
-) where {F <: AbstractLazy} end
+) where {F <: AbstractLazy}
+    error("'write_file' is not implemented for $(typeof(handler))")
+end
 
 function write_file(
     basename::String,
