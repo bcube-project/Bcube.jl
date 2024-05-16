@@ -93,6 +93,7 @@ function read_zone(zone, varnames, topo_dim, space_dim, verbose)
 
     # Number of elements
     nvertices, ncells, nbnd = get_value(zone)
+    verbose && println("nvertices = $nvertices, ncells = $ncells")
 
     # Read GridCoordinates
     gridCoordinates = get_child(zone; type = "GridCoordinates_t")
@@ -173,7 +174,7 @@ function read_bc(bc, elts, verbose)
 
             # Loop over all the Elements_t 'nodes'
             for elt in elts
-                verbose && println("Searching for elements in Elements_t '$(elt.name)'")
+                # verbose && println("Searching for elements in Elements_t '$(elt.name)'")
                 i1, i2 = elt.erange
                 etype = cgns_entity_to_bcube_entity(first(elt.c2t))
                 nnodes_by_elt = nnodes(etype)
@@ -220,12 +221,62 @@ function read_bc(bc, elts, verbose)
             unique!(bcnodes)
 
         elseif !isnothing(pointList)
-            error("not implemented yet")
+            # Elements indices
+            elts_ind = vec(get_value(pointList))
+            sort!(elts_ind)
+
+            # Allocate the array of node indices corresponding to the BC
+            nelts_bc = length(elts_ind)
+            T = eltype(first(elts).c2n[1])
+            bcnodes = T[]
+            sizehint!(bcnodes, nelts_bc * 4) # we assume 4 nodes by elements
+
+            icurr = 1
+            for elt in elts
+                verbose && println("Searching for elements in Elements_t '$(elt.name)'")
+                i1, i2 = elt.erange
+                etype = cgns_entity_to_bcube_entity(first(elt.c2t))
+                nnodes_by_elt = nnodes(etype)
+
+                (icurr < i1) && continue
+                (icurr > i2) && continue
+
+                if elts_ind[end] >= i2
+                    iEnd = i2
+                else
+                    iEnd = findfirst(i -> i > i2, view(elts_ind, icurr:nelts_bc)) - 1
+                end
+                offset = (elts_ind[icurr] - i1) * nnodes_by_elt
+                push!(bcnodes, elt.c2n[(1 + offset):(nnodes_by_elt * (iEnd - i1 + 1))]...)
+                icurr = iEnd + 1
+
+                (icurr > nelts_bc) && break
+
+                # Element-wise version (OK, but very slow)
+                # while i1 <= elts_ind[icurr] <= i2
+                #     offset = (elts_ind[icurr] - i1) * nnodes_by_elt
+                #     push!(bcnodes, elt.c2n[(1 + offset):(offset + nnodes_by_elt)]...)
+                #     (icurr == nelts_bc) && break
+                #     icurr += 1
+                # end
+            end
+
+            @assert icurr >= nelts_bc
         else
             error("Could not find either the PointRange nor the PointList")
         end
     elseif bc_type == "Vertex"
-        error("not implemented yet")
+        if !isnothing(pointList)
+            bcnodes = get_value(pointList)
+        elseif !isnothing(indexRange)
+            erange = get_value(indexRange)
+            bcnodes = collect(erange[1]:erange[2])
+        else
+            error("Could not find either the PointRange nor the PointList")
+        end
+
+        # TODO : we could try to guess `bcdim` by search the Elements_t containing
+        # the points of the PointList
     else
         error("BC GridLocation '$(bc_type)' not implemented")
     end

@@ -48,7 +48,7 @@ function get_value(n::Node)
     data = get_wrapped_node(n)[" data"]
     if data_type == "C1"
         return String(UInt8.(data))
-    elseif data_type in ("I4", "R8")
+    elseif data_type in ("I4", "I8", "R4", "R8")
         return data
     else
         error("Datatype '$(data_type)' not handled")
