@@ -35,7 +35,7 @@ function Bcube.read_file(
     if length(zones) == 0
         error("Could not find any Zone_t node in the file")
     elseif length(zones) > 1
-        error("The file contains several Zone_t nodes, only one base is supported")
+        error("The file contains several Zone_t nodes, only one zone is supported for now")
     end
     zone = first(zones)
 
@@ -181,7 +181,7 @@ function read_bc(bc, elts, verbose)
                 if i1 <= erange[1] <= i2
                     # Compute how many nodes are concerned in this Elements_t,
                     # and the offset in the connectivity
-                    nelts_concerned = max(i2, erange[2]) - erange[1] + 1
+                    nelts_concerned = min(i2, erange[2]) - erange[1] + 1
                     nnodes_concerned = nelts_concerned * nnodes_by_elt
                     offset = (erange[1] - i1) * nnodes_by_elt
 
