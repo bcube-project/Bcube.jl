@@ -420,71 +420,6 @@ function LazyOperators.materialize(
 end
 
 """
-Represent the tangential projector associated to an hypersurface. Its expression is
-```math
-    P = I - \\nu \\otimes \\nu
-```
-where ``\\nu`` is the cell normal vector.
-"""
-struct TangentialProjector <: AbstractLazy end
-
-LazyOperators.materialize(P::TangentialProjector, ::CellInfo) = P
-
-function LazyOperators.materialize(
-    ::TangentialProjector,
-    cPoint::CellPoint{ReferenceDomain},
-)
-    cnodes = get_cellnodes(cPoint)
-    ctype = get_celltype(cPoint)
-    ξ = get_coords(cPoint)
-    return _tangential_projector(cnodes, ctype, ξ)
-end
-
-function LazyOperators.materialize(
-    P::TangentialProjector,
-    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
-)
-    P
-end
-
-function LazyOperators.materialize(
-    ::TangentialProjector,
-    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
-)
-    fPoint, = get_args(sideFacePoint)
-    fInfo = get_faceinfo(fPoint)
-    cInfo = get_cellinfo_n(fInfo)
-    cnodes = nodes(cInfo)
-    ctype = celltype(cInfo)
-    ξcell = get_coords(side_n(fPoint))
-
-    return _tangential_projector(cnodes, ctype, ξcell)
-end
-
-function LazyOperators.materialize(
-    ::TangentialProjector,
-    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
-)
-    fPoint, = get_args(sideFacePoint)
-    fInfo = get_faceinfo(fPoint)
-    cInfo = get_cellinfo_p(fInfo)
-    cnodes = nodes(cInfo)
-    ctype = celltype(cInfo)
-    ξcell = get_coords(side_p(fPoint))
-
-    return _tangential_projector(cnodes, ctype, ξcell)
-end
-
-"""
-Warning : `cell_normal` is a "cell" operator, not a "face" operator.
-So ξ is expected to be in the reference domain of the cell.
-"""
-function _tangential_projector(cnodes, ctype, ξ)
-    ν = cell_normal(ctype, cnodes, ξ)
-    return I - (ν ⊗ ν)
-end
-
-"""
 Hypersurface "face" operator that rotates around the face-axis to virtually
 bring back the two adjacent cells in the same plane.
 """
@@ -519,53 +454,31 @@ function LazyOperators.materialize(
     sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
 )
     cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p = _unpack_face_point(sideFacePoint)
-    return _coplanar_rotation(cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p)
+
+    # We choose to use `cell_normal` instead of `normal`,
+    # but we could do the same with the latter.
+    ν_n = cell_normal(ctype_n, cnodes_n, ξ_n)
+    ν_p = cell_normal(ctype_p, cnodes_p, ξ_p)
+
+    return _coplanar_rotation(ν_n, ν_p)
 end
 
 function LazyOperators.materialize(
-    ::CoplanarRotation,
+    cr::CoplanarRotation,
     sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
 )
-    cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p = _unpack_face_point(sideFacePoint)
-    return _coplanar_rotation(cnodes_p, cnodes_n, ctype_p, ctype_n, ξ_p, ξ_n)
+    fPoint, = get_args(sideFacePoint)
+    materialize(cr, Side⁻(opposite_side(fPoint)))
 end
 
-function _coplanar_rotation(
-    cnodes_n::AbstractArray{Node{2, T}, N},
-    cnodes_p,
-    ctype_n::AbstractEntityType{1},
-    ctype_p,
-    ξ_n,
-    ξ_p,
-) where {T, N}
-
-    # We choose to use `cell_normal` instead of `normal`,
-    # but we could do the same with the latter.
-    ν_n = cell_normal(ctype_n, cnodes_n, ξ_n)
-    ν_p = cell_normal(ctype_p, cnodes_p, ξ_p)
-
+function _coplanar_rotation(ν_n::SVector{2}, ν_p::SVector{2})
     _cos = ν_p ⋅ ν_n
     _sin = ν_p[1] * ν_n[2] - ν_p[2] * ν_n[1] # 2D-vector cross-product
-
-    _R = SA[_cos (-_sin); _sin _cos]
-
-    return _R
+    R = SA[_cos (-_sin); _sin _cos]
+    return R
 end
 
-function _coplanar_rotation(
-    cnodes_n::AbstractArray{Node{3, T}, N},
-    cnodes_p,
-    ctype_n::AbstractEntityType{2},
-    ctype_p,
-    ξ_n,
-    ξ_p,
-) where {T, N}
-
-    # We choose to use `cell_normal` instead of `normal`,
-    # but we could do the same with the latter.
-    ν_n = cell_normal(ctype_n, cnodes_n, ξ_n)
-    ν_p = cell_normal(ctype_p, cnodes_p, ξ_p)
-
+function _coplanar_rotation(ν_n::SVector{3}, ν_p::SVector{3})
     _cos = ν_p ⋅ ν_n
     _sin = cross(ν_p, ν_n) # this is not really a 'sinus', it is (sinus x u)
 
@@ -613,6 +526,44 @@ function LazyOperators.materialize(::CellNormal, cPoint::CellPoint{ReferenceDoma
     ξ = get_coords(cPoint)
     return cell_normal(ctype, cnodes, ξ)
 end
+
+function LazyOperators.materialize(
+    ν::CellNormal,
+    ::AbstractSide{Nothing, <:Tuple{<:FaceInfo}},
+)
+    ν
+end
+
+function LazyOperators.materialize(
+    ::CellNormal,
+    sideFacePoint::Side⁻{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+    cInfo = get_cellinfo_n(fInfo)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    ξcell = get_coords(side_n(fPoint))
+
+    return cell_normal(ctype, cnodes, ξcell)
+end
+
+function LazyOperators.materialize(
+    ::CellNormal,
+    sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
+)
+    fPoint, = get_args(sideFacePoint)
+    fInfo = get_faceinfo(fPoint)
+    cInfo = get_cellinfo_p(fInfo)
+    cnodes = nodes(cInfo)
+    ctype = celltype(cInfo)
+    ξcell = get_coords(side_p(fPoint))
+
+    return cell_normal(ctype, cnodes, ξcell)
+end
+
+_tangential_projector(ν) = I - (ν ⊗ ν)
+tangential_projector(mesh) = _tangential_projector ∘ CellNormal(mesh)
 
 LazyOperators.materialize(f::Function, ::CellInfo) = f
 LazyOperators.materialize(f::Function, ::CellPoint) = f

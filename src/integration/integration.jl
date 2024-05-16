@@ -21,22 +21,18 @@ end
 
 function integrate_on_ref_element(
     g,
-    cInfo::CellInfo,
+    elementInfo::Union{CellInfo, FaceInfo},
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
 )
-    _g(ξ) = g(CellPoint(ξ, cInfo, ReferenceDomain()))
-    integrate_on_ref_element(_g, celltype(cInfo), nodes(cInfo), quadrature, mapstyle)
-end
-
-function integrate_on_ref_element(
-    g,
-    fInfo::FaceInfo,
-    quadrature::AbstractQuadrature,
-    mapstyle::MapComputeQuadratureStyle,
-)
-    _g(ξ) = g(FacePoint(ξ, fInfo, ReferenceDomain()))
-    integrate_on_ref_element(_g, facetype(fInfo), nodes(fInfo), quadrature, mapstyle)
+    _g(ξ) = g(ElementPoint(ξ, elementInfo, ReferenceDomain()))
+    integrate_on_ref_element(
+        _g,
+        get_element_type(elementInfo),
+        nodes(elementInfo),
+        quadrature,
+        mapstyle,
+    )
 end
 
 function integrate_on_ref_element(
@@ -119,11 +115,11 @@ Alternative version of `apply_quadrature` thats seems to be more efficient
 for face integration (this observation is not really understood)
 """
 function apply_quadrature_v2(
-    g_ref,
+    g_ref::G,
     shape::AbstractShape,
     quadrature::AbstractQuadrature,
     ::MapComputeQuadratureStyle,
-)
+) where {G}
     quadrule = QuadratureRule(shape, quadrature)
     # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
     quadnodes = map(get_coords, get_quadnodes(quadrule))
@@ -138,12 +134,12 @@ end
 
 # Below are "dispatch functions" to select the more appropriate quadrature function
 function apply_quadrature(
-    g,
+    g::G,
     ctype::AbstractEntityType,
-    cnodes,
+    cnodes::CN,
     quadrature::AbstractQuadrature,
     qStyle::AbstractComputeQuadratureStyle,
-)
+) where {G, CN}
     apply_quadrature(topology_style(ctype, cnodes), g, shape(ctype), quadrature, qStyle)
 end
 
@@ -159,11 +155,11 @@ end
 
 function apply_quadrature(
     ::isSurfacic,
-    g,
+    g::G,
     shape::AbstractShape,
     quadrature::AbstractQuadrature,
     qStyle::MapComputeQuadratureStyle,
-)
+) where {G}
     apply_quadrature_v2(g, shape, quadrature, qStyle)
 end
 
