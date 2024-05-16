@@ -85,7 +85,7 @@ function write_vtk_discontinuous(
     vtkcells = MeshCell[]
     count = 0
     for icell in 1:ncells(mesh)
-        _nnode = ndofs(fs, shape(celltypes[icell])) #length(c2n[icell])
+        _nnode = get_ndofs(fs, shape(celltypes[icell]))
         push!(
             vtkcells,
             MeshCell(
@@ -166,7 +166,7 @@ function write_vtk_bnd_discontinuous(
     vtkcells = MeshCell[]
     count = 0
     for ftype in ftypes
-        _nnode = ndofs(fs, shape(ftype)) #length(c2n[icell])
+        _nnode = get_ndofs(fs, shape(ftype))
         push!(vtkcells, MeshCell(vtk_entity(ftype), collect((count + 1):(count + _nnode))))
         count += _nnode
     end
@@ -383,7 +383,7 @@ function write_vtk_lagrange(
     @assert get_type(fs_export) <: Lagrange "Only FunctionSpace of type Lagrange are supported for now"
     degree_export = get_degree(fs_export)
     dhl_export = Bcube._get_dhl(U_export)
-    nd = ndofs(dhl_export)
+    nd = get_ndofs(dhl_export)
 
     # Get ncomps and type of each `point` variable
     type_dim = map(var -> get_return_type_and_codim(var, mesh), values(vars_point))
@@ -411,7 +411,7 @@ function write_vtk_lagrange(
         # Add nodes coordinates to coords_vtk
         for (iloc, ξ) in enumerate(coords_bcube)
             # Global number of the node
-            iglob = dof(dhl_export, icell, 1, iloc)
+            iglob = get_dof(dhl_export, icell, 1, iloc)
 
             # Create CellPoint (in reference domain)
             cpoint = CellPoint(ξ, cinfo, ReferenceDomain())
@@ -428,7 +428,7 @@ function write_vtk_lagrange(
         end
 
         # Create the VTK cells with the correct ordering
-        iglobs = dof(dhl_export, icell)
+        iglobs = get_dof(dhl_export, icell)
         push!(
             cells_vtk,
             MeshCell(vtk_entity(_shape, Val(degree_export)), view(iglobs, v2b)),

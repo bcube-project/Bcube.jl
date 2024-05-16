@@ -3,6 +3,7 @@ name: Run benchmarks
 on:
   pull_request:
     types: [unlabeled, opened, synchronize, reopened]
+  workflow_dispatch:
 
 concurrency:
   # Skip intermediate builds: always.
