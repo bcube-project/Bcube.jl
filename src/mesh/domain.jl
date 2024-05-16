@@ -297,7 +297,6 @@ get_element_type(c::CellSide) = celltype(c)
 
 abstract type AbstractFaceInfo <: AbstractDomainIndex end
 
-abstract type AbstractFaceInfo <: AbstractDomainIndex end
 """
     FaceInfo{CN<:CellInfo,CP<:CellInfo,FT,FN,F2N,I}
 
