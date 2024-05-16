@@ -3,7 +3,7 @@ struct CGNSIoHandler <: AbstractIoHandler end
 struct GMSHIoHandler <: AbstractIoHandler end
 
 """
-    read_file([handler::AbstractIoHandler,] filepath::String; domainNames = nothing, varnames = nothing, kwargs...,)
+    read_file([handler::AbstractIoHandler,] filepath::String; domainNames = nothing, varnames = nothing, topodim = 0, kwargs...,)
 
 Read the mesh and associated data in the given file.
 
@@ -18,6 +18,9 @@ a filtered list/array of the domain names to retain.
 If `varnames` is set to `nothing`, no variables will be read, which is the behavior of `read_mesh`. To read all the
 variables, `varnames` must be set to `"*"`.
 
+The argument `topodim` can be used to force and/or select the elements of this topological dimension to be interpreted as
+"volumic". Leave it to `0` to let the reader determines the topological dimension automatically. The same goes for `spacedim`.
+
 # Dev
 Possible names:
 * read_file
@@ -31,6 +34,8 @@ function read_file(
     filepath::String;
     domainNames = String[],
     varnames = nothing,
+    topodim = 0,
+    spacedim = 0,
     kwargs...,
 )
     error("'read_file' is not implemented for $(typeof(handler))")
