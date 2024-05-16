@@ -468,7 +468,7 @@ function LazyOperators.materialize(
     sideFacePoint::Side⁺{Nothing, <:Tuple{<:FacePoint}},
 )
     fPoint, = get_args(sideFacePoint)
-    materialize(cr, side_n(opposite_side(fPoint)))
+    materialize(cr, Side⁻(opposite_side(fPoint)))
 end
 
 function _coplanar_rotation(ν_n::SVector{2}, ν_p::SVector{2})

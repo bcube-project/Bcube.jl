@@ -148,6 +148,17 @@ function FacePoint(x, faceInfo::FaceInfo, ds::DomainStyle)
 end
 
 """
+Return the opposite side of the `FacePoint`
+"""
+function opposite_side(fPoint::FacePoint)
+    return FacePoint(
+        get_coords(fPoint),
+        opposite_side(get_faceinfo(fPoint)),
+        DomainStyle(fPoint),
+    )
+end
+
+"""
 Return the `CellPoint` corresponding to the `FacePoint` on negative side
 """
 function side_n(facePoint::FacePoint{ReferenceDomain})
