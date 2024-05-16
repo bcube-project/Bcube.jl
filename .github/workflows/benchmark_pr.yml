@@ -4,6 +4,7 @@ on:
   pull_request_target:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   # Skip intermediate builds: always.
