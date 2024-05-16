@@ -106,7 +106,6 @@ import Bcube:
     minsize,
     myrand,
     nedges,
-    ndofs,
     nfaces,
     nlayers,
     nodes,
