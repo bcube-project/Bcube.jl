@@ -417,6 +417,8 @@ Base.iterate(::AbstractDomainIterator) = error("to be defined")
 Base.iterate(::AbstractDomainIterator, state) = error("to be defined")
 Base.eltype(::AbstractDomainIterator) = error("to be defined")
 Base.length(iter::AbstractDomainIterator) = length(indices(get_domain(iter)))
+Base.firstindex(::AbstractDomainIterator) = 1
+Base.getindex(::AbstractDomainIterator, i) = error("to be defined")
 
 struct DomainIterator{D <: AbstractDomain} <: AbstractDomainIterator{D}
     domain::D
@@ -432,6 +434,8 @@ function Base.iterate(iter::DomainIterator, i::Integer = 1)
         return _get_index(get_domain(iter), i), i + 1
     end
 end
+
+Base.getindex(iter::DomainIterator, i) = _get_index(get_domain(iter), i)
 
 function _get_index(domain::AbstractCellDomain, i::Integer)
     icell = indices(domain)[i]

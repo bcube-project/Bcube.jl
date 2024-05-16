@@ -120,7 +120,7 @@ function _∂λξ_∂x_hypersurface(fs, ctype, cnodes, ξ)
     # Compute shape functions gradient : we "add a dimension" to the ref gradient,
     # and then right-multiply by the inverse of the jacobian
     s = shape(ctype)
-    z = @SVector zeros(ndofs(fs, s))
+    z = @SVector zeros(get_ndofs(fs, s))
     ∇λ = hcat(∂λξ_∂ξ(fs, s, ξ), z) * inv(J)
 
     return ∇λ
@@ -229,7 +229,7 @@ end
 #     fs = function_space(dhl,varname)
 #     λ = x -> shape_functions(fs, shape(ctype), mapping_inv(cnodes, ctype, x))
 #     ncomp = ncomps(dhl,varname)
-#     return interpolate(λ, q[dof(dhl, icell, shape(ctype), varname)], Val(ncomp))
+#     return interpolate(λ, q[get_dof(dhl, icell, shape(ctype), varname)], Val(ncomp))
 # end
 
 # """

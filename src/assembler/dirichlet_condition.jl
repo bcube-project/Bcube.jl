@@ -279,7 +279,7 @@ function _apply_dirichlet_on_face!(
         # Loop over components
         for icomp in 1:sizeV
             # Absolute number of the dof for this component
-            idof_glo = m[dof(dhl_V, icell, icomp, idof_loc)]
+            idof_glo = m[get_dof(dhl_V, icell, icomp, idof_loc)]
 
             # Apply condition on each array according to the corresponding callback
             for (array, callback!) in zip(arrays, callbacks)
