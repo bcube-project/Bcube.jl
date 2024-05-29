@@ -1355,6 +1355,7 @@ function gen_torus_shell_mesh(
     order = 1,
     lc = 0.1,
     write_geo = false,
+    n_partitions = 0,
     kwargs...,
 )
     gmsh.initialize()
@@ -1393,6 +1394,7 @@ function gen_torus_shell_mesh(
     gmsh.model.geo.synchronize()
     gmsh.model.mesh.generate(2)
     gmsh.model.mesh.setOrder(order)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
     gmsh.write(output)
