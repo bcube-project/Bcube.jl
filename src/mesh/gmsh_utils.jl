@@ -1359,7 +1359,7 @@ function gen_torus_shell_mesh(
 )
     gmsh.initialize()
     gmsh.model.add("model") # helps debugging
-    _apply_gmsh_options(kwargs...)
+    _apply_gmsh_options(; kwargs...)
 
     # Points
     xc = (rint + rext) / 2
