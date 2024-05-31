@@ -9,7 +9,7 @@ Read the mesh and associated data in the given file.
 
 Returns a NamedTuple with the following keys:
 * mesh -> the Bcube mesh
-* data -> to be defined
+* data -> dictionnary of FlowSolutionName => (dictionnary of VariableName => MeshData)
 * to be defined : stuff related to subdomains
 
 If `domainNames` is an empty list/array, all the domains found will be read and merged. Otherwise, `domainNames` can be

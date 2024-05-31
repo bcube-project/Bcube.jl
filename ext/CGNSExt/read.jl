@@ -68,22 +68,35 @@ function cgns_mesh_to_bcube_mesh(zoneCGNS)
     return Bcube.Mesh(nodes, c2t, Bcube.Connectivity(c2nnodes, c2n); bc_names, bc_nodes)
 end
 
+"""
+The input `fSols` is suppose to be a dictionnary FlowSolutionName => (gridlocation, Dict(varname => array))
+
+The output is a dictionnary FlowSolutionName => dictionnary(varname => MeshData)
+"""
 function flow_solutions_to_bcube_data(fSols)
-    length(fSols) == 0 && (return Dict(), Dict())
+    # length(fSols) == 0 && (return Dict(), Dict())
 
-    pointSols = filter(fs -> fs.gridLocation == "Vertex", fSols)
-    cellSols = filter(fs -> fs.gridLocation == "CellCenter", fSols)
+    # pointSols = filter(fs -> fs.gridLocation == "Vertex", fSols)
+    # cellSols = filter(fs -> fs.gridLocation == "CellCenter", fSols)
 
-    pointDicts = [fs.data for fs in pointSols]
-    cellDicts = [fs.data for fs in cellSols]
+    # pointDicts = [fs.data for fs in pointSols]
+    # cellDicts = [fs.data for fs in cellSols]
 
-    pointDict = merge(pointDicts)
-    cellDict = merge(cellDicts)
+    # pointDict = merge(pointDicts)
+    # cellDict = merge(cellDicts)
 
-    pointDict = Dict(key => MeshPointData(val) for (key, val) in pointDict)
-    cellDict = Dict(key => MeshCellData(val) for (key, val) in cellDict)
+    # pointDict = Dict(key => MeshPointData(val) for (key, val) in pointDict)
+    # cellDict = Dict(key => MeshCellData(val) for (key, val) in cellDict)
 
-    return pointDict, cellDict
+    # return pointDict, cellDict
+
+    return Dict(
+        fname => Dict(
+            varname =>
+                t.gridLocation == "Vertex" ? MeshPointData(array) : MeshCellData(array)
+            for (varname, array) in t.data
+        ) for (fname, t) in fSols
+    )
 end
 
 function read_zone(zone, varnames, topo_dim, space_dim, verbose)
@@ -286,24 +299,29 @@ end
 
 """
 Read all the flow solutions in the Zone, filtering data arrays whose name is not in the `varnames` list
+
+# TODO : check if all varnames have been found
 """
 function read_solutions(zone, varnames, verbose)
-    fSols =
-        map(fs -> read_solution(fs, varnames), get_children(zone; type = "FlowSolution_t"))
+    # fSols =
+    #     map(fs -> read_solution(fs, varnames), get_children(zone; type = "FlowSolution_t"))
 
-    n_vertex_fsol = count(fs -> fs.gridLocation == "Vertex", fSols)
-    n_cell_fsol = count(fs -> fs.gridLocation == "CellCenter", fSols)
+    # n_vertex_fsol = count(fs -> fs.gridLocation == "Vertex", fSols)
+    # n_cell_fsol = count(fs -> fs.gridLocation == "CellCenter", fSols)
 
-    if verbose
-        (n_vertex_fsol > 1) && println(
-            "WARNING : found more than one Vertex FlowSolution, reading them all...",
-        )
-        (n_cell_fsol > 1) && println(
-            "WARNING : found more than one CellCenter FlowSolution, reading them all...",
-        )
-    end
+    # if verbose
+    #     (n_vertex_fsol > 1) && println(
+    #         "WARNING : found more than one Vertex FlowSolution, reading them all...",
+    #     )
+    #     (n_cell_fsol > 1) && println(
+    #         "WARNING : found more than one CellCenter FlowSolution, reading them all...",
+    #     )
+    # end
 
-    # TODO : check if all varnames have been found
+    fSols = Dict(
+        get_name(fs) => read_solution(fs, varnames) for
+        fs in get_children(zone; type = "FlowSolution_t")
+    )
 
     return fSols
 end
@@ -322,7 +340,10 @@ function read_solution(fs, varnames)
     filter!(dArray -> get_name(dArray) in _varnames, dArrays)
     data = Dict(get_name(dArray) => get_value(dArray) for dArray in dArrays)
 
-    return (; gridLocation, data)
+    # Flow solution name
+    name = get_name(fs)
+
+    return (; name, gridLocation, data)
 end
 
 function is_volumic_entity(node::Node, topo_dim)
