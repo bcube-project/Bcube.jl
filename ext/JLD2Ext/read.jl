@@ -1,5 +1,5 @@
 function Bcube.read_file(
-    ::Bcube.CGNSIoHandler,
+    ::Bcube.JLD2IoHandler,
     filepath::String;
     domainNames = String[],
     varnames = nothing,
