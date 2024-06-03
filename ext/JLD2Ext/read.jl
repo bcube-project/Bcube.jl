@@ -48,11 +48,15 @@ function Bcube.read_file(
     # Build Bcube Mesh
     mesh = cgns_mesh_to_bcube_mesh(zoneCGNS)
 
-    # Build Bcube MeshCellData / MeshPointData
-    pointData, cellData = flow_solutions_to_bcube_data(zoneCGNS.fSols)
+    # Build Bcube MeshCellData & MeshPointData
+    if !isnothing(varnames)
+        data = flow_solutions_to_bcube_data(zoneCGNS.fSols)
+    else
+        data = nothing
+    end
 
     # Should we return something when pointData and/or cellData is nothing? Or remove it completely from the returned Tuple?
-    return (; mesh, pointData, cellData)
+    return (; mesh, data)
 end
 
 """
@@ -144,7 +148,11 @@ function read_zone(zone, varnames, topo_dim, space_dim, verbose)
     filter!(bc -> (bc.bcdim == topo_dim - 1) || (bc.bcdim == -1), bcs)
 
     # Read FlowSolutions
-    fSols = read_solutions(zone, varnames, verbose)
+    if !isnothing(varnames)
+        fSols = read_solutions(zone, varnames, verbose)
+    else
+        fSols = nothing
+    end
 
     # @show coords
     # @show c2t
@@ -355,9 +363,11 @@ function read_solution(fs, varnames)
     gridLocation = get_value(node)
 
     # Read variables matching asked "varnames"
-    _varnames = isnothing(varnames) ? [] : varnames
     dArrays = get_children(fs; type = "DataArray_t")
-    filter!(dArray -> get_name(dArray) in _varnames, dArrays)
+    if varnames != "*"
+        # filter to obtain only the desired variables names
+        filter!(dArray -> get_name(dArray) in varnames, dArrays)
+    end
     data = Dict(get_name(dArray) => get_value(dArray) for dArray in dArrays)
 
     # Flow solution name
