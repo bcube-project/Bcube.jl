@@ -1,5 +1,5 @@
 abstract type AbstractIoHandler end
-struct CGNSIoHandler <: AbstractIoHandler end
+struct JLD2IoHandler <: AbstractIoHandler end
 struct GMSHIoHandler <: AbstractIoHandler end
 
 """
@@ -123,7 +123,7 @@ function _filename_to_handler(filename::String)
     if ext in [".msh"]
         return GMSHIoHandler()
     elseif ext in [".cgns", ".hdf", ".hdf5"]
-        return CGNSIoHandler()
+        return JLD2IoHandler()
     end
     error("Could not find a handler for the filename $filename")
 end
