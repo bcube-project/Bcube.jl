@@ -75,9 +75,9 @@ Questions:
 function write_file(
     handler::AbstractIoHandler,
     basename::String,
-    vars::Dict{String, F},
     mesh::AbstractMesh,
-    U_export::AbstractFESpace,
+    vars::Dict{String, F} = Dict{String, AbstractLazy}(),
+    U_export::AbstractFESpace = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh),
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
@@ -88,9 +88,9 @@ end
 
 function write_file(
     basename::String,
-    vars::Dict{String, F},
     mesh::AbstractMesh,
-    U_export::AbstractFESpace,
+    vars::Dict{String, F} = Dict{String, AbstractLazy}(),
+    U_export::AbstractFESpace = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh),
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
@@ -99,8 +99,8 @@ function write_file(
     write_file(
         _filename_to_handler(basename),
         basename,
-        vars,
         mesh,
+        vars,
         U_export;
         it,
         time,
