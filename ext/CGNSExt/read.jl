@@ -55,6 +55,9 @@ function Bcube.read_file(
     return (; mesh, pointData, cellData)
 end
 
+"""
+Convert CGNS Zone information into a Bcube `Mesh`.
+"""
 function cgns_mesh_to_bcube_mesh(zoneCGNS)
     nodes = [Bcube.Node(zoneCGNS.coords[i, :]) for i in 1:size(zoneCGNS.coords, 1)]
     # nodes = map(row -> Bcube.Node(row), eachrow(zoneCGNS.coords)) # problem with Node + Slice
@@ -99,6 +102,14 @@ function flow_solutions_to_bcube_data(fSols)
     )
 end
 
+"""
+Read a CGNS Zone node.
+
+Return a NamedTuple with node coordinates, cell-to-type connectivity (type is a integer),
+cell-to-node connectivity, boundaries (see `read_zoneBC`), and a dictionnary of flow solutions (see `read_solutions`)
+
+-> (; coords, c2t, c2n, bcs, fSols)
+"""
 function read_zone(zone, varnames, topo_dim, space_dim, verbose)
     # Preliminary check
     zoneType = get_value(get_child(zone; type = "ZoneType_t"))
@@ -145,6 +156,8 @@ end
 
 """
 Read the "ZoneBC_t" node to build bnd connectivities.
+
+See `read_bc` for more information of what is returned.
 """
 function read_zoneBC(zone, elts, verbose)
     zoneBC = get_child(zone; type = "ZoneBC_t")
@@ -153,6 +166,8 @@ function read_zoneBC(zone, elts, verbose)
 end
 
 """
+Read a BC node.
+
 Return a named Tuple (bcname, bcnodes, bcdim) where bcnodes is an array of the nodes
 belonging to this BC.
 """
@@ -326,6 +341,11 @@ function read_solutions(zone, varnames, verbose)
     return fSols
 end
 
+"""
+Read a FlowSolution node.
+
+Return a NamedTuple with flow solution name, grid location and array of vectors.
+"""
 function read_solution(fs, varnames)
     # Read GridLocation : we could deal with a missing GridLocation node, by later comparing
     # the length of the DataArray to the number of cells / nodes of the zone. Let's do this
@@ -346,6 +366,10 @@ function read_solution(fs, varnames)
     return (; name, gridLocation, data)
 end
 
+"""
+Indicate if the Elements node contains "volumic" entities (with respect
+to the `topo_dim` argument)
+"""
 function is_volumic_entity(node::Node, topo_dim)
     @assert get_cgns_type(node) == "Elements_t"
     code, _ = get_value(node)
