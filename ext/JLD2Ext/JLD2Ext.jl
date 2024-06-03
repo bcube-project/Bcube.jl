@@ -1,4 +1,4 @@
-module CGNSExt
+module JLD2Ext
 using Bcube
 using JLD2
 
