@@ -1,6 +1,7 @@
 abstract type AbstractIoHandler end
-struct JLD2IoHandler <: AbstractIoHandler end
 struct GMSHIoHandler <: AbstractIoHandler end
+struct HDF5IoHandler <: AbstractIoHandler end
+struct JLD2IoHandler <: AbstractIoHandler end
 
 """
     read_file([handler::AbstractIoHandler,] filepath::String; domainNames = nothing, varnames = nothing, topodim = 0, kwargs...,)
@@ -38,7 +39,9 @@ function read_file(
     spacedim = 0,
     kwargs...,
 )
-    error("'read_file' is not implemented for $(typeof(handler))")
+    error(
+        "'read_file' is not implemented for $(typeof(handler)). Have you loaded the extension?",
+    )
 end
 
 function read_file(filepath::String; domainNames = String[], varnames = nothing, kwargs...)
@@ -123,7 +126,7 @@ function _filename_to_handler(filename::String)
     if ext in [".msh"]
         return GMSHIoHandler()
     elseif ext in [".cgns", ".hdf", ".hdf5"]
-        return JLD2IoHandler()
+        return HDF5IoHandler()
     end
     error("Could not find a handler for the filename $filename")
 end
