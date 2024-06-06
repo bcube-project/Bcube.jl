@@ -20,7 +20,6 @@ function Bcube.read_file(
         error("The file contains several CGNSBase_t nodes, only one base is supported")
     end
     cgnsBase = first(cgnsBases)
-    @show cgnsBase
 
     # Read base dimensions (topo and space)
     dims = get_value(cgnsBase)
@@ -68,7 +67,6 @@ cell-to-node connectivity, boundaries (see `read_zoneBC`), and a dictionnary of 
 function read_zone(zone, varnames, topo_dim, space_dim, verbose)
     # Preliminary check
     zoneType = get_value(get_child(zone; type = "ZoneType_t"))
-    @show zoneType
     @assert zoneType == "Unstructured" "Only unstructured zone are supported"
 
     # Number of elements
