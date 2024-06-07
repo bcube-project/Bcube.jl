@@ -11,11 +11,31 @@ function Bcube.write_file(
     kwargs...,
 ) where {F <: Bcube.AbstractLazy}
     mode = collection_append ? "a+" : "w"
-    # fcpl = HDF5.FileCreateProperties(; track_order = true)
-    fcpl = HDF5.FileCreateProperties()
+    fcpl = HDF5.FileCreateProperties(; track_order = true)
+    # fcpl = HDF5.FileCreateProperties()
 
     h5open(basename, mode; fcpl) do file
+        # @show file.id
+        # @show HDF5.API.h5i_get_file_id(file)
+        # HDF5.API.h5f_set_libver_bounds(
+        #     # file.id,
+        #     file,
+        #     HDF5.API.H5F_LIBVER_V18,
+        #     HDF5.API.H5F_LIBVER_LATEST,
+        # )
+        # HDF5.API.h5f_flush(file.id)
+
+        # Root element
         set_cgns_root!(file)
+
+        # Library version
+        create_cgns_node(
+            file,
+            "CGNSLibraryVersion",
+            "CGNSLibraryVersion_t";
+            type = "R4",
+            value = Float32[3.2],
+        )
 
         # Base
         cgnsBase = create_cgns_node(
@@ -45,13 +65,14 @@ function Bcube.write_file(
         # GridCoordinates
         gridCoordinates =
             create_cgns_node(zone, "GridCoordinates", "GridCoordinates_t"; type = "MT")
-        for (i, suffix) in enumerate(("X", "Y", "Z"))
+        suffixes = ("X", "Y", "Z")
+        for idim in 1:Bcube.spacedim(mesh)
             create_cgns_node(
                 gridCoordinates,
-                "Coordinate$suffix",
+                "Coordinate$(suffixes[idim])",
                 "DataArray_t";
                 type = "R8",
-                value = [get_coords(node, i) for node in get_nodes(mesh)],
+                value = [get_coords(node, idim) for node in get_nodes(mesh)],
             )
         end
 
@@ -146,7 +167,7 @@ function create_cgns_elements(mesh, zone; write_bnd_faces = false, verbose = fal
             elts,
             "ElementConnectivity",
             "DataArray_t";
-            value = Int32.(vec(conn[ct])),
+            value = Int32.(vec(transpose(conn[ct]))),
         )
         i += typeCount[ct]
     end
