@@ -205,30 +205,47 @@ end
 
 function create_flow_solutions(mesh, zone, data; verbose = false)
     if valtype(data) <: Dict
-        error("multiple flow solutions not implemented yet")
+        # First, we check that inside each FlowSolution, the data location is the same
+        # for all variables
+        for d in values(data)
+            v = values(d)
+            @assert all(x -> x == v[1][2], values(d)) # ugly, but ok for now
+        end
+
+        foreach(
+            (name, _data) -> create_flow_solutions(mesh, zone, _data, name; verbose),
+            data,
+        )
     else
-        @assert all(x -> is_fespace_supported(x[2]), values(data))
-
-        cellCenter =
-            filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 0, data)
-        create_flow_solution(
-            zone,
-            cellCenter,
-            "FlowSolutionCell",
-            false,
-            Base.Fix2(var_on_centers, mesh),
-        )
-
-        nodeCenter =
-            filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 1, data)
-        create_flow_solution(
-            zone,
-            nodeCenter,
-            "FlowSolutionVertex",
-            true,
-            Base.Fix2(var_on_vertices, mesh),
-        )
+        create_flow_solutions(mesh, zone, data, ""; verbose)
     end
+end
+
+"""
+This function is a trick to refactor some code 
+"""
+function create_flow_solutions(mesh, zone, data, fname; verbose = false)
+    @assert all(x -> is_fespace_supported(x[2]), values(data))
+
+    cellCenter =
+        filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 0, data)
+    create_flow_solution(
+        zone,
+        cellCenter,
+        isempty(fname) ? "FlowSolutionCell" : fname,
+        false,
+        Base.Fix2(var_on_centers, mesh),
+    )
+
+    nodeCenter =
+        filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 1, data)
+    create_flow_solution(
+        zone,
+        nodeCenter,
+        isempty(fname) ? "FlowSolutionVertex" : fname,
+        true,
+        Base.Fix2(var_on_vertices, mesh),
+    )
 end
 
 function create_flow_solution(zone, data, fname, isVertex, projection)
