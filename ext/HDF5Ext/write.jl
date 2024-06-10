@@ -2,14 +2,13 @@ function Bcube.write_file(
     ::Bcube.HDF5IoHandler,
     basename::String,
     mesh::Bcube.AbstractMesh,
-    vars::Dict{String, F} = Dict{String, Bcube.AbstractLazy}(),
-    U_export::Bcube.AbstractFESpace = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh),
+    vars = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
     verbose = false,
     kwargs...,
-) where {F <: Bcube.AbstractLazy}
+)
     mode = collection_append ? "a+" : "w"
     fcpl = HDF5.FileCreateProperties(; track_order = true)
     # fcpl = HDF5.FileCreateProperties()
@@ -78,6 +77,12 @@ function Bcube.write_file(
 
         # Write elements
         create_cgns_elements(mesh, zone; write_bnd_faces = false, verbose)
+
+        # Write BCs
+        @warn "BCs not implemented yet"
+
+        # Write solution
+        create_flow_solutions(mesh, zone, vars)
     end
 end
 
@@ -173,6 +178,47 @@ function create_cgns_elements(mesh, zone; write_bnd_faces = false, verbose = fal
     end
 end
 
+function create_flow_solutions(mesh, zone, vars)
+    if valtype(vars) <: Dict
+        @assert all(is_fespace_supported, Bcube.get_function_space.(values(vars)))
+
+        cellCenter =
+            filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 0, vars)
+        create_flow_solution(
+            zone,
+            cellCenter,
+            "FlowSolutionCell",
+            false,
+            x -> var_on_centers(mesh, x),
+        )
+
+        nodeCenter =
+            filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 1, vars)
+        create_flow_solution(
+            zone,
+            nodeCenter,
+            "FlowSolutionVertex",
+            true,
+            x -> var_on_vertices(mesh, x),
+        )
+    else
+        error("multiple flow solutions not implemented yet")
+    end
+end
+
+function create_flow_solution(zone, vars, fname, isVertex, projection)
+    fnode = create_cgns_node(zone, fname, "FlowSolution_t")
+    gd = isVertex ? "Vertex" : "CellCenter"
+    create_cgns_node(fnode, "GridLocation", "GridLocation_t"; value = gd)
+
+    for (k, v) in vars
+        var = v[1]
+        y = projection(var)
+        create_cgns_node(fnode, k, "DataArray_t"; type = "R8", value = y)
+    end
+    return fnode
+end
+
 function create_cgns_node(parent, name, label; type = "I4", value = nothing)
     child = create_group(parent, name; track_order = true)
     set_cgns_attr!(child, name, label, type)
@@ -180,6 +226,18 @@ function create_cgns_node(parent, name, label; type = "I4", value = nothing)
         append_data(child, value)
     end
     return child
+end
+
+function is_fespace_supported(U)
+    is_discontinuous(U) && return false
+
+    fs = get_function_space(U)
+    if Bcube.get_type(fs) <: Bcube.Lagrange && Bcube.get_degree(fs) <= 1
+        return true
+    elseif Bcube.get_type(fs) <: Bcube.Taylor && Bcube.get_degree(fs) <= 0
+        return true
+    end
+    return false
 end
 
 function append_data(obj, data)

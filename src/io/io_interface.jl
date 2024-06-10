@@ -22,6 +22,13 @@ variables, `varnames` must be set to `"*"`.
 The argument `topodim` can be used to force and/or select the elements of this topological dimension to be interpreted as
 "volumic". Leave it to `0` to let the reader determines the topological dimension automatically. The same goes for `spacedim`.
 
+# Example
+```julia
+result = read_file("file.cgns"; varnames = ["Temperature", "Density"], verbose = true)
+@show ncells(result.mesh)
+@show keys(result.data)
+```
+
 # Dev
 Possible names:
 * read_file
@@ -66,6 +73,10 @@ function read_mesh(filepath::String; domainNames = String[], kwargs...)
 end
 
 """
+`vars` can be provided as a `Dict{String, Tuple{AbstractLazy, AbstractFESpace}}` if they
+share the same "container" (~FlowSolution), or as a `Dict{String, T}` where T is the
+previous Dict type described.
+
 Possible names:
 * write_file
 * write_to_file
@@ -79,32 +90,29 @@ function write_file(
     handler::AbstractIoHandler,
     basename::String,
     mesh::AbstractMesh,
-    vars::Dict{String, F} = Dict{String, AbstractLazy}(),
-    U_export::AbstractFESpace = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh),
+    vars = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
     kwargs...,
-) where {F <: AbstractLazy}
+)
     error("'write_file' is not implemented for $(typeof(handler))")
 end
 
 function write_file(
     basename::String,
     mesh::AbstractMesh,
-    vars::Dict{String, F} = Dict{String, AbstractLazy}(),
-    U_export::AbstractFESpace = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh),
+    vars = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
     kwargs...,
-) where {F <: AbstractLazy}
+)
     write_file(
         _filename_to_handler(basename),
         basename,
         mesh,
         vars,
-        U_export;
         it,
         time,
         collection_append,
