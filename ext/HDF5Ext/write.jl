@@ -2,7 +2,7 @@ function Bcube.write_file(
     ::Bcube.HDF5IoHandler,
     basename::String,
     mesh::Bcube.AbstractMesh,
-    vars = nothing,
+    data = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
@@ -79,10 +79,12 @@ function Bcube.write_file(
         create_cgns_elements(mesh, zone; write_bnd_faces = false, verbose)
 
         # Write BCs
-        @warn "BCs not implemented yet"
+        create_cgns_bcs(mesh, zone; verbose)
 
         # Write solution
-        create_flow_solutions(mesh, zone, vars)
+        if !isnothing(data)
+            create_flow_solutions(mesh, zone, data)
+        end
     end
 end
 
@@ -122,7 +124,7 @@ function set_cgns_root!(root)
         @warn "Could determine float type, assuming IEEE_LITTLE_32"
         format = "IEEE_LITTLE_32"
     end
-    root[" format"] = Int8.(Vector{UInt8}(format))
+    root[" format"] = str2int8(format)
 end
 
 function create_cgns_elements(mesh, zone; write_bnd_faces = false, verbose = false)
@@ -178,43 +180,68 @@ function create_cgns_elements(mesh, zone; write_bnd_faces = false, verbose = fal
     end
 end
 
-function create_flow_solutions(mesh, zone, vars)
-    if valtype(vars) <: Dict
-        @assert all(is_fespace_supported, Bcube.get_function_space.(values(vars)))
+"""
+Create the ZoneBC node and the associated BC nodes.
+
+For now, BCs are defined by a list of nodes. We could implement a version where BCs
+are defined by a list of faces (this necessitates faces nodes in the Elements_t part).
+"""
+function create_cgns_bcs(mesh, zone; verbose = false)
+    zoneBC = create_cgns_node(zone, "ZoneBC", "ZoneBC_t"; type = "MT")
+    for (tag, name) in boundary_names(mesh)
+        # for (name, nodes) in zip(boundary_names(mesh), Bcube.boundary_nodes(mesh))
+        bcnodes = Bcube.boundary_nodes(mesh, tag)
+        bc = create_cgns_node(zoneBC, name, "BC_t"; type = "C1", value = str2int8("BCWall"))
+        create_grid_location(bc, "Vertex")
+        create_cgns_node(
+            bc,
+            "PointList",
+            "IndexArray_t";
+            type = "I4",
+            value = Int32.(transpose(bcnodes)),
+        )
+    end
+end
+
+function create_flow_solutions(mesh, zone, data; verbose = false)
+    if valtype(data) <: Dict
+        error("multiple flow solutions not implemented yet")
+    else
+        @assert all(x -> is_fespace_supported(x[2]), values(data))
 
         cellCenter =
-            filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 0, vars)
+            filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 0, data)
         create_flow_solution(
             zone,
             cellCenter,
             "FlowSolutionCell",
             false,
-            x -> var_on_centers(mesh, x),
+            Base.Fix2(var_on_centers, mesh),
         )
 
         nodeCenter =
-            filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 1, vars)
+            filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 1, data)
         create_flow_solution(
             zone,
             nodeCenter,
             "FlowSolutionVertex",
             true,
-            x -> var_on_vertices(mesh, x),
+            Base.Fix2(var_on_vertices, mesh),
         )
-    else
-        error("multiple flow solutions not implemented yet")
     end
 end
 
-function create_flow_solution(zone, vars, fname, isVertex, projection)
-    fnode = create_cgns_node(zone, fname, "FlowSolution_t")
-    gd = isVertex ? "Vertex" : "CellCenter"
-    create_cgns_node(fnode, "GridLocation", "GridLocation_t"; value = gd)
+function create_flow_solution(zone, data, fname, isVertex, projection)
+    isempty(data) && return
 
-    for (k, v) in vars
-        var = v[1]
+    fnode = create_cgns_node(zone, fname, "FlowSolution_t"; type = "MT")
+    gdValue = isVertex ? "Vertex" : "CellCenter"
+    create_grid_location(fnode, gdValue)
+
+    for (name, val) in data
+        var = val[1]
         y = projection(var)
-        create_cgns_node(fnode, k, "DataArray_t"; type = "R8", value = y)
+        create_cgns_node(fnode, name, "DataArray_t"; type = "R8", value = y)
     end
     return fnode
 end
@@ -228,10 +255,20 @@ function create_cgns_node(parent, name, label; type = "I4", value = nothing)
     return child
 end
 
-function is_fespace_supported(U)
-    is_discontinuous(U) && return false
+function create_grid_location(parent, value)
+    return create_cgns_node(
+        parent,
+        "GridLocation",
+        "GridLocation_t";
+        type = "C1",
+        value = str2int8(value),
+    )
+end
 
-    fs = get_function_space(U)
+function is_fespace_supported(U)
+    Bcube.is_discontinuous(U) && return false
+
+    fs = Bcube.get_function_space(U)
     if Bcube.get_type(fs) <: Bcube.Lagrange && Bcube.get_degree(fs) <= 1
         return true
     elseif Bcube.get_type(fs) <: Bcube.Taylor && Bcube.get_degree(fs) <= 0
@@ -263,7 +300,7 @@ correct according to cgnscheck, once I've solved the cgnscheck problem I should
 check that the present function is still necessary.
 """
 function add_cgns_string_attr!(obj, name, value, length = sizeof(value))
-    dtype = _build_cgns_string_dtype(length)
+    dtype = build_cgns_string_dtype(length)
     attr = create_attribute(obj, name, dtype, HDF5.dataspace(value))
     try
         write_attribute(attr, dtype, value)
@@ -276,7 +313,7 @@ function add_cgns_string_attr!(obj, name, value, length = sizeof(value))
     end
 end
 
-function _build_cgns_string_dtype(length)
+function build_cgns_string_dtype(length)
     type_id = HDF5.API.h5t_copy(HDF5.hdf5_type_id(String))
     HDF5.API.h5t_set_size(type_id, length)
     HDF5.API.h5t_set_cset(type_id, HDF5.API.H5T_CSET_ASCII)
@@ -284,6 +321,8 @@ function _build_cgns_string_dtype(length)
     # @show d
     return dtype
 end
+
+str2int8(str) = return Int8.(Vector{UInt8}(str))
 
 union_types(x::Union) = (x.a, union_types(x.b)...)
 union_types(x::Type) = (x,)

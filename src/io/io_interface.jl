@@ -73,7 +73,7 @@ function read_mesh(filepath::String; domainNames = String[], kwargs...)
 end
 
 """
-`vars` can be provided as a `Dict{String, Tuple{AbstractLazy, AbstractFESpace}}` if they
+`data` can be provided as a `Dict{String, Tuple{AbstractLazy, AbstractFESpace}}` if they
 share the same "container" (~FlowSolution), or as a `Dict{String, T}` where T is the
 previous Dict type described.
 
@@ -90,7 +90,7 @@ function write_file(
     handler::AbstractIoHandler,
     basename::String,
     mesh::AbstractMesh,
-    vars = nothing,
+    data = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
@@ -102,7 +102,7 @@ end
 function write_file(
     basename::String,
     mesh::AbstractMesh,
-    vars = nothing,
+    data = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
@@ -112,9 +112,9 @@ function write_file(
         _filename_to_handler(basename),
         basename,
         mesh,
-        vars,
+        data,
         it,
-        time,
+        time;
         collection_append,
         kwargs...,
     )
