@@ -7,6 +7,7 @@ function Bcube.write_file(
     time::Real = 0.0;
     collection_append = false,
     verbose = false,
+    update_mesh = false,
     kwargs...,
 )
     mode = collection_append ? "a+" : "w"
@@ -14,77 +15,108 @@ function Bcube.write_file(
     # fcpl = HDF5.FileCreateProperties()
 
     h5open(basename, mode; fcpl) do file
-        # @show file.id
-        # @show HDF5.API.h5i_get_file_id(file)
-        # HDF5.API.h5f_set_libver_bounds(
-        #     # file.id,
-        #     file,
-        #     HDF5.API.H5F_LIBVER_V18,
-        #     HDF5.API.H5F_LIBVER_LATEST,
-        # )
-        # HDF5.API.h5f_flush(file.id)
-
-        # Root element
-        set_cgns_root!(file)
-
-        # Library version
-        create_cgns_node(
-            file,
-            "CGNSLibraryVersion",
-            "CGNSLibraryVersion_t";
-            type = "R4",
-            value = Float32[3.2],
-        )
-
-        # Base
-        cgnsBase = create_cgns_node(
-            file,
-            "Base",
-            "CGNSBase_t";
-            value = Int32[Bcube.topodim(mesh), Bcube.spacedim(mesh)],
-        )
-
-        # Zone
-        zone = create_cgns_node(
-            cgnsBase,
-            "Zone",
-            "Zone_t";
-            value = reshape(Int32[nnodes(mesh), ncells(mesh), 0], 1, 3),
-        )
-
-        # ZoneType
-        create_cgns_node(
-            zone,
-            "ZoneType",
-            "ZoneType_t";
-            value = Int8.(Vector{UInt8}("Unstructured")),
-            type = "C1",
-        )
-
-        # GridCoordinates
-        gridCoordinates =
-            create_cgns_node(zone, "GridCoordinates", "GridCoordinates_t"; type = "MT")
-        suffixes = ("X", "Y", "Z")
-        for idim in 1:Bcube.spacedim(mesh)
-            create_cgns_node(
-                gridCoordinates,
-                "Coordinate$(suffixes[idim])",
-                "DataArray_t";
-                type = "R8",
-                value = [get_coords(node, idim) for node in get_nodes(mesh)],
-            )
+        if collection_append
+            error("not implemented yet")
+        else
+            create_cgns_file(file, mesh, data; verbose)
         end
+    end
+end
 
-        # Write elements
-        create_cgns_elements(mesh, zone; write_bnd_faces = false, verbose)
+"""
+Append data to an existing file.
+"""
+function append_to_cgns_file(
+    file,
+    mesh,
+    data,
+    it,
+    time;
+    verbose = false,
+    update_mesh = false,
+)
+    @assert !update_mesh "Mesh update not implemented yet"
 
-        # Write BCs
-        create_cgns_bcs(mesh, zone; verbose)
+    # Read (unique) CGNS base
+    cgnsBase = get_cgns_base(root)
 
-        # Write solution
-        if !isnothing(data)
-            create_flow_solutions(mesh, zone, data)
-        end
+    # Read BaseIterativeData (if any)
+end
+
+"""
+Create the whole file from scratch
+"""
+function create_cgns_file(file, mesh, data; verbose)
+    # @show file.id
+    # @show HDF5.API.h5i_get_file_id(file)
+    # HDF5.API.h5f_set_libver_bounds(
+    #     # file.id,
+    #     file,
+    #     HDF5.API.H5F_LIBVER_V18,
+    #     HDF5.API.H5F_LIBVER_LATEST,
+    # )
+    # HDF5.API.h5f_flush(file.id)
+
+    # Root element
+    set_cgns_root!(file)
+
+    # Library version
+    create_cgns_node(
+        file,
+        "CGNSLibraryVersion",
+        "CGNSLibraryVersion_t";
+        type = "R4",
+        value = Float32[3.2],
+    )
+
+    # Base
+    cgnsBase = create_cgns_node(
+        file,
+        "Base",
+        "CGNSBase_t";
+        value = Int32[Bcube.topodim(mesh), Bcube.spacedim(mesh)],
+    )
+
+    # Zone
+    zone = create_cgns_node(
+        cgnsBase,
+        "Zone",
+        "Zone_t";
+        value = reshape(Int32[nnodes(mesh), ncells(mesh), 0], 1, 3),
+    )
+
+    # ZoneType
+    create_cgns_node(
+        zone,
+        "ZoneType",
+        "ZoneType_t";
+        value = Int8.(Vector{UInt8}("Unstructured")),
+        type = "C1",
+    )
+
+    # GridCoordinates
+    gridCoordinates =
+        create_cgns_node(zone, "GridCoordinates", "GridCoordinates_t"; type = "MT")
+    suffixes = ("X", "Y", "Z")
+    for idim in 1:Bcube.spacedim(mesh)
+        create_cgns_node(
+            gridCoordinates,
+            "Coordinate$(suffixes[idim])",
+            "DataArray_t";
+            type = "R8",
+            value = [get_coords(node, idim) for node in get_nodes(mesh)],
+        )
+    end
+
+    # Write elements
+    create_cgns_elements(mesh, zone; write_bnd_faces = false, verbose)
+
+    # Write BCs
+    create_cgns_bcs(mesh, zone; verbose)
+
+    # Write solution
+    if !isnothing(data)
+        create_flow_solutions(mesh, zone, data; verbose)
     end
 end
 
@@ -205,24 +237,26 @@ end
 
 function create_flow_solutions(mesh, zone, data; verbose = false)
     if valtype(data) <: Dict
-        # First, we check that inside each FlowSolution, the data location is the same
-        # for all variables
-        for d in values(data)
-            v = values(d)
-            @assert all(x -> x == v[1][2], values(d)) # ugly, but ok for now
-        end
+        verbose && println("Named FlowSolution(s) detected")
+        for (fname, _data) in data
 
-        foreach(
-            (name, _data) -> create_flow_solutions(mesh, zone, _data, name; verbose),
-            data,
-        )
+            # First, we check that the data location is the same
+            # for all variables
+            # -> a bit ugly, but ok for now
+            vars = values(_data)
+            U = first(vars)[2]
+            @assert all(x -> x[2] == U, vars) "The variables sharing the same FlowSolution must share the same FESpace to export"
+
+            # Then, we create a flowsolution
+            create_flow_solutions(mesh, zone, _data, fname; verbose)
+        end
     else
         create_flow_solutions(mesh, zone, data, ""; verbose)
     end
 end
 
 """
-This function is a trick to refactor some code 
+This function is a trick to refactor some code
 """
 function create_flow_solutions(mesh, zone, data, fname; verbose = false)
     @assert all(x -> is_fespace_supported(x[2]), values(data))
@@ -234,7 +268,8 @@ function create_flow_solutions(mesh, zone, data, fname; verbose = false)
         cellCenter,
         isempty(fname) ? "FlowSolutionCell" : fname,
         false,
-        Base.Fix2(var_on_centers, mesh),
+        Base.Fix2(var_on_centers, mesh);
+        verbose,
     )
 
     nodeCenter =
@@ -244,12 +279,15 @@ function create_flow_solutions(mesh, zone, data, fname; verbose = false)
         nodeCenter,
         isempty(fname) ? "FlowSolutionVertex" : fname,
         true,
-        Base.Fix2(var_on_vertices, mesh),
+        Base.Fix2(var_on_vertices, mesh);
+        verbose,
     )
 end
 
-function create_flow_solution(zone, data, fname, isVertex, projection)
+function create_flow_solution(zone, data, fname, isVertex, projection; verbose)
     isempty(data) && return
+
+    verbose && println("Writing FlowSolution '$fname'")
 
     fnode = create_cgns_node(zone, fname, "FlowSolution_t"; type = "MT")
     gdValue = isVertex ? "Vertex" : "CellCenter"

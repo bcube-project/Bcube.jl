@@ -12,14 +12,8 @@ function Bcube.read_file(
     file = h5open(filepath, "r")
     root = file
 
-    # Find the list of CGNSBase_t
-    cgnsBases = get_children(root; type = "CGNSBase_t")
-    if length(cgnsBases) == 0
-        error("Could not find any CGNSBase_t node in the file")
-    elseif length(cgnsBases) > 1
-        error("The file contains several CGNSBase_t nodes, only one base is supported")
-    end
-    cgnsBase = first(cgnsBases)
+    # Read (unique) CGNS base
+    cgnsBase = get_cgns_base(root)
 
     # Read base dimensions (topo and space)
     dims = get_value(cgnsBase)
@@ -410,55 +404,4 @@ end
 
 function is_volumic_entity(code::Integer, topo_dim)
     Bcube.topodim(cgns_entity_to_bcube_entity(code)) == topo_dim
-end
-
-function get_child(parent; name = "", type = "")
-    for child_name in keys(parent)
-        child = parent[child_name]
-        child_match(child, name, type) && (return child)
-    end
-end
-
-function get_children(parent; name = "", type = "")
-    filtered =
-        filter(child_name -> child_match(parent[child_name], name, type), keys(parent))
-    map(child_name -> parent[child_name], filtered)
-end
-
-function child_match(child, name, type)
-    if get_name(child) == name
-        if length(name) > 0 && length(type) > 0
-            (get_cgns_type(child) == type) && (return true)
-        elseif length(name) > 0
-            return true
-        end
-    end
-
-    if get_cgns_type(child) == type
-        if length(name) > 0 && length(type) > 0
-            (get_name(child) == name) && (return true)
-        elseif length(type) > 0
-            return true
-        end
-    end
-
-    return false
-end
-
-get_name(obj) = last(split(HDF5.name(obj), '/'))
-
-get_data_type(obj) = attributes(obj)["type"][]
-
-get_cgns_type(obj) = haskey(attributes(obj), "label") ? attributes(obj)["label"][] : nothing
-
-function get_value(obj)
-    data_type = get_data_type(obj)
-    data = read(obj[" data"])
-    if data_type == "C1"
-        return String(UInt8.(data))
-    elseif data_type in ("I4", "I8", "R4", "R8")
-        return data
-    else
-        error("Datatype '$(data_type)' not handled")
-    end
 end
