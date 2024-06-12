@@ -77,7 +77,7 @@ function get_value(obj)
 end
 
 function get_cgns_base(obj)
-    get_children(obj; type = "CGNSBase_t")
+    cgnsBases = get_children(obj; type = "CGNSBase_t")
     if length(cgnsBases) == 0
         error("Could not find any CGNSBase_t node in the file")
     elseif length(cgnsBases) > 1

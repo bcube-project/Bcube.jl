@@ -10,13 +10,13 @@ function Bcube.write_file(
     update_mesh = false,
     kwargs...,
 )
-    mode = collection_append ? "a+" : "w"
+    mode = collection_append ? "r+" : "w"
     fcpl = HDF5.FileCreateProperties(; track_order = true)
     # fcpl = HDF5.FileCreateProperties()
 
     h5open(basename, mode; fcpl) do file
         if collection_append
-            error("not implemented yet")
+            append_to_cgns_file(file, mesh, data, it, time; verbose, update_mesh)
         else
             create_cgns_file(file, mesh, data; verbose)
         end
@@ -38,9 +38,30 @@ function append_to_cgns_file(
     @assert !update_mesh "Mesh update not implemented yet"
 
     # Read (unique) CGNS base
-    cgnsBase = get_cgns_base(root)
+    cgnsBase = get_cgns_base(file)
 
-    # Read BaseIterativeData (if any)
+    # Find the list of Zone_t
+    zones = get_children(cgnsBase; type = "Zone_t")
+    if length(zones) == 0
+        error("Could not find any Zone_t node in the file")
+    elseif length(zones) > 1
+        error("The file contains several Zone_t nodes, only one zone is supported for now")
+    end
+    zone = first(zones)
+
+    # If it >= 0, update/create BaseIterativeData
+    if it >= 0
+        bid = get_child(cgnsBase; type = "BaseIterativeData_t")
+        if isnothing(bid)
+            verbose && println("BaseIterativeData not found, creating it")
+            bid = create_cgns_base_iterative_data(cgnsBase, get_name(zone), it, time)
+        else
+            verbose && println("Appending to BaseIterativeData")
+            append_to_base_iterative_data(bid, get_name(zone), it, time)
+        end
+    else
+        verbose && println("Skipping BaseIterativeData because iteration < 0")
+    end
 end
 
 """
@@ -134,9 +155,7 @@ function set_cgns_root!(root)
 
     v = HDF5.libversion
     version = "HDF5 Version $(v.major).$(v.minor).$(v.patch)"
-    buffer = zeros(UInt8, 33)
-    buffer[1:length(version)] .= Vector{UInt8}(version)
-    root[" hdf5version"] = Int8.(buffer)
+    root[" hdf5version"] = str2int8_with_fixed_length(version, 33)
 
     # @show HDF5.API.H5T_NATIVE_DOUBLE
     # @show HDF5.API.H5T_NATIVE_FLOAT
@@ -305,7 +324,7 @@ function create_cgns_node(parent, name, label; type = "I4", value = nothing)
     child = create_group(parent, name; track_order = true)
     set_cgns_attr!(child, name, label, type)
     if !isnothing(value)
-        append_data(child, value)
+        append_cgns_data(child, value)
     end
     return child
 end
@@ -332,10 +351,63 @@ function is_fespace_supported(U)
     return false
 end
 
-function append_data(obj, data)
+function create_cgns_base_iterative_data(parent, zonename, it, time)
+    bid = create_cgns_node(
+        parent,
+        "BaseIterativeData",
+        "BaseIterativeData_t";
+        type = "I4",
+        value = Int32(1),
+    )
+    create_cgns_node(bid, "NumberOfZones", "DataArray_t"; type = "I4", value = Int32(1))
+    create_cgns_node(bid, "TimeValues", "DataArray_t"; type = "R8", value = time)
+    create_cgns_node(bid, "IterationValues", "DataArray_t"; type = "I4", value = Int32(it))
+    str = str2int8_with_fixed_length(zonename, 32)
+    create_cgns_node(
+        bid,
+        "ZonePointers",
+        "DataArray_t";
+        type = "C1",
+        value = reshape(str, 32, 1, 1),
+    )
+
+    return bid
+end
+
+function append_to_base_iterative_data(bid, zonename, it, time)
+    numberOfZones = get_child(bid; name = "NumberOfZones")
+    nzones = first(get_value(numberOfZones)) # 'first' because `get_value` returns an Array
+    update_cgns_data(numberOfZones, nzones + Int32(1))
+
+    timeValues = get_child(bid; name = "TimeValues")
+    data = push!(get_value(timeValues), time)
+    update_cgns_data(timeValues, data)
+
+    # Warning : CGNS also allows for a "TimeDurations" node instead of "IterationValues"
+    iterationValues = get_child(bid; name = "IterationValues")
+    data = push!(get_value(iterationValues), it)
+    update_cgns_data(iterationValues, data)
+
+    zonePointers = get_child(bid; name = "ZonePointers")
+    data = read(zonePointers[" data"])
+    new_data = zeros(eltype(data), (32, 1, nzones + 1))
+    str = str2int8_with_fixed_length(zonename, 32)
+    for i in 1:nzones
+        new_data[:, 1, i] .= data[:, 1, i]
+    end
+    new_data[:, 1, end] .= str
+    update_cgns_data(zonePointers, new_data)
+end
+
+function append_cgns_data(obj, data)
     _data = data isa AbstractArray ? data : [data]
     dset = create_dataset(obj, " data", eltype(_data), size(_data))
     write(dset, _data)
+end
+
+function update_cgns_data(obj, data)
+    delete_object(obj, " data")
+    append_cgns_data(obj, data)
 end
 
 function set_cgns_attr!(obj, name, label, type)
@@ -378,6 +450,12 @@ function build_cgns_string_dtype(length)
 end
 
 str2int8(str) = return Int8.(Vector{UInt8}(str))
+
+function str2int8_with_fixed_length(str, n)
+    buffer = zeros(UInt8, n)
+    buffer[1:length(str)] .= Vector{UInt8}(str)
+    return Int8.(buffer)
+end
 
 union_types(x::Union) = (x.a, union_types(x.b)...)
 union_types(x::Type) = (x,)
