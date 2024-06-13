@@ -311,7 +311,7 @@ function read_solutions(zone, varnames, verbose)
     # end
 
     fSols = Dict(
-        get_name(fs) => read_solution(fs, varnames) for
+        get_name(fs) => read_solution(zone, fs, varnames) for
         fs in get_children(zone; type = "FlowSolution_t")
     )
 
@@ -323,13 +323,28 @@ Read a FlowSolution node.
 
 Return a NamedTuple with flow solution name, grid location and array of vectors.
 """
-function read_solution(fs, varnames)
+function read_solution(zone, fs, varnames)
     # Read GridLocation : we could deal with a missing GridLocation node, by later comparing
     # the length of the DataArray to the number of cells / nodes of the zone. Let's do this
     # later.
     node = get_child(fs; type = "GridLocation_t")
-    @assert !isnothing(node) "Missing GridLocation in FlowSolution '$(get_name(fs))'"
-    gridLocation = get_value(node)
+    if isnothing(node)
+        _nnodes, _ncells, _ = get_zone_dims(zone)
+        dArray = get_child(fs; type = "DataArray_t")
+        err_msg = "Could not determine GridLocation in FlowSolution '$(get_name(fs))'"
+        @assert !isnothing(dArray) err_msg
+        x = get_value(dArray)
+        if length(x) == _nnodes
+            gridLocation = "Vertex"
+        elseif length(x) == _ncells
+            gridLocation = "CellCenter"
+        else
+            error(err_msg)
+        end
+        @warn "Missing GridLocation in FlowSolution '$(get_name(fs))', autoset to '$gridLocation'"
+    else
+        gridLocation = get_value(node)
+    end
 
     # Read variables matching asked "varnames"
     dArrays = get_children(fs; type = "DataArray_t")
@@ -404,4 +419,11 @@ end
 
 function is_volumic_entity(code::Integer, topo_dim)
     Bcube.topodim(cgns_entity_to_bcube_entity(code)) == topo_dim
+end
+
+"""
+Return nnodes, ncells, nbnd
+"""
+function get_zone_dims(zone)
+    d = get_value(zone)
 end
