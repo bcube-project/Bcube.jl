@@ -8,6 +8,7 @@ function Bcube.write_file(
     collection_append = false,
     verbose = false,
     update_mesh = false,
+    skip_iterative_data = false,
     kwargs...,
 )
     mode = collection_append ? "r+" : "w"
@@ -16,9 +17,18 @@ function Bcube.write_file(
 
     h5open(basename, mode; fcpl) do file
         if collection_append
-            append_to_cgns_file(file, mesh, data, it, time; verbose, update_mesh)
+            append_to_cgns_file(
+                file,
+                mesh,
+                data,
+                it,
+                time;
+                verbose,
+                update_mesh,
+                skip_iterative_data,
+            )
         else
-            create_cgns_file(file, mesh, data; verbose)
+            create_cgns_file(file, mesh, data; verbose, skip_iterative_data)
         end
     end
 end
@@ -34,6 +44,7 @@ function append_to_cgns_file(
     time;
     verbose = false,
     update_mesh = false,
+    skip_iterative_data,
 )
     @assert !update_mesh "Mesh update not implemented yet"
 
@@ -50,24 +61,26 @@ function append_to_cgns_file(
     zone = first(zones)
 
     # If it >= 0, update/create BaseIterativeData
-    if it >= 0
-        bid = get_child(cgnsBase; type = "BaseIterativeData_t")
-        if isnothing(bid)
-            verbose && println("BaseIterativeData not found, creating it")
-            bid = create_cgns_base_iterative_data(cgnsBase, get_name(zone), it, time)
-        else
-            verbose && println("Appending to BaseIterativeData")
-            append_to_base_iterative_data(bid, get_name(zone), it, time)
-        end
+    if it >= 0 && !skip_iterative_data
+        append_to_base_iterative_data(cgnsBase, get_name(zone), it, time)
     else
-        verbose && println("Skipping BaseIterativeData because iteration < 0")
+        verbose &&
+            println("Skipping BaseIterativeData because iteration < 0 or asked to skip it")
+    end
+
+    # Append solution
+    create_flow_solutions(mesh, zone, data, it, true; verbose)
+
+    # Append to ZoneIterativeData
+    if it >= 0 && !skip_iterative_data
+        append_to_zone_iterative_data(zone, it; verbose)
     end
 end
 
 """
 Create the whole file from scratch
 """
-function create_cgns_file(file, mesh, data; verbose)
+function create_cgns_file(file, mesh, data; verbose, skip_iterative_data)
     # @show file.id
     # @show HDF5.API.h5i_get_file_id(file)
     # HDF5.API.h5f_set_libver_bounds(
@@ -137,7 +150,14 @@ function create_cgns_file(file, mesh, data; verbose)
 
     # Write solution
     if !isnothing(data)
-        create_flow_solutions(mesh, zone, data; verbose)
+        create_flow_solutions(mesh, zone, data, it, false; verbose)
+    end
+
+    # Base and zone iterative data
+    if it >= 0 && !skip_iterative_data
+        verbose && println("Creating BaseIterativeData and ZoneIterativeData")
+        create_cgns_base_iterative_data(cgnsBase, get_name(zone), it, time)
+        create_cgns_zone_iterative_data(zon, it; verbose)
     end
 end
 
@@ -254,7 +274,10 @@ function create_cgns_bcs(mesh, zone; verbose = false)
     end
 end
 
-function create_flow_solutions(mesh, zone, data; verbose = false)
+"""
+`append` indicates if the FlowSolution(s) may already exist (and hence completed) or not.
+"""
+function create_flow_solutions(mesh, zone, data, it, append; verbose = false)
     if valtype(data) <: Dict
         verbose && println("Named FlowSolution(s) detected")
         for (fname, _data) in data
@@ -267,50 +290,64 @@ function create_flow_solutions(mesh, zone, data; verbose = false)
             @assert all(x -> x[2] == U, vars) "The variables sharing the same FlowSolution must share the same FESpace to export"
 
             # Then, we create a flowsolution
-            create_flow_solutions(mesh, zone, _data, fname; verbose)
+            create_flow_solutions(mesh, zone, _data, fname, it, append; verbose)
         end
     else
-        create_flow_solutions(mesh, zone, data, ""; verbose)
+        create_flow_solutions(mesh, zone, data, "", it, append; verbose)
     end
 end
 
 """
 This function is a trick to refactor some code
 """
-function create_flow_solutions(mesh, zone, data, fname; verbose = false)
+function create_flow_solutions(mesh, zone, data, fname, it, append; verbose = false)
     @assert all(x -> is_fespace_supported(x[2]), values(data))
 
     cellCenter =
         filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 0, data)
+    _fname = isempty(fname) ? "FlowSolutionCell" : fname
+    (it >= 0) && (_fname *= iteration_to_string(it))
     create_flow_solution(
         zone,
         cellCenter,
-        isempty(fname) ? "FlowSolutionCell" : fname,
+        _fname,
         false,
-        Base.Fix2(var_on_centers, mesh);
+        Base.Fix2(var_on_centers, mesh),
+        append;
         verbose,
     )
 
     nodeCenter =
         filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 1, data)
+    _fname = isempty(fname) ? "FlowSolutionVertex" : fname
+    (it >= 0) && (_fname *= iteration_to_string(it))
     create_flow_solution(
         zone,
         nodeCenter,
-        isempty(fname) ? "FlowSolutionVertex" : fname,
+        _fname,
         true,
-        Base.Fix2(var_on_vertices, mesh);
+        Base.Fix2(var_on_vertices, mesh),
+        append;
         verbose,
     )
 end
 
-function create_flow_solution(zone, data, fname, isVertex, projection; verbose)
+function create_flow_solution(zone, data, fname, isVertex, projection, append; verbose)
     isempty(data) && return
 
     verbose && println("Writing FlowSolution '$fname'")
 
-    fnode = create_cgns_node(zone, fname, "FlowSolution_t"; type = "MT")
-    gdValue = isVertex ? "Vertex" : "CellCenter"
-    create_grid_location(fnode, gdValue)
+    # Try to get an existing node. If it exists and append=true,
+    # an error is raised.
+    # Otherwise, a new node is created.
+    fnode = get_child(zone; name = fname, type = "FlowSolution_t")
+    if !isnothing(fnode) && !append
+        error("The node '$fname' already exists")
+    else
+        fnode = create_cgns_node(zone, fname, "FlowSolution_t"; type = "MT")
+        gdValue = isVertex ? "Vertex" : "CellCenter"
+        create_grid_location(fnode, gdValue)
+    end
 
     for (name, val) in data
         var = val[1]
@@ -318,6 +355,15 @@ function create_flow_solution(zone, data, fname, isVertex, projection; verbose)
         create_cgns_node(fnode, name, "DataArray_t"; type = "R8", value = y)
     end
     return fnode
+end
+
+function append_flow_solutions(zone, data)
+    if valtype(data) <: Dict
+        verbose && println("Named FlowSolution(s) detected")
+        for (fname, _data) in data
+        end
+    else
+    end
 end
 
 function create_cgns_node(parent, name, label; type = "I4", value = nothing)
@@ -374,29 +420,115 @@ function create_cgns_base_iterative_data(parent, zonename, it, time)
     return bid
 end
 
-function append_to_base_iterative_data(bid, zonename, it, time)
+"""
+# Warnings
+* CGNS also allows for a "TimeDurations" node instead of "IterationValues"
+* a unique zone is assumed
+"""
+function append_to_base_iterative_data(cgnsBase, zonename, it, time)
+    bid = get_child(cgnsBase; type = "BaseIterativeData_t")
+
+    # Check if node exists, if not -> create it
+    if isnothing(bid)
+        verbose && println("BaseIterativeData not found, creating it")
+        return create_cgns_base_iterative_data(cgnsBase, zonename, it, time)
+    end
+
+    # First, we check if the given iteration is not already known from the
+    # BaseIterativeData. If it is the case, we don't do anything.
+    # Note that in the maia example, the node IterationValues does not exist,
+    # hence we skip this part if the node is not found.
+    iterationValues = get_child(bid; name = "IterationValues")
+    if !isnothing(iterationValues)
+        iterations = get_value(iterationValues)
+        (it ∈ iterations) && return
+        push!(iterations, it)
+        update_cgns_data(iterationValues, iterations)
+    end
+
     numberOfZones = get_child(bid; name = "NumberOfZones")
-    nzones = first(get_value(numberOfZones)) # 'first' because `get_value` returns an Array
-    update_cgns_data(numberOfZones, nzones + Int32(1))
+    data = get_value(numberOfZones)
+    nsteps = length(data)
+    push!(data, 1)
+    update_cgns_data(numberOfZones, data)
 
     timeValues = get_child(bid; name = "TimeValues")
     data = push!(get_value(timeValues), time)
     update_cgns_data(timeValues, data)
 
-    # Warning : CGNS also allows for a "TimeDurations" node instead of "IterationValues"
-    iterationValues = get_child(bid; name = "IterationValues")
-    data = push!(get_value(iterationValues), it)
-    update_cgns_data(iterationValues, data)
-
     zonePointers = get_child(bid; name = "ZonePointers")
     data = read(zonePointers[" data"])
-    new_data = zeros(eltype(data), (32, 1, nzones + 1))
+    new_data = zeros(eltype(data), (32, 1, nsteps + 1))
     str = str2int8_with_fixed_length(zonename, 32)
-    for i in 1:nzones
+    for i in 1:nsteps
         new_data[:, 1, i] .= data[:, 1, i]
     end
     new_data[:, 1, end] .= str
     update_cgns_data(zonePointers, new_data)
+end
+
+"""
+Call to this function must be performed AFTER the FlowSolution creation
+"""
+function create_cgns_zone_iterative_data(zone, it; verbose)
+    # Find the FlowSolution name that matches the iteration
+    fsname = "NotFound"
+    for fs in get_children(zone; type = "FlowSolution_t")
+        _fsname = get_name(fs)
+        if endswith(_fsname, iteration_to_string(it))
+            fsname = _fsname
+            break
+        end
+    end
+    verbose && println("Attaching iteration $it to FlowSolution '$fsname'")
+
+    # Create node
+    zid = create_cgns_node(zone, "ZoneIterativeData", "ZoneIterativeData_t"; type = "MT")
+    str = str2int8_with_fixed_length(fsname, 32)
+    create_cgns_node(
+        zid,
+        "FlowSolutionPointers",
+        "DataArray_t";
+        type = "C1",
+        value = reshape(str, 32, 1),
+    )
+
+    return zid
+end
+
+"""
+Call to this function must be performed AFTER the FlowSolution creation
+
+# Warning
+CGNS does seem to allow multiple FlowSolution nodes for one time step in a Zone.
+"""
+function append_to_zone_iterative_data(zone, it; verbose)
+    # Find the FlowSolution name that matches the iteration
+    fsname = "NotFound"
+    for fs in get_children(zone; type = "FlowSolution_t")
+        _fsname = get_name(fs)
+        if endswith(_fsname, iteration_to_string(it))
+            fsname = _fsname
+            break
+        end
+    end
+    verbose && println("Attaching iteration $it to FlowSolution '$fsname'")
+
+    # Get ZoneIterativeData node (or create it)
+    zid = get_child(zone; type = "ZoneIterativeData_t")
+    isnothing(zid) && (return create_cgns_zone_iterative_data(zone, it))
+
+    # Append to FlowSolutionPointers
+    fsPointers = get_child(zid; name = "FlowSolutionPointers")
+    data = read(fsPointers[" data"])
+    n = size(data, 2)
+    new_data = zeros(eltype(data), (32, n + 1))
+    str = str2int8_with_fixed_length(fsname, 32)
+    for i in 1:n
+        new_data[:, i] .= data[:, i]
+    end
+    new_data[:, end] .= str
+    update_cgns_data(fsPointers, new_data)
 end
 
 function append_cgns_data(obj, data)
@@ -459,3 +591,5 @@ end
 
 union_types(x::Union) = (x.a, union_types(x.b)...)
 union_types(x::Type) = (x,)
+
+iteration_to_string(it) = "#$it"

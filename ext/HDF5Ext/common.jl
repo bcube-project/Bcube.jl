@@ -58,7 +58,7 @@ function child_match(child, name, type)
     return false
 end
 
-get_name(obj) = last(split(HDF5.name(obj), '/'))
+get_name(obj) = String(last(split(HDF5.name(obj), '/')))
 
 get_data_type(obj) = attributes(obj)["type"][]
 
