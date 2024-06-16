@@ -115,8 +115,8 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
     nbnd2 = length(bndfaces2)
 
     # Allocate result
-    bnd_f2n1 = [f2n[iface] for iface in bndfaces2]
-    bnd_f2n2 = [f2n[iface] for iface in bndfaces2]
+    bnd_f2n1 = [zero(f2n[iface]) for iface in bndfaces1]
+    bnd_f2n2 = [zero(f2n[iface]) for iface in bndfaces2]
     bnd_f2c = zeros(Int, nbnd2, 2) # Adjacent cells for each bnd face
     bnd_ftypes = Array{AbstractEntityType}(undef, nbnd2)
 
