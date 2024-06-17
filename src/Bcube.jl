@@ -24,7 +24,7 @@ import .LazyOperators:
 include("utils.jl")
 
 include("./mesh/transformation.jl")
-export Translation
+export Translation, Rotation
 
 include("./mesh/boundary_condition.jl")
 export BoundaryCondition, PeriodicBCType

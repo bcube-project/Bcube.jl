@@ -1240,12 +1240,15 @@ function gen_cylinder_shell_mesh(
     # Mesh settings
     if transfinite
         _nθ = round(Int, nθ / 3)
-        map(
+        foreach(
             line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, _nθ),
             (AOB1, BOC1, COA1, AOB2, BOC2, COA2),
         )
-        map(line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, nz), (A1A2, B1B2, C1C2))
-        map(surf -> gmsh.model.geo.mesh.setTransfiniteSurface(surf), surfs)
+        foreach(
+            line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, nz),
+            (A1A2, B1B2, C1C2),
+        )
+        foreach(gmsh.model.geo.mesh.setTransfiniteSurface, surfs)
     end
     recombine && map(surf -> gmsh.model.geo.mesh.setRecombine(2, surf), surfs)
 
