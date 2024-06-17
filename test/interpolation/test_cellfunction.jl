@@ -287,4 +287,34 @@ end
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u
         @test abs(ν2 ⋅ v1_in_2) < 1e-16
     end
+
+    @testset "Point interpolation" begin
+        degree = 2
+        path = joinpath(tempdir, "mesh.msh")
+        gen_rectangle_mesh_with_tri_and_quad(path; nx = 10, ny = 10, xc = 0.5, yc = 0.5)
+        mesh = read_msh(path)
+        Uspace = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh; size = 2)
+        Vspace = TestFESpace(Uspace)
+        dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
+
+        pointFinder = Bcube.PointFinder(mesh)
+
+        u = FEFunction(Uspace)
+        f1((x, y)) = SA[x + 4y + 1, 7x * x + 2y * x + 2y * y + 3y + 12]
+        projection_l2!(u, PhysicalFunction(f1), dΩ)
+        npoints = 20
+        xp = [rand(SVector{2}) for i in 1:npoints]
+        icells = map(Base.Fix1(Bcube.find_cell, pointFinder), xp)
+        cpoints = map(
+            (x, i) ->
+                Bcube.CellPoint(x, Bcube.CellInfo(mesh, i), Bcube.PhysicalDomain()),
+            xp,
+            icells,
+        )
+        up = map(cpoints) do cpoint
+            uᵢ = Bcube.materialize(u, Bcube.get_cellinfo(cpoint))
+            Bcube.materialize(uᵢ, cpoint)
+        end
+        @test all(f1.(xp) .≈ up)
+    end
 end
