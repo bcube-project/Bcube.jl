@@ -215,7 +215,7 @@ end
 
 `S` is the codomain size of `f`.
 """
-function CellFunction(f::Function, ds::DomainStyle, ::Val{S}) where {S}
+function CellFunction(f::F, ds::DomainStyle, ::Val{S}) where {F <: Function, S}
     CellFunction{typeof(ds), S, typeof(f)}(f)
 end
 
