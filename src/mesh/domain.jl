@@ -115,8 +115,8 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
     nbnd2 = length(bndfaces2)
 
     # Allocate result
-    bnd_f2n1 = [f2n[iface] for iface in bndfaces2]
-    bnd_f2n2 = [f2n[iface] for iface in bndfaces2]
+    bnd_f2n1 = [zero(f2n[iface]) for iface in bndfaces1]
+    bnd_f2n2 = [zero(f2n[iface]) for iface in bndfaces2]
     bnd_f2c = zeros(Int, nbnd2, 2) # Adjacent cells for each bnd face
     bnd_ftypes = Array{AbstractEntityType}(undef, nbnd2)
 
@@ -233,6 +233,13 @@ function BoundaryFaceDomain(mesh::AbstractMesh, args...; kwargs...)
     BoundaryFaceDomain(parent(mesh), args...; kwargs...)
 end
 
+"""
+    abstract type AbstractDomainIndex
+
+# Devs notes
+All subtypes should implement the following functions:
+- get_element_type(::AbstractDomainIndex)
+"""
 abstract type AbstractDomainIndex end
 
 abstract type AbstractCellInfo <: AbstractDomainIndex end
@@ -250,6 +257,7 @@ end
 @inline celltype(c::CellInfo) = c.ctype
 @inline nodes(c::CellInfo) = c.nodes
 @inline get_nodes_index(c::CellInfo) = c.c2n
+get_element_type(c::CellInfo) = celltype(c)
 
 """ Legacy constructor for CellInfo : no information about node indices """
 CellInfo(icell, ctype, nodes) = CellInfo(icell, ctype, nodes, nothing)
@@ -285,6 +293,9 @@ end
 @inline celltype(c::CellSide) = c.ctype
 @inline nodes(c::CellSide) = c.nodes
 @inline cell2nodes(c::CellSide) = c.c2n
+get_element_type(c::CellSide) = celltype(c)
+
+abstract type AbstractFaceInfo <: AbstractDomainIndex end
 
 """
     FaceInfo{CN<:CellInfo,CP<:CellInfo,FT,FN,F2N,I}
@@ -302,7 +313,7 @@ are duplicate from the negative ones.
 is stored explicitely in `FaceInfo` even if it could have been
 computed by collecting info from the side of the negative or positive cells.
 """
-struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N, I}
+struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N, I} <: AbstractFaceInfo
     cellinfo_n::CN
     cellinfo_p::CP
     cellside_n::Int
@@ -379,6 +390,7 @@ get_cellinfo_p(faceInfo::FaceInfo) = faceInfo.cellinfo_p
 @inline get_nodes_index(faceInfo::FaceInfo) = faceInfo.f2n
 get_cell_side_n(faceInfo::FaceInfo) = faceInfo.cellside_n
 get_cell_side_p(faceInfo::FaceInfo) = faceInfo.cellside_p
+get_element_type(c::FaceInfo) = facetype(c)
 
 """
 Return the opposite side of the `FaceInfo` : cellside "n" because cellside "p"
@@ -405,6 +417,8 @@ Base.iterate(::AbstractDomainIterator) = error("to be defined")
 Base.iterate(::AbstractDomainIterator, state) = error("to be defined")
 Base.eltype(::AbstractDomainIterator) = error("to be defined")
 Base.length(iter::AbstractDomainIterator) = length(indices(get_domain(iter)))
+Base.firstindex(::AbstractDomainIterator) = 1
+Base.getindex(::AbstractDomainIterator, i) = error("to be defined")
 
 struct DomainIterator{D <: AbstractDomain} <: AbstractDomainIterator{D}
     domain::D
@@ -421,9 +435,10 @@ function Base.iterate(iter::DomainIterator, i::Integer = 1)
     end
 end
 
+Base.getindex(iter::DomainIterator, i) = _get_index(get_domain(iter), i)
+
 function _get_index(domain::AbstractCellDomain, i::Integer)
     icell = indices(domain)[i]
-    i ≠ icell && error("Only dense indexing is supported (i=$i  icell=$icell)")  # TODO
     mesh = get_mesh(domain)
     _get_cellinfo(mesh, icell)
 end

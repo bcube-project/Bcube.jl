@@ -1,4 +1,4 @@
-@testset "ref2loc" begin
+@testset "ref2phys" begin
 
     # TODO : add more test for gradients, waiting for Ghislain's commit
 
@@ -22,7 +22,7 @@
         λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         r = rand()
         q = [r]
-        u = interpolate(λ, q[dof(dhl, 1)])
+        u = interpolate(λ, q[get_dof(dhl, 1)])
         @test isapprox_arrays(λ(rand(1)), [1.0])
         @test all(isapprox(u([x]), r; rtol = eps()) for x in xtest)
         #-- new api
@@ -41,7 +41,7 @@
         λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         coef = rand()
         q = [coef * (xmin + xmax) / 2, (xmax - xmin) * coef] # f(x) = coef*x
-        u = interpolate(λ, q[dof(dhl, 1)])
+        u = interpolate(λ, q[get_dof(dhl, 1)])
         @test isapprox(λ([xmin]), [1.0, -0.5])
         @test isapprox_arrays(λ(xc), [1.0, 0.0])
         @test isapprox_arrays(λ([xmax]), [1.0, 0.5])
@@ -144,7 +144,7 @@
         λ = shape_functions(fs, shape(ctype))
         r = rand()
         q = [r]
-        u = interpolate(λ, q[dof(dhl, 1)])
+        u = interpolate(λ, q[get_dof(dhl, 1)])
         @test isapprox_arrays(λ(rand(2)), [1.0])
         @test all(isapprox(u(x), r; rtol = eps()) for x in xtest)
         #-- new api
@@ -163,7 +163,7 @@
         λ = x -> shape_functions(fs, shape(ctype), Finv(x))
         coefx, coefy = rand(2)
         q = [[coefx, coefy] ⋅ xc, Δx * coefx, Δy * coefy] # f(x,y) = coefx*x + coefy*y
-        u = interpolate(λ, q[dof(dhl, 1)])
+        u = interpolate(λ, q[get_dof(dhl, 1)])
         xr = rand(2)
         @test isapprox(λ(xr), [1.0, (xr[1] - xc[1]) / Δx, (xr[2] - xc[2]) / Δy])
         @test all(isapprox(u(x), [coefx, coefy] ⋅ x) for x in xtest)

@@ -156,7 +156,7 @@ function ∂λξ_∂ξ_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Line, ξ) wh
 end
 # #############################
 
-function ndofs(fs::FunctionSpace{<:Lagrange, D}, shape::AbstractShape) where {D}
+function get_ndofs(fs::FunctionSpace{<:Lagrange, D}, shape::AbstractShape) where {D}
     quadtype = lagrange_quadrature_type(fs)
     quadrule = QuadratureRule(shape, Quadrature(quadtype, Val(D)))
     return length(quadrule)
@@ -234,8 +234,8 @@ function shape_functions(
 end
 
 # Lagrange function for degree = 0
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Line, ξ) = SA[1.0]
-ndofs(::FunctionSpace{<:Lagrange, 0}, ::Line) = 1
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Line, ξ) = SA[one(eltype(ξ))]
+get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Line) = 1
 
 """
     ∂λξ_∂ξ(::FunctionSpace{<:Lagrange}, ::Val{1}, ::AbstractShape, ξ)
@@ -308,15 +308,16 @@ ndofs(::FunctionSpace{<:Lagrange, 0}, ::Line) = 1
 
 """
 function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Line, ξ::Number)
-    SA[0.0]
+    SA[zero(ξ)]
 end
 
 # Functions for Triangle shape
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Triangle, ξ) = SA[1.0]
-ndofs(::FunctionSpace{<:Lagrange, 0}, ::Triangle) = 1
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Triangle, ξ) = SA[one(eltype(ξ))]
+get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Triangle) = 1
 
 function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Triangle, ξ)
-    return SA[0.0 0.0]
+    _zero = zero(eltype(ξ))
+    return SA[_zero _zero]
 end
 
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Triangle, ξ)
@@ -335,7 +336,7 @@ function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Triangle, ξ)
     ]
 end
 
-ndofs(::FunctionSpace{<:Lagrange, 1}, ::Triangle) = 3
+get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Triangle) = 3
 
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 2}, ::Triangle, ξ)
     return SA[
@@ -359,7 +360,7 @@ function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 2}, ::Val{1}, ::Triangle, ξ)
     ]
 end
 
-ndofs(::FunctionSpace{<:Lagrange, 2}, ::Triangle) = 6
+get_ndofs(::FunctionSpace{<:Lagrange, 2}, ::Triangle) = 6
 
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 3}, ::Triangle, ξ)
     λ1 = 1 - ξ[1] - ξ[2]
@@ -379,20 +380,24 @@ function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 3}, ::Triangle, ξ)
     ]
 end
 
-ndofs(::FunctionSpace{<:Lagrange, 3}, ::Triangle) = 10
+get_ndofs(::FunctionSpace{<:Lagrange, 3}, ::Triangle) = 10
 
 # Functions for Square shape
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Square, ξ) = SA[1.0]
-ndofs(::FunctionSpace{<:Lagrange, 0}, ::Square) = 1
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Square, ξ) = SA[one(eltype(ξ))]
+get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Square) = 1
 
 function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Square, ξ)
-    return SA[0.0 0.0]
+    _zero = zero(eltype(ξ))
+    return SA[_zero _zero]
 end
 
 # Tetra
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Tetra, ξ) = SA[1.0]
-grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Tetra, ξ) = SA[0.0 0.0 0.0]
-ndofs(::FunctionSpace{<:Lagrange, 0}, ::Tetra) = 1
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Tetra, ξ) = SA[one(eltype(ξ))]
+function grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Tetra, ξ)
+    _zero = zero(eltype(ξ))
+    return SA[_zero _zero _zero]
+end
+get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Tetra) = 1
 
 """
     shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Tetra, ξ)
@@ -423,21 +428,23 @@ function grad_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Tetra,
         0 0 1
     ]
 end
-ndofs(::FunctionSpace{<:Lagrange, 1}, ::Tetra) = 4
+get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Tetra) = 4
 
 # Functions for Cube shape
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Cube, ξ) = SA[1.0]
-ndofs(::FunctionSpace{<:Lagrange, 0}, ::Cube) = 1
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Cube, ξ) = SA[one(eltype(ξ))]
+get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Cube) = 1
 function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Cube, ξ)
-    SA[0.0 0.0 0.0]
+    _zero = zero(eltype(ξ))
+    SA[_zero _zero _zero]
 end
 
 # Prism
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Prism, ξ) = SA[1.0]
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Prism, ξ) = SA[one(eltype(ξ))]
 function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Prism, ξ)
-    SA[0.0 0.0 0.0]
+    _zero = zero(eltype(ξ))
+    SA[_zero _zero _zero]
 end
-ndofs(::FunctionSpace{<:Lagrange, 0}, ::Prism) = 1
+get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Prism) = 1
 
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Prism, ξηζ)
     ξ, η, ζ = ξηζ
@@ -463,13 +470,16 @@ function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Prism, ξηζ
     ] ./ 2.0
 end
 
-ndofs(::FunctionSpace{<:Lagrange, 1}, ::Prism) = 6
+get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Prism) = 6
 
 # Pyramid
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Pyramid, ξ) = SA[1.0]
-ndofs(::FunctionSpace{<:Lagrange, 0}, ::Pyramid) = 1
+_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Pyramid, ξ) = SA[one(eltype(ξ))]
+get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Pyramid) = 1
 
-∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Pyramid, ξ) = SA[0.0 0.0]
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Pyramid, ξ)
+    _zero = zero(eltype(ξ))
+    SA[_zero _zero _zero]
+end
 
 function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Pyramid, ξηζ)
     ξ = ξηζ[1]
@@ -488,7 +498,7 @@ function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Pyramid, ξη
     ]
 end
 
-ndofs(::FunctionSpace{<:Lagrange, 1}, ::Pyramid) = 5
+get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Pyramid) = 5
 
 # bmxam/remark : I first tried to write "generic" functions covering multiple case. But it's easy to
 # forget some case and think they are already covered. In the end, it's easier to write them all explicitely,

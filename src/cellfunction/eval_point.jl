@@ -148,6 +148,17 @@ function FacePoint(x, faceInfo::FaceInfo, ds::DomainStyle)
 end
 
 """
+Return the opposite side of the `FacePoint`
+"""
+function opposite_side(fPoint::FacePoint)
+    return FacePoint(
+        get_coords(fPoint),
+        opposite_side(get_faceinfo(fPoint)),
+        DomainStyle(fPoint),
+    )
+end
+
+"""
 Return the `CellPoint` corresponding to the `FacePoint` on negative side
 """
 function side_n(facePoint::FacePoint{ReferenceDomain})
@@ -215,4 +226,31 @@ function change_domain(p::FacePoint{ReferenceDomain}, ::PhysicalDomain)
     m(x) = mapping(facetype(faceInfo), nodes(faceInfo), x)
     x_phy = _apply_mapping(m, get_coords(p))
     FacePoint(x_phy, faceInfo, PhysicalDomain())
+end
+
+ElementPoint(x, elementInfo::CellInfo, ds) = CellPoint(x, elementInfo, ds)
+ElementPoint(x, elementInfo::FaceInfo, ds) = FacePoint(x, elementInfo, ds)
+
+"""
+    get_dummy_element_point(elementInfo::AbstractDomainIndex)
+    get_dummy_element_point(domain::AbstractDomain)
+
+Return a `CellPoint` (or a `FacePoint` depending on the
+type of `elementInfo`) whose coordinates are equals
+to the center of the reference shape of the element.
+
+For a `domain` argument, the point is built from its firt element.
+
+# Devs notes:
+These utility functions can be used to easily materialize
+a `CellFunction` and get the type of the result for example.
+"""
+function get_dummy_element_point(elementInfo::AbstractDomainIndex)
+    x = center(shape(get_element_type(elementInfo)))
+    ElementPoint(x, elementInfo, ReferenceDomain())
+end
+
+function get_dummy_element_point(domain::AbstractDomain)
+    elementInfo = first(DomainIterator(domain))
+    get_dummy_element_point(elementInfo)
 end

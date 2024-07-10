@@ -60,7 +60,7 @@ several FESpace (see MultiFESpace), the sum of all dofs is returned.
 get_ndofs(feSpace::AbstractFESpace) = get_ndofs(parent(feSpace))
 
 function get_ndofs(feSpace::AbstractFESpace, shape::AbstractShape)
-    ndofs(get_function_space(feSpace), shape) * get_ncomponents(feSpace)
+    get_ndofs(get_function_space(feSpace), shape) * get_ncomponents(feSpace)
 end
 
 function get_dofs(feSpace::AbstractFESpace, icell::Int, n::Val{N}) where {N}
@@ -145,11 +145,11 @@ is_continuous(feSpace::SingleFESpace) = feSpace.isContinuous
 
 _get_dof_handler(feSpace::SingleFESpace) = feSpace.dhl
 
-get_dofs(feSpace::SingleFESpace, icell::Int) = dof(feSpace.dhl, icell)
+get_dofs(feSpace::SingleFESpace, icell::Int) = get_dof(feSpace.dhl, icell)
 function get_dofs(feSpace::SingleFESpace, icell::Int, n::Val{N}) where {N}
-    dof(feSpace.dhl, icell, n)
+    get_dof(feSpace.dhl, icell, n)
 end
-get_ndofs(feSpace::SingleFESpace) = ndofs(_get_dhl(feSpace))
+get_ndofs(feSpace::SingleFESpace) = get_ndofs(_get_dhl(feSpace))
 
 get_dirichlet_boundary_tags(feSpace::SingleFESpace) = feSpace.dirichletBndTags
 
@@ -309,7 +309,8 @@ function MultiplierFESpace(mesh::AbstractMesh, size::Int = 1, kwargs...)
         offset[:, i] .= i - 1
     end
     ndofs = ones(ncells(mesh), size)
-    dhl = DofHandler(iglob, offset, ndofs)
+    ndofs_tot = length(unique(iglob))
+    dhl = DofHandler(iglob, offset, ndofs, ndofs_tot)
 
     feSpace = SingleFESpace{size, typeof(fSpace)}(fSpace, dhl, true, Int[])
 
@@ -551,7 +552,7 @@ end
 Build a global numbering using an Array-Of-Struct strategy
 """
 function _build_mapping_AoS(feSpaces::Tuple{Vararg{TrialOrTest}}, ncells::Int)
-    # mapping = ntuple(i -> zeros(Int, ndofs(_get_dhl(feSpaces[i]))), length(feSpaces))
+    # mapping = ntuple(i -> zeros(Int, get_ndofs(_get_dhl(feSpaces[i]))), length(feSpaces))
     # mapping = ntuple(i -> zeros(Int, get_ndofs(feSpaces[i])), N)
     mapping = ntuple(i -> zeros(Int, get_ndofs(feSpaces[i])), length(feSpaces))
     ndofs = 0
@@ -571,7 +572,7 @@ end
 
 """ Build a global numbering using an Struct-Of-Array strategy """
 function _build_mapping_SoA(feSpaces::Tuple{Vararg{TrialOrTest}}, ncells::Int)
-    # mapping = ntuple(i -> zeros(Int, ndofs(_get_dhl(feSpaces[i]))), length(feSpaces))
+    # mapping = ntuple(i -> zeros(Int, get_ndofs(_get_dhl(feSpaces[i]))), length(feSpaces))
     # mapping = ntuple(i -> zeros(Int, get_ndofs(feSpaces[i])), N)
     mapping = ntuple(i -> zeros(Int, get_ndofs(feSpaces[i])), length(feSpaces))
     ndofs = 0
@@ -695,7 +696,7 @@ allocate_dofs(mfeSpace::MultiFESpace, T = Float64) = zeros(T, get_ndofs(mfeSpace
 #         shape_i = shape(ct_i)
 
 #         # Check that all the dofs in this cell are unique
-#         iglobs = dof(dhl, icell)
+#         iglobs = get_dof(dhl, icell)
 #         if length(unique(iglobs)) != length(iglobs)
 #             nerrors += 1
 #             verbose && println("ERROR : two dofs in the same cell share the same identifier")
@@ -729,8 +730,8 @@ allocate_dofs(mfeSpace::MultiFESpace, T = Float64) = zeros(T, get_ndofs(mfeSpace
 #                 coincident = norm(xi - xj) < atol
 
 #                 for kcomp in 1:ncomponents(cv)
-#                     iglob = dof(dhl, icell, kcomp, idof_loc)
-#                     jglob = dof(dhl, jcell, kcomp, jdof_loc)
+#                     iglob = get_dof(dhl, icell, kcomp, idof_loc)
+#                     jglob = get_dof(dhl, jcell, kcomp, jdof_loc)
 
 #                     msg = ""
 

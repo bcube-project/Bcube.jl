@@ -1240,12 +1240,15 @@ function gen_cylinder_shell_mesh(
     # Mesh settings
     if transfinite
         _nθ = round(Int, nθ / 3)
-        map(
+        foreach(
             line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, _nθ),
             (AOB1, BOC1, COA1, AOB2, BOC2, COA2),
         )
-        map(line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, nz), (A1A2, B1B2, C1C2))
-        map(surf -> gmsh.model.geo.mesh.setTransfiniteSurface(surf), surfs)
+        foreach(
+            line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, nz),
+            (A1A2, B1B2, C1C2),
+        )
+        foreach(gmsh.model.geo.mesh.setTransfiniteSurface, surfs)
     end
     recombine && map(surf -> gmsh.model.geo.mesh.setRecombine(2, surf), surfs)
 
@@ -1336,6 +1339,72 @@ function _gen_cube_pile(output)
 
     # Write result
     gmsh.write(output)
+
+    # End
+    gmsh.finalize()
+end
+
+"""
+    gen_torus_shell_mesh(output, rint, rext; order = 1, lc = 0.1, write_geo = false, kwargs...)
+
+Generate the mesh of the shell of a torus, defined by its inner radius `rint` and exterior radius `rext`.
+
+The torus revolution axis is the z-axis.
+"""
+function gen_torus_shell_mesh(
+    output,
+    rint,
+    rext;
+    order = 1,
+    lc = 0.1,
+    write_geo = false,
+    n_partitions = 0,
+    kwargs...,
+)
+    gmsh.initialize()
+    gmsh.model.add("model") # helps debugging
+    _apply_gmsh_options(; kwargs...)
+
+    # Points
+    xc = (rint + rext) / 2
+    r = (rext - rint) / 2
+    O = gmsh.model.geo.addPoint(xc, 0, 0, lc)
+    A = gmsh.model.geo.addPoint(xc + r, 0, 0, lc)
+    B = gmsh.model.geo.addPoint(xc + r * cos(2π / 3), 0, r * sin(2π / 3), lc)
+    C = gmsh.model.geo.addPoint(xc + r * cos(4π / 3), 0, r * sin(4π / 3), lc)
+
+    # Lines
+    AOB = gmsh.model.geo.addCircleArc(A, O, B)
+    BOC = gmsh.model.geo.addCircleArc(B, O, C)
+    COA = gmsh.model.geo.addCircleArc(C, O, A)
+
+    # Surfaces
+    opts = (0, 0, 0, 0, 0, 1, 2π / 3)
+    out = gmsh.model.geo.revolve([(1, AOB), (1, BOC), (1, COA)], opts...)
+    rev1_AOB = out[1:4]
+    rev1_BOC = out[5:8]
+    rev1_COA = out[9:12]
+    out = gmsh.model.geo.revolve([rev1_AOB[1], rev1_BOC[1], rev1_COA[1]], opts...)
+    rev2_AOB = out[1:4]
+    rev2_BOC = out[5:8]
+    rev2_COA = out[9:12]
+    out = gmsh.model.geo.revolve([rev2_AOB[1], rev2_BOC[1], rev2_COA[1]], opts...)
+    rev3_AOB = out[1:4]
+    rev3_BOC = out[5:8]
+    rev3_COA = out[9:12]
+
+    # Gen mesh
+    gmsh.model.geo.synchronize()
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
+    gmsh.model.mesh.partition(n_partitions)
+
+    # Write result
+    gmsh.write(output)
+    if write_geo
+        output_geo = first(splitext(output)) * ".geo_unrolled"
+        gmsh.write(output_geo)
+    end
 
     # End
     gmsh.finalize()

@@ -390,6 +390,19 @@
         driver_heat_solver()
     end
 
+    @testset "Subdomain" begin
+        n = 5
+        mesh = line_mesh(2 * n + 1; xmin = 0, xmax = 1)
+        sub1 = 1:2:(2 * n)
+        sub2 = 2:2:(2 * n)
+        dΩ = Measure(CellDomain(mesh), 1)
+        dΩ1 = Measure(CellDomain(mesh, sub1), 1)
+        dΩ2 = Measure(CellDomain(mesh, sub2), 1)
+        f = PhysicalFunction(x -> 1.0)
+        @test sum(Bcube.compute(∫(f)dΩ1)) == 0.5
+        @test sum(Bcube.compute(∫(f)dΩ2)) == 0.5
+    end
+
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials

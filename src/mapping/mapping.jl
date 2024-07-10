@@ -807,7 +807,7 @@ function normal(::isSurfacic, ctype::AbstractEntityType, cnodes, iside, ξ)
     ftype = facetypes(ctype)[iside]
 
     # Get face nodes
-    fnodes = [cnodes[i] for i in faces2nodes(ctype)[iside]] # @ghislainb : need better solution to index
+    fnodes = map(i -> cnodes[i], faces2nodes(ctype)[iside])
 
     # Get face direction vector (face Jacobian)
     u = mapping_jacobian(ftype, fnodes, ξ)

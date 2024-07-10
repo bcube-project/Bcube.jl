@@ -64,7 +64,7 @@ import Bcube:
     connectivity_cell2cell_by_faces,
     connectivity_cell2cell_by_nodes,
     Cube,
-    dof,
+    get_dof,
     DofHandler,
     DomainIterator,
     edges2nodes,
@@ -106,7 +106,6 @@ import Bcube:
     minsize,
     myrand,
     nedges,
-    ndofs,
     nfaces,
     nlayers,
     nodes,
@@ -141,6 +140,7 @@ fname2sum = Dict(r[2] => r[1] for r in eachrow(f))
     custom_include("./test_utils.jl")
     custom_include("./mesh/test_entity.jl")
     custom_include("./mesh/test_connectivity.jl")
+    custom_include("./mesh/test_transformation.jl")
     custom_include("./mesh/test_mesh.jl")
     custom_include("./mesh/test_mesh_generator.jl")
     custom_include("./mesh/test_gmsh.jl")
@@ -150,9 +150,11 @@ fname2sum = Dict(r[2] => r[1] for r in eachrow(f))
     custom_include("./interpolation/test_shape.jl")
     custom_include("./interpolation/test_lagrange.jl")
     custom_include("./interpolation/test_taylor.jl")
+    custom_include("./fespace/test_dofhandler.jl")
+    custom_include("./fespace/test_fespace.jl")
+    custom_include("./fespace/test_fefunction.jl")
     custom_include("./interpolation/test_projection.jl")
     custom_include("./integration/test_integration.jl")
-    custom_include("./dof/test_dofhandler.jl")
     # custom_include("./dof/test_variable.jl")  #TODO : update with new API
     custom_include("./interpolation/test_shapefunctions.jl")
     # custom_include("./interpolation/test_limiter.jl")
