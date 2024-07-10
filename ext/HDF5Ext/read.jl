@@ -89,7 +89,9 @@ function read_zone(zone, varnames, topo_dim, space_dim, verbose)
 
     # Read all BCs and then keep only the ones whose topo dim is equal to the base topo dim minus 1
     bcs = read_zoneBC(zone, elts, verbose)
-    filter!(bc -> (bc.bcdim == topo_dim - 1) || (bc.bcdim == -1), bcs)
+    if !isnothing(bcs)
+        filter!(bc -> (bc.bcdim == topo_dim - 1) || (bc.bcdim == -1), bcs)
+    end
 
     # Read FlowSolutions
     if !isnothing(varnames)
@@ -138,6 +140,11 @@ See `read_bc` for more information of what is returned.
 """
 function read_zoneBC(zone, elts, verbose)
     zoneBC = get_child(zone; type = "ZoneBC_t")
+
+    # Premature exit if no ZoneBC is present
+    isnothing(zoneBC) && (return nothing)
+
+    # Read each BC
     bcs = map(bc -> read_bc(bc, elts, verbose), get_children(zoneBC; type = "BC_t"))
     return bcs
 end
@@ -370,10 +377,14 @@ function cgns_mesh_to_bcube_mesh(zoneCGNS)
     c2n = Int.(zoneCGNS.c2n)
     c2t = map(cgns_entity_to_bcube_entity, zoneCGNS.c2t)
     c2nnodes = map(nnodes, c2t)
-    bc_names = Dict(i => bc.bcname for (i, bc) in enumerate(zoneCGNS.bcs))
-    bc_nodes = Dict(i => Int.(bc.bcnodes) for (i, bc) in enumerate(zoneCGNS.bcs))
 
-    return Bcube.Mesh(nodes, c2t, Bcube.Connectivity(c2nnodes, c2n); bc_names, bc_nodes)
+    if isnothing(zoneCGNS.bcs)
+        return Bcube.Mesh(nodes, c2t, Bcube.Connectivity(c2nnodes, c2n))
+    else
+        bc_names = Dict(i => bc.bcname for (i, bc) in enumerate(zoneCGNS.bcs))
+        bc_nodes = Dict(i => Int.(bc.bcnodes) for (i, bc) in enumerate(zoneCGNS.bcs))
+        return Bcube.Mesh(nodes, c2t, Bcube.Connectivity(c2nnodes, c2n); bc_names, bc_nodes)
+    end
 end
 
 """
