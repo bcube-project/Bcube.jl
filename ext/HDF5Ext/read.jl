@@ -18,8 +18,8 @@ function Bcube.read_file(
     # Read base dimensions (topo and space)
     dims = get_value(cgnsBase)
     topodim = topodim > 0 ? topodim : dims[1]
-    spacedim = spacedim > 0 ? spacedim : dims[2]
-    verbose && println("topodim = $topodim, spacedim = $spacedim")
+    zone_space_dim = dims[2]
+    verbose && println("topodim = $topodim, spacedim = $(zone_space_dim)")
 
     # Find the list of Zone_t
     zones = get_children(cgnsBase; type = "Zone_t")
@@ -31,7 +31,7 @@ function Bcube.read_file(
     zone = first(zones)
 
     # Read zone
-    zoneCGNS = read_zone(zone, varnames, topodim, spacedim, verbose)
+    zoneCGNS = read_zone(zone, varnames, topodim, zone_space_dim, spacedim, verbose)
 
     # Close the file
     close(file)
@@ -57,8 +57,11 @@ Return a NamedTuple with node coordinates, cell-to-type connectivity (type is a 
 cell-to-node connectivity, boundaries (see `read_zoneBC`), and a dictionnary of flow solutions (see `read_solutions`)
 
 -> (; coords, c2t, c2n, bcs, fSols)
+
+Note : the `zone_space_dim` is the number of spatial dimension according to the CGNS "Zone" node; whereas
+`usr_space_dim` is the number of spatial dimensions asked by the user (0 to select automatic detection).
 """
-function read_zone(zone, varnames, topo_dim, space_dim, verbose)
+function read_zone(zone, varnames, topo_dim, zone_space_dim, usr_space_dim, verbose)
     # Preliminary check
     zoneType = get_value(get_child(zone; type = "ZoneType_t"))
     @assert zoneType == "Unstructured" "Only unstructured zone are supported"
@@ -71,13 +74,17 @@ function read_zone(zone, varnames, topo_dim, space_dim, verbose)
     gridCoordinates = get_child(zone; type = "GridCoordinates_t")
     coordXNode = get_child(gridCoordinates; name = "CoordinateX")
     X = get_value(coordXNode)
-    coords = zeros(eltype(X), nvertices, space_dim)
+    coords = zeros(eltype(X), nvertices, zone_space_dim)
     coords[:, 1] .= X
     suffixes = ["X", "Y", "Z"]
-    for (idim, suffix) in enumerate(suffixes[1:space_dim])
+    for (idim, suffix) in enumerate(suffixes[1:zone_space_dim])
         node = get_child(gridCoordinates; name = "Coordinate" * suffix)
         coords[:, idim] .= get_value(node)
     end
+
+    # Resize the `coords` array if necessary
+    _space_dim = usr_space_dim > 0 ? usr_space_dim : compute_space_dim(topo_dim, coords)
+    coords = coords[:, 1:_space_dim]
 
     # Read all elements
     elts = map(read_connectivity, get_children(zone; type = "Elements_t"))
@@ -416,6 +423,27 @@ function flow_solutions_to_bcube_data(fSols)
             for (varname, array) in t.data
         ) for (fname, t) in fSols
     )
+end
+
+function compute_space_dim(topodim, coords, tol = 1e-15, verbose = true)
+    spacedim = size(coords, 2)
+
+    xmin, xmax = extrema(view(coords, :, 1))
+    lx = xmax - xmin
+
+    ly = lz = 0.0
+
+    if spacedim > 1
+        ymin, ymax = extrema(view(coords, :, 2))
+        ly = ymax - ymin
+    end
+
+    if spacedim > 2
+        zmin, zmax = extrema(view(coords, :, 3))
+        lz = zmax - zmin
+    end
+
+    return Bcube._compute_space_dim(topodim, lx, ly, lz, tol, verbose)
 end
 
 """
