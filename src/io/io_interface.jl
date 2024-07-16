@@ -2,6 +2,7 @@ abstract type AbstractIoHandler end
 struct GMSHIoHandler <: AbstractIoHandler end
 struct HDF5IoHandler <: AbstractIoHandler end
 struct JLD2IoHandler <: AbstractIoHandler end
+struct VTKIoHandler <: AbstractIoHandler end
 
 """
     read_file([handler::AbstractIoHandler,] filepath::String; domainNames = nothing, varnames = nothing, topodim = 0, kwargs...,)
@@ -131,9 +132,11 @@ check_input_file(filename::String) = check_input_file(_filename_to_handler(filen
 
 function _filename_to_handler(filename::String)
     ext = last(splitext(filename))
-    if ext in [".msh"]
+    if ext in (".msh",)
         return GMSHIoHandler()
-    elseif ext in [".cgns", ".hdf", ".hdf5"]
+    elseif ext in (".pvd", ".vtk", ".vtu")
+        return VTKIoHandler()
+    elseif ext in (".cgns", ".hdf", ".hdf5")
         return HDF5IoHandler()
     end
     error("Could not find a handler for the filename $filename")
