@@ -372,18 +372,33 @@ function write_vtk_lagrange(
     collection_append = false,
     vtk_kwargs...,
 ) where {F <: AbstractLazy}
-    # extract all `MeshCellData` in `vars` as this type of variable
-    # will not be interpolated to nodes and will be written with
-    # the `VTKCellData` attribute.
-    vars_cell = filter(((k, v),) -> v isa MeshData{<:CellData}, vars)
-    vars_point = filter(((k, v),) -> k ∉ keys(vars_cell), vars)
-
     # FE space stuff
     fs_export = get_function_space(U_export)
     @assert get_type(fs_export) <: Lagrange "Only FunctionSpace of type Lagrange are supported for now"
     degree_export = get_degree(fs_export)
     dhl_export = Bcube._get_dhl(U_export)
     nd = get_ndofs(dhl_export)
+
+    # If the FunctionSpace is a Lagrange P0, we shortcut the rest of this function
+    # to call a more adequate one.
+    if degree_export == 0
+        vals = map(values(vars)) do var
+            _, dim = get_return_type_and_codim(var, mesh)
+            is_scalar = dim[1] == 1
+            value = var_on_centers(var, mesh)
+            value = is_scalar ? value : transpose(value)
+            value
+        end
+        d = Dict(key => (value, VTKCellData()) for (key, value) in zip(keys(vars), vals))
+        write_vtk(basename, it, time, mesh, d)
+        return nothing
+    end
+
+    # extract all `MeshCellData` in `vars` as this type of variable
+    # will not be interpolated to nodes and will be written with
+    # the `VTKCellData` attribute.
+    vars_cell = filter(((k, v),) -> v isa MeshData{<:CellData}, vars)
+    vars_point = filter(((k, v),) -> k ∉ keys(vars_cell), vars)
 
     # Get ncomps and type of each `point` variable
     type_dim = map(var -> get_return_type_and_codim(var, mesh), values(vars_point))
