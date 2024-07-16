@@ -32,7 +32,7 @@
 
         # bmxam: for some obscur reason, order 3 and 5 lead to different sha1sum
         # when running in standard mode or in test mode...
-        for degree_export in (1, 2, 4)
+        for degree_export in (0, 1, 2, 4)
             U_export = TrialFESpace(FunctionSpace(:Lagrange, degree_export), mesh)
             basename = "write_vtk_lagrange_deg$(degree_export)"
             Bcube.write_vtk_lagrange(
