@@ -89,7 +89,7 @@ nfaces(::AbstractShape) = error("Function 'nfaces' is not defined")
 
 Return node coordinates of the shape in the reference space.
 """
-get_coords(::AbstractShape) = error("Function 'coordinates' is not defined")
+get_coords(s::AbstractShape) = error("`get_coordinates` is not defined for shape $s")
 
 """
     get_coords(shape::AbstractShape,i)
@@ -176,6 +176,7 @@ function center(s::AbstractShape)
     return sum(get_coords(s)) / nvertices(s)
 end
 
+nvertices(::Point) = 1
 nvertices(::Line) = nnodes(Bar2_t())
 nvertices(::Triangle) = nnodes(Tri3_t())
 nvertices(::Square) = nnodes(Quad4_t())
@@ -200,6 +201,7 @@ nfaces(::Cube) = nfaces(Hexa8_t())
 nfaces(::Prism) = nfaces(Penta6_t())
 nfaces(::Pyramid) = nfaces(Pyra5_t())
 
+get_coords(::Point) = (SA[0.0],)
 get_coords(::Line) = (SA[-1.0], SA[1.0])
 get_coords(::Triangle) = (SA[0.0, 0.0], SA[1.0, 0.0], SA[0.0, 1.0])
 get_coords(::Square) = (SA[-1.0, -1.0], SA[1.0, -1.0], SA[1.0, 1.0], SA[-1.0, 1.0])
