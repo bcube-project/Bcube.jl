@@ -390,7 +390,7 @@ function write_vtk_lagrange(
             value
         end
         d = Dict(key => (value, VTKCellData()) for (key, value) in zip(keys(vars), vals))
-        write_vtk(basename, it, time, mesh, d)
+        write_vtk(basename, it, time, mesh, d; append = collection_append)
         return nothing
     end
 
