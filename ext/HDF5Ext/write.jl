@@ -3,6 +3,7 @@ function Bcube.write_file(
     basename::String,
     mesh::Bcube.AbstractMesh,
     data = nothing,
+    U_export = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
@@ -21,6 +22,7 @@ function Bcube.write_file(
                 file,
                 mesh,
                 data,
+                U_export,
                 it,
                 time;
                 verbose,
@@ -28,7 +30,7 @@ function Bcube.write_file(
                 skip_iterative_data,
             )
         else
-            create_cgns_file(file, mesh, data; verbose, skip_iterative_data)
+            create_cgns_file(file, mesh, data, U_export; verbose, skip_iterative_data)
         end
     end
 end
@@ -40,6 +42,7 @@ function append_to_cgns_file(
     file,
     mesh,
     data,
+    U_export,
     it,
     time;
     verbose = false,
@@ -69,7 +72,7 @@ function append_to_cgns_file(
     end
 
     # Append solution
-    create_flow_solutions(mesh, zone, data, it, true; verbose)
+    create_flow_solutions(mesh, zone, data, U_export, it, true; verbose)
 
     # Append to ZoneIterativeData
     if it >= 0 && !skip_iterative_data
@@ -80,7 +83,7 @@ end
 """
 Create the whole file from scratch
 """
-function create_cgns_file(file, mesh, data; verbose, skip_iterative_data)
+function create_cgns_file(file, mesh, data, U_export; verbose, skip_iterative_data)
     # @show file.id
     # @show HDF5.API.h5i_get_file_id(file)
     # HDF5.API.h5f_set_libver_bounds(
@@ -150,7 +153,7 @@ function create_cgns_file(file, mesh, data; verbose, skip_iterative_data)
 
     # Write solution
     if !isnothing(data)
-        create_flow_solutions(mesh, zone, data, it, false; verbose)
+        create_flow_solutions(mesh, zone, data, U_export, it, false; verbose)
     end
 
     # Base and zone iterative data
@@ -277,48 +280,48 @@ end
 """
 `append` indicates if the FlowSolution(s) may already exist (and hence completed) or not.
 """
-function create_flow_solutions(mesh, zone, data, it, append; verbose = false)
+function create_flow_solutions(mesh, zone, data, U_export, it, append; verbose = false)
     if valtype(data) <: Dict
         verbose && println("Named FlowSolution(s) detected")
         for (fname, _data) in data
-
-            # First, we check that the data location is the same
-            # for all variables
-            # -> a bit ugly, but ok for now
-            vars = values(_data)
-            U = first(vars)[2]
-            @assert all(x -> x[2] == U, vars) "The variables sharing the same FlowSolution must share the same FESpace to export"
-
             # Then, we create a flowsolution
-            create_flow_solutions(mesh, zone, _data, fname, it, append; verbose)
+            create_flow_solutions(mesh, zone, _data, U_export, fname, it, append; verbose)
         end
     else
-        create_flow_solutions(mesh, zone, data, "", it, append; verbose)
+        create_flow_solutions(mesh, zone, data, U_export, "", it, append; verbose)
     end
 end
 
 """
 This function is a trick to refactor some code
 """
-function create_flow_solutions(mesh, zone, data, fname, it, append; verbose = false)
-    @assert all(x -> is_fespace_supported(x[2]), values(data))
+function create_flow_solutions(
+    mesh,
+    zone,
+    data,
+    U_export,
+    fname,
+    it,
+    append;
+    verbose = false,
+)
+    @assert is_fespace_supported(U_export)
 
-    cellCenter =
-        filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 0, data)
+    cellCenter = filter(((name, var),) -> var isa Bcube.MeshData{Bcube.CellData}, data)
     _fname = isempty(fname) ? "FlowSolutionCell" : fname
     (it >= 0) && (_fname *= iteration_to_string(it))
+    dΩ = Measure(CellDomain(mesh), 1)
     create_flow_solution(
         zone,
         cellCenter,
         _fname,
         false,
-        Base.Fix2(var_on_centers, mesh),
+        Base.Fix2(Bcube.cell_mean, dΩ),
         append;
         verbose,
     )
 
-    nodeCenter =
-        filter(((k, v),) -> Bcube.get_degree(Bcube.get_function_space(v[2])) == 1, data)
+    nodeCenter = filter(((name, var),) -> !(var isa Bcube.MeshData{Bcube.CellData}), data)
     _fname = isempty(fname) ? "FlowSolutionVertex" : fname
     (it >= 0) && (_fname *= iteration_to_string(it))
     create_flow_solution(

@@ -74,19 +74,65 @@ function read_mesh(filepath::String; domainNames = String[], kwargs...)
 end
 
 """
-`data` can be provided as a `Dict{String, Tuple{AbstractLazy, AbstractFESpace}}` if they
-share the same "container" (~FlowSolution), or as a `Dict{String, T}` where T is the
-previous Dict type described.
+    write_file(
+        [handler::AbstractIoHandler,]
+        basename::String,
+        mesh::AbstractMesh,
+        data = nothing,
+        it::Integer = -1,
+        time::Real = 0.0;
+        mesh_degree::Integer = 1,
+        functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
+        discontinuous::Bool = true,
+        collection_append::Bool = false,
+        kwargs...,
+    )
 
-Possible names:
+Write a set of `AbstractLazy` to a file.
+
+`data` can be provided as a `Dict{String, AbstractLazy}` if they share the same
+"container" (~FlowSolution), or as a `Dict{String, T}` where T is the previous
+Dict type described.
+
+To write cell-centered data, wrapped your input into a `MeshCellData` (for instance
+using Bcube.cell_mean).
+
+
+# Implementation
+To specialize this method, please specialize:
+write_file(
+    handler::AbstractIoHandler,
+    basename::String,
+    mesh::AbstractMesh,
+    data = nothing,
+    U_export = nothing,
+    it::Integer = -1,
+    time::Real = 0.0;
+    collection_append::Bool = false,
+    kwargs...,
+)
+
+Possible alternative names:
 * write_file
 * write_to_file
 * write_data
 * same with "save" instead of "write"
 
-Questions:
-* should we define a defaut value for `U_export` ?
 """
+function write_file(
+    handler::AbstractIoHandler,
+    basename::String,
+    mesh::AbstractMesh,
+    data = nothing,
+    U_export = nothing,
+    it::Integer = -1,
+    time::Real = 0.0;
+    collection_append::Bool = false,
+    kwargs...,
+)
+    error("'write_file' is not implemented for $(typeof(handler))")
+end
+
 function write_file(
     handler::AbstractIoHandler,
     basename::String,
@@ -94,10 +140,32 @@ function write_file(
     data = nothing,
     it::Integer = -1,
     time::Real = 0.0;
-    collection_append = false,
+    mesh_degree::Integer = 1,
+    functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
+    discontinuous::Bool = true,
+    collection_append::Bool = false,
     kwargs...,
 )
-    error("'write_file' is not implemented for $(typeof(handler))")
+
+    # Build FESpace corresponding to asked degree, func space and discontinuous
+    U_export = TrialFESpace(
+        FunctionSpace(functionSpaceType, mesh_degree),
+        mesh;
+        isContinuous = !discontinuous,
+    )
+
+    # Call version with U_export
+    write_file(
+        handler,
+        basename,
+        mesh,
+        data,
+        U_export,
+        it,
+        time;
+        collection_append,
+        kwargs...,
+    )
 end
 
 function write_file(
@@ -106,7 +174,10 @@ function write_file(
     data = nothing,
     it::Integer = -1,
     time::Real = 0.0;
-    collection_append = false,
+    mesh_degree::Integer = 1,
+    functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
+    discontinuous::Bool = true,
+    collection_append::Bool = false,
     kwargs...,
 )
     write_file(
@@ -116,6 +187,9 @@ function write_file(
         data,
         it,
         time;
+        mesh_degree,
+        functionSpaceType,
+        discontinuous,
         collection_append,
         kwargs...,
     )

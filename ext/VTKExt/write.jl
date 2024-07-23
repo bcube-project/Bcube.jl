@@ -3,6 +3,7 @@ function write_file(
     basename::String,
     mesh::AbstractMesh,
     data = nothing,
+    U_export = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
@@ -27,15 +28,6 @@ function write_file(
         _values = vcat(_values...)
         _data = Dict(_keys .=> _values)
     end
-
-    # First, we check that the export space is the same for all variables
-    # -> a bit ugly, but ok for now
-    vars = values(_data)
-    U_export = first(vars)[2]
-    @assert all(x -> x[2] == U_export, vars) "Export FESpace must be identical for all variables"
-
-    # Reshape "data" to remove export space
-    _data = Dict(keys(_data) .=> first.(values(_data)))
 
     # Write !
     write_vtk_lagrange(_basename, _data, mesh, U_export, it, time; collection_append)
