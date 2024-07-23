@@ -23,8 +23,6 @@ import .LazyOperators:
 
 include("utils.jl")
 
-include("./mesh/mesh_utils.jl")
-
 include("./mesh/transformation.jl")
 export Translation, Rotation
 
@@ -53,18 +51,6 @@ include("./mesh/connectivity.jl")
 include("./mesh/mesh.jl")
 export ncells, nnodes, boundary_names, nboundaries, boundary_tag, get_nodes
 
-include("./mesh/gmsh_utils.jl")
-export read_msh,
-    read_msh_with_cell_names,
-    gen_line_mesh,
-    gen_rectangle_mesh,
-    gen_hexa_mesh,
-    gen_disk_mesh,
-    gen_star_disk_mesh,
-    gen_cylinder_mesh,
-    read_partitions,
-    gen_rectangle_mesh_with_tri_and_quad
-
 include("./mesh/mesh_generator.jl")
 export basic_mesh,
     one_cell_mesh,
@@ -79,6 +65,18 @@ export basic_mesh,
     transform!,
     translate,
     translate!
+
+include("./mesh/gmsh_utils.jl")
+export read_msh,
+    read_msh_with_cell_names,
+    gen_line_mesh,
+    gen_rectangle_mesh,
+    gen_hexa_mesh,
+    gen_disk_mesh,
+    gen_star_disk_mesh,
+    gen_cylinder_mesh,
+    read_partitions,
+    gen_rectangle_mesh_with_tri_and_quad
 
 include("./mesh/domain.jl")
 export AbstractDomain,
