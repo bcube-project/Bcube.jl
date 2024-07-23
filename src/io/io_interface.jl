@@ -69,8 +69,8 @@ function read_mesh(
     return res.mesh
 end
 
-function read_mesh(filepath::String; domainNames = String[], kwargs...)
-    read_mesh(_filename_to_handler(filepath), filepath; domainNames, kwargs...)
+function read_mesh(filepath::String; kwargs...)
+    read_mesh(_filename_to_handler(filepath), filepath; kwargs...)
 end
 
 """
@@ -168,31 +168,8 @@ function write_file(
     error("'write_file' is not implemented for $(typeof(handler))")
 end
 
-function write_file(
-    basename::String,
-    mesh::AbstractMesh,
-    data = nothing,
-    it::Integer = -1,
-    time::Real = 0.0;
-    mesh_degree::Integer = 1,
-    functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
-    discontinuous::Bool = true,
-    collection_append::Bool = false,
-    kwargs...,
-)
-    write_file(
-        _filename_to_handler(basename),
-        basename,
-        mesh,
-        data,
-        it,
-        time;
-        mesh_degree,
-        functionSpaceType,
-        discontinuous,
-        collection_append,
-        kwargs...,
-    )
+function write_file(basename::String, args...; kwargs...)
+    write_file(_filename_to_handler(basename), basename, args...; kwargs...)
 end
 
 """
