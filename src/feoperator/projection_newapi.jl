@@ -120,6 +120,8 @@ end
 _may_scalar(a::SVector{1}) = a[1]
 _may_scalar(a) = a
 
+cell_mean(u::MeshData{CellData}, ::Measure) = u
+
 function build_mass_matrix(u::AbstractFEFunction, dΩ::AbstractMeasure)
     U = get_fespace(u)
     V = TestFESpace(U)
