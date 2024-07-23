@@ -23,6 +23,8 @@ import .LazyOperators:
 
 include("utils.jl")
 
+include("./mesh/mesh_utils.jl")
+
 include("./mesh/transformation.jl")
 export Translation, Rotation
 
