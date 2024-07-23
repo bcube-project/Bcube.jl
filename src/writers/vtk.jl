@@ -496,7 +496,7 @@ function write_file(
     ::Bcube.VTKIoHandler,
     basename::String,
     mesh::AbstractMesh,
-    U_export,
+    U_export::AbstractFESpace,
     data = nothing,
     it::Integer = -1,
     time::Real = 0.0;
