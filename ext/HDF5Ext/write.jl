@@ -2,8 +2,8 @@ function Bcube.write_file(
     ::Bcube.HDF5IoHandler,
     basename::String,
     mesh::Bcube.AbstractMesh,
+    U_export::Bcube.AbstractFESpace,
     data = nothing,
-    U_export = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
@@ -30,7 +30,16 @@ function Bcube.write_file(
                 skip_iterative_data,
             )
         else
-            create_cgns_file(file, mesh, data, U_export; verbose, skip_iterative_data)
+            create_cgns_file(
+                file,
+                mesh,
+                data,
+                U_export,
+                it,
+                time;
+                verbose,
+                skip_iterative_data,
+            )
         end
     end
 end
@@ -83,7 +92,16 @@ end
 """
 Create the whole file from scratch
 """
-function create_cgns_file(file, mesh, data, U_export; verbose, skip_iterative_data)
+function create_cgns_file(
+    file,
+    mesh,
+    data,
+    U_export,
+    it,
+    time;
+    verbose,
+    skip_iterative_data,
+)
     # @show file.id
     # @show HDF5.API.h5i_get_file_id(file)
     # HDF5.API.h5f_set_libver_bounds(
@@ -316,7 +334,7 @@ function create_flow_solutions(
         cellCenter,
         _fname,
         false,
-        Base.Fix2(Bcube.cell_mean, dΩ),
+        Base.Fix2(var_on_centers, mesh),
         append;
         verbose,
     )
@@ -352,8 +370,7 @@ function create_flow_solution(zone, data, fname, isVertex, projection, append; v
         create_grid_location(fnode, gdValue)
     end
 
-    for (name, val) in data
-        var = val[1]
+    for (name, var) in data
         y = projection(var)
         create_cgns_node(fnode, name, "DataArray_t"; type = "R8", value = y)
     end

@@ -104,8 +104,8 @@ write_file(
     handler::AbstractIoHandler,
     basename::String,
     mesh::AbstractMesh,
+    U_export::AbstractFESpace,
     data = nothing,
-    U_export = nothing,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append::Bool = false,
@@ -119,20 +119,6 @@ Possible alternative names:
 * same with "save" instead of "write"
 
 """
-function write_file(
-    handler::AbstractIoHandler,
-    basename::String,
-    mesh::AbstractMesh,
-    data = nothing,
-    U_export = nothing,
-    it::Integer = -1,
-    time::Real = 0.0;
-    collection_append::Bool = false,
-    kwargs...,
-)
-    error("'write_file' is not implemented for $(typeof(handler))")
-end
-
 function write_file(
     handler::AbstractIoHandler,
     basename::String,
@@ -159,13 +145,27 @@ function write_file(
         handler,
         basename,
         mesh,
-        data,
         U_export,
+        data,
         it,
         time;
         collection_append,
         kwargs...,
     )
+end
+
+function write_file(
+    handler::AbstractIoHandler,
+    basename::String,
+    mesh::AbstractMesh,
+    U_export::AbstractFESpace,
+    data = nothing,
+    it::Integer = -1,
+    time::Real = 0.0;
+    collection_append::Bool = false,
+    kwargs...,
+)
+    error("'write_file' is not implemented for $(typeof(handler))")
 end
 
 function write_file(
