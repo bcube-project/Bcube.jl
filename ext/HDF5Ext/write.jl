@@ -353,6 +353,9 @@ function create_flow_solutions(
     )
 end
 
+"""
+WARNING : vector variables are not supported for now !!
+"""
 function create_flow_solution(zone, data, fname, isVertex, projection, append; verbose)
     isempty(data) && return
 
