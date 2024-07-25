@@ -325,17 +325,40 @@ end
         basename::String,
         vars::Dict{String, F},
         mesh::AbstractMesh,
-        U_export::AbstractFESpace,
         it::Integer = -1,
         time::Real = 0.0;
-        collection_append = false,
+        mesh_degree::Integer = 1,
+        discontinuous::Bool = true,
+        functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
+        collection_append::Bool = false,
         vtk_kwargs...,
     ) where {F <: AbstractLazy}
 
-Write the provided FEFunction/MeshCellData/CellFunction on the mesh with
-the precision of the Lagrange FESpace provided.
+    write_vtk_lagrange(
+        basename::String,
+        vars::Dict{String, F},
+        mesh::AbstractMesh,
+        U_export::AbstractFESpace,
+        it::Integer = -1,
+        time::Real = 0.0;
+        collection_append::Bool = false,
+        vtk_kwargs...,
+    ) where {F <: AbstractLazy}
+
+Write the provided FEFunction/MeshCellData/CellFunction on a mesh of order `mesh_degree` with the nodes
+defined by the `functionSpaceType` (only `Lagrange{:Uniform}` supported for now). The boolean `discontinuous`
+indicate if the node values should be discontinuous or not.
 
 `vars` is a dictionnary of variable name => Union{FEFunction,MeshCellData,CellFunction} to write.
+
+Cell-centered data should be wrapped as `MeshCellData` in the `vars` dict. To convert an `AbstractLazy` to
+a `MeshCellData`, simply use `Bcube.cell_mean` or `MeshCellData ∘ Bcube.var_on_centers`.
+
+# Remarks:
+* If `mesh` is of degree `d`, the solution will be written on a mesh of degree `mesh_degree`, even if this
+number is different from `d`.
+* The degree of the input FEFunction (P1, P2, P3, ...) is not used to define the nodes where the solution is
+written, only `mesh` and `mesh_degree` matter. The FEFunction is simply evaluated on the aforementionned nodes.
 
 # Example
 ```julia
@@ -346,13 +369,13 @@ projection_l2!(u, f_u, mesh)
 
 vars = Dict("f_u" => f_u, "u" => u, "grad_u" => ∇(u))
 
-for degree_export in 1:5
-    U_export = TrialFESpace(FunctionSpace(:Lagrange, degree_export), mesh)
+for mesh_degree in 1:5
     Bcube.write_vtk_lagrange(
         joinpath(@__DIR__, "output"),
         vars,
-        mesh,
-        U_export,
+        mesh;
+        mesh_degree,
+        discontinuous = false
     )
 end
 ```
@@ -362,6 +385,35 @@ end
 - `collection_append` is not named `append` to enable passing correct `kwargs` to `vtk_grid`
 - remove (once fully validated) : `write_vtk_discontinuous`
 """
+function write_vtk_lagrange(
+    basename::String,
+    vars::Dict{String, F},
+    mesh::AbstractMesh,
+    it::Integer = -1,
+    time::Real = 0.0;
+    mesh_degree::Integer = 1,
+    discontinuous::Bool = true,
+    functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
+    collection_append::Bool = false,
+    vtk_kwargs...,
+) where {F <: AbstractLazy}
+    U_export = TrialFESpace(
+        FunctionSpace(functionSpaceType, mesh_degree),
+        mesh;
+        isContinuous = !discontinuous,
+    )
+    write_vtk_lagrange(
+        basename,
+        vars,
+        mesh,
+        U_export,
+        it,
+        time;
+        collection_append,
+        vtk_kwargs...,
+    )
+end
+
 function write_vtk_lagrange(
     basename::String,
     vars::Dict{String, F},
@@ -378,21 +430,6 @@ function write_vtk_lagrange(
     degree_export = get_degree(fs_export)
     dhl_export = Bcube._get_dhl(U_export)
     nd = get_ndofs(dhl_export)
-
-    # If the FunctionSpace is a Lagrange P0, we shortcut the rest of this function
-    # to call a more adequate one.
-    if degree_export == 0
-        vals = map(values(vars)) do var
-            _, dim = get_return_type_and_codim(var, mesh)
-            is_scalar = dim[1] == 1
-            value = var_on_centers(var, mesh)
-            value = is_scalar ? value : transpose(value)
-            value
-        end
-        d = Dict(key => (value, VTKCellData()) for (key, value) in zip(keys(vars), vals))
-        write_vtk(basename, it, time, mesh, d; append = collection_append)
-        return nothing
-    end
 
     # extract all `MeshCellData` in `vars` as this type of variable
     # will not be interpolated to nodes and will be written with

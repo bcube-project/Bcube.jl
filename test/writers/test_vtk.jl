@@ -32,14 +32,14 @@
 
         # bmxam: for some obscur reason, order 3 and 5 lead to different sha1sum
         # when running in standard mode or in test mode...
-        for degree_export in (0, 1, 2, 4)
-            U_export = TrialFESpace(FunctionSpace(:Lagrange, degree_export), mesh)
-            basename = "write_vtk_lagrange_deg$(degree_export)"
+        for mesh_degree in (1, 2, 4)
+            basename = "write_vtk_lagrange_deg$(mesh_degree)"
             Bcube.write_vtk_lagrange(
                 joinpath(tempdir, basename),
                 vars,
-                mesh,
-                U_export;
+                mesh;
+                mesh_degree,
+                discontinuous = false,
                 vtkversion = v"1.0",
             )
 
@@ -52,13 +52,13 @@
         quad = Quadrature(4)
         dΩ = Measure(CellDomain(mesh), quad)
         vars["umean"] = Bcube.cell_mean(u, dΩ)
-        U_export = TrialFESpace(FunctionSpace(:Lagrange, 4), mesh)
         basename = "write_vtk_lagrange_deg4_with_mean"
         Bcube.write_vtk_lagrange(
             joinpath(tempdir, basename),
             vars,
-            mesh,
-            U_export;
+            mesh;
+            mesh_degree = 4,
+            discontinuous = false,
             vtkversion = v"1.0",
         )
 
@@ -66,13 +66,13 @@
         fname = basename * ".vtu"
         @test fname2sum[fname] == bytes2hex(open(sha1, joinpath(tempdir, fname)))
 
-        U_export = TrialFESpace(FunctionSpace(:Lagrange, 4), mesh, :discontinuous)
         basename = "write_vtk_lagrange_deg4_dg_with_mean"
         Bcube.write_vtk_lagrange(
             joinpath(tempdir, basename),
             vars,
-            mesh,
-            U_export;
+            mesh;
+            mesh_degree = 4,
+            discontinuous = true,
             vtkversion = v"1.0",
         )
 
