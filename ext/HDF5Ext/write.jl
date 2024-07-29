@@ -12,6 +12,8 @@ function Bcube.write_file(
     skip_iterative_data = false,
     kwargs...,
 )
+    @assert is_fespace_supported(U_export) "Export FESpace not supported yet"
+
     mode = collection_append ? "r+" : "w"
     fcpl = HDF5.FileCreateProperties(; track_order = true)
     # fcpl = HDF5.FileCreateProperties()
@@ -178,7 +180,7 @@ function create_cgns_file(
     if it >= 0 && !skip_iterative_data
         verbose && println("Creating BaseIterativeData and ZoneIterativeData")
         create_cgns_base_iterative_data(cgnsBase, get_name(zone), it, time)
-        create_cgns_zone_iterative_data(zon, it; verbose)
+        create_cgns_zone_iterative_data(zone, it; verbose)
     end
 end
 
@@ -323,12 +325,9 @@ function create_flow_solutions(
     append;
     verbose = false,
 )
-    @assert is_fespace_supported(U_export)
-
     cellCenter = filter(((name, var),) -> var isa Bcube.MeshData{Bcube.CellData}, data)
     _fname = isempty(fname) ? "FlowSolutionCell" : fname
     (it >= 0) && (_fname *= iteration_to_string(it))
-    dΩ = Measure(CellDomain(mesh), 1)
     create_flow_solution(
         zone,
         cellCenter,
