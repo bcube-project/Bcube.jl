@@ -148,6 +148,9 @@ export var_on_centers,
 include("./feoperator/limiter.jl")
 export linear_scaling_limiter
 
+include("./io/io_interface.jl")
+export read_file, read_mesh, write_file
+
 include("./writers/vtk.jl")
 export write_vtk
 
