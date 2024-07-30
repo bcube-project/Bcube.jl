@@ -26,16 +26,13 @@ end
 cgns_entity_to_bcube_entity(code::Integer) = CGNS_ENTITY_TO_BCUBE_ENTITY[code]()
 
 function get_child(parent; name = "", type = "")
-    for child_name in keys(parent)
-        child = parent[child_name]
-        child_match(child, name, type) && (return child)
-    end
+    child_name = findfirst(child -> child_match(child, name, type), parent)
+    return isnothing(child_name) ? nothing : parent[child_name]
 end
 
 function get_children(parent; name = "", type = "")
-    filtered =
-        filter(child_name -> child_match(parent[child_name], name, type), keys(parent))
-    map(child_name -> parent[child_name], filtered)
+    child_names = findall(child -> child_match(child, name, type), parent)
+    return map(child_name -> parent[child_name], child_names)
 end
 
 function child_match(child, name, type)

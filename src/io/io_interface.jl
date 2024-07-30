@@ -28,15 +28,6 @@ The argument `topodim` can be used to force and/or select the elements of this t
 result = read_file("file.cgns"; varnames = ["Temperature", "Density"], verbose = true)
 @show ncells(result.mesh)
 @show keys(result.data)
-```
-
-# Dev
-Possible names:
-* read_file
-* read_from_file
-* same with "load" instead of "read"
-
-Questions:
 """
 function read_file(
     handler::AbstractIoHandler,
@@ -111,13 +102,6 @@ write_file(
     collection_append::Bool = false,
     kwargs...,
 )
-
-Possible alternative names:
-* write_file
-* write_to_file
-* write_data
-* same with "save" instead of "write"
-
 """
 function write_file(
     handler::AbstractIoHandler,
