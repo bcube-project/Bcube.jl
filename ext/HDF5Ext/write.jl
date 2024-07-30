@@ -374,18 +374,27 @@ function create_flow_solution(zone, data, fname, isVertex, projection, append; v
 
     for (name, var) in data
         y = projection(var)
-        create_cgns_node(fnode, name, "DataArray_t"; type = "R8", value = y)
+
+        if ndims(y) == 1
+            # Scalar field
+            create_cgns_node(fnode, name, "DataArray_t"; type = "R8", value = y)
+
+        elseif ndims(y) == 2 && size(y, 2) <= 3
+            # Vector field
+            for (col, suffix) in zip(eachcol(y), ("X", "Y", "Z"))
+                create_cgns_node(
+                    fnode,
+                    name * suffix,
+                    "DataArray_t";
+                    type = "R8",
+                    value = col,
+                )
+            end
+        else
+            error("wrong dimension for y")
+        end
     end
     return fnode
-end
-
-function append_flow_solutions(zone, data)
-    if valtype(data) <: Dict
-        verbose && println("Named FlowSolution(s) detected")
-        for (fname, _data) in data
-        end
-    else
-    end
 end
 
 function create_cgns_node(parent, name, label; type = "I4", value = nothing)
@@ -464,8 +473,13 @@ function append_to_base_iterative_data(cgnsBase, zonename, it, time)
     if !isnothing(iterationValues)
         iterations = get_value(iterationValues)
         (it ∈ iterations) && return
+
+        # Append iteration to the list of iteration values
         push!(iterations, it)
         update_cgns_data(iterationValues, iterations)
+
+        # Increase the number of iterations stored in this BaseIterativeData
+        update_cgns_data(bid, length(iterations))
     end
 
     numberOfZones = get_child(bid; name = "NumberOfZones")
