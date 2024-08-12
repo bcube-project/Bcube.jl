@@ -16,28 +16,28 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 gmsh_jll = "630162c2-fc9b-58b3-9910-8442a8a132e6"
 
+[weakdeps]
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+
+[extensions]
+HDF5Ext = "HDF5"
+JLD2Ext = "JLD2"
+
 [compat]
 FEMQuad = "0.3"
 FastGaussQuadrature = "0.4, 0.5"
 ForwardDiff = "0.10"
+HDF5 = "0.17"
+JLD2 = "0.4.47"
 LinearSolve = "1, 2"
 StaticArrays = "1.2"
-Symbolics = "5"
+Symbolics = "5, 6"
 WriteVTK = "1.12"
 julia = "1.6"
-JLD2 = "0.4.47"
-HDF5 = "0.17"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
-
-[weakdeps]
-JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
-HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
-
-[extensions]
-JLD2Ext = "JLD2"
-HDF5Ext = "HDF5"
