@@ -13,6 +13,7 @@ using Printf # just for tmp vtk, to be removed
 # import LinearSolve: solve, solve!, LinearProblem
 import LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
+using NearestNeighbors
 
 const MAX_LENGTH_STATICARRAY = (10^6)
 
@@ -95,6 +96,8 @@ include("./mapping/mapping.jl")
 
 include("./mapping/ref2phys.jl")
 export get_cell_centers
+
+include("mapping/findpoint.jl")
 
 include("./cellfunction/eval_point.jl")
 
