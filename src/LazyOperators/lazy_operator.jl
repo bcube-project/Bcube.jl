@@ -287,9 +287,10 @@ get_operator(a::NullOperator) = nothing
 get_args(a::NullOperator) = (nothing,)
 materialize(a::NullOperator, x) = a
 
-Base.length(::NullOperator) = 1
-Base.iterate(a::NullOperator) = (a, nothing)
-Base.iterate(a::NullOperator, state) = nothing
+# Base.length(::NullOperator) = 1
+# Base.iterate(a::NullOperator) = (a, nothing)
+# Base.iterate(a::NullOperator, state) = nothing
+Base.map(f, a::NullOperator) = f(a)
 
 function show_lazy_operator(op::NullOperator; level = 1, indent = 4, islast = (true,))
     level == 1 && println("\n---------------")

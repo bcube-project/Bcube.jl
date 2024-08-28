@@ -283,18 +283,11 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::CellInfo, dom
     icell = cellindex(elementInfo)
     nU = Val(get_ndofs(U, shape(celltype(elementInfo))))
     nV = Val(get_ndofs(V, shape(celltype(elementInfo))))
-    jdofs = get_dofs(U, icell, nU) # columns correspond to the TrialFunction
-    idofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
-    _idofs, _jdofs = _cartesian_product(idofs, jdofs)
+    Udofs = get_dofs(U, icell, nU) # columns correspond to the TrialFunction
+    Vdofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
     unwrapValues = _unwrap_cell_integrate(V, values)
-    val = [reduce((x, y) -> (x..., y...), unwrapValues)...]
-    for (_i, _j, _v) in zip(_idofs, _jdofs, val)
-        if !isa(_v, NullOperator)
-            append!(X, _v)
-            append!(I, _i)
-            append!(J, _j)
-        end
-    end
+    matrixvalues = _pack_bilinear_cell_contribution(unwrapValues, Udofs, Vdofs)
+    _append_bilinear!(I, J, X, Vdofs, Udofs, matrixvalues)
     return nothing
 end
 
@@ -349,6 +342,14 @@ function _append_bilinear!(
     vals::Union{T, SMatrix{M, N, T}},
 ) where {M, N, T <: NullOperator}
     nothing
+end
+
+function _pack_bilinear_cell_contribution(
+    values,
+    col_dofs_U::SVector{NU},
+    row_dofs_V::SVector{NV},
+) where {NU, NV}
+    return SMatrix{NV, NU}(values[j][i] for i in 1:NV, j in 1:NU)
 end
 
 function _pack_bilinear_face_contribution(
