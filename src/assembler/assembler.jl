@@ -287,10 +287,13 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::CellInfo, dom
     idofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
     _idofs, _jdofs = _cartesian_product(idofs, jdofs)
     unwrapValues = _unwrap_cell_integrate(V, values)
-    append!(I, _idofs)
-    append!(J, _jdofs)
-    for _v in unwrapValues
-        append!(X, _v)
+    val = [reduce((x, y) -> (x..., y...), unwrapValues)...]
+    for (_i, _j, _v) in zip(_idofs, _jdofs, val)
+        if !isa(_v, NullOperator)
+            append!(X, _v)
+            append!(I, _i)
+            append!(J, _j)
+        end
     end
     return nothing
 end
