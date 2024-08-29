@@ -87,14 +87,15 @@ Base.broadcasted(f, a, b::AbstractLazy) = Base.broadcasted(f, LazyWrap(a), b)
 ###############################################################
 # Define rules with composition
 ###############################################################
+lazy_compose(a, b...) = lazy_compose(a, b)
+lazy_compose(a, b::Tuple) = LazyOperator(lazy_compose, LazyWrap(a), LazyWrap(b...))
 
 # trigger lazy composition for `f∘tuple(a...)` if in the tuple
 # there is an `AbtractLazy` at first position,
-Base.:∘(a::Function, b::AbstractLazy) = _compose_lazy_operator_tuple(a, (b,))
+Base.:∘(a::Function, b::AbstractLazy) = lazy_compose(a, (b,))
 function Base.:∘(a::Function, b::Tuple{AbstractLazy, Vararg{Any}})
-    _compose_lazy_operator_tuple(a, b)
+    lazy_compose(a, b)
 end
 function Base.:∘(a::Function, b::Tuple{Tuple{AbstractLazy, Vararg{Any}}, Vararg{Any}})
-    _compose_lazy_operator_tuple(a, b)
+    lazy_compose(a, b)
 end
-_compose_lazy_operator_tuple(a, b) = LazyOperator(∘, LazyWrap(a), LazyWrap(b...))

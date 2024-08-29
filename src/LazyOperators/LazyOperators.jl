@@ -38,6 +38,7 @@ export print_tree_prefix
 export pretty_name_style
 export pretty_name
 export NullOperator
+export lazy_compose
 
 export LazyMapOver
 export MapOver
@@ -52,6 +53,8 @@ any_of_type(a, ::Type{T}) where {T} = Val(false)
         return :(Val(false))
     end
 end
+
+function lazy_compose end
 
 include("lazy_operator.jl")
 include("algebra.jl")
