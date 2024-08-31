@@ -20,6 +20,7 @@ include("LazyOperators/LazyOperators.jl")
 using .LazyOperators
 import .LazyOperators:
     materialize, materialize_args, AbstractLazyOperator, get_args, get_operator, unwrap
+export lazy_compose
 
 include("utils.jl")
 
