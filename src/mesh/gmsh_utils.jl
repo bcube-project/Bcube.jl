@@ -134,8 +134,7 @@ function read_msh_with_cell_names(path::String, spaceDim = 0; verbose = false)
     _spaceDim = spaceDim > 0 ? spaceDim : _compute_space_dim(verbose)
     mesh = _read_msh(_spaceDim, verbose)
 
-    #----- Read cell names
-    # Read elements
+    # Read volumic physical groups (build a dict tag -> name)
     el_tags = gmsh.model.getPhysicalGroups(_spaceDim)
     _el_names = [gmsh.model.getPhysicalName(_dim, _tag) for (_dim, _tag) in el_tags]
     el = [
@@ -145,33 +144,25 @@ function read_msh_with_cell_names(path::String, spaceDim = 0; verbose = false)
     el_names = Dict(convert(Int, _tag) => _name for (_tag, _name) in el)
     el_names_inv = Dict(_name => convert(Int, _tag) for (_tag, _name) in el)
 
-    #@show _el_names
+    # Read cell indices associated to each volumic physical group
     el_cells = Dict{Int, Array{Int}}()
-    #el_cells_inv = Dict{Int,Int}()
     for (_dim, _tag) in el_tags
         v = Int[]
-        for i in 1:length(gmsh.model.getEntitiesForPhysicalGroup(_dim, _tag))
-            tmpTypes, tmpTags, tmpNodeTags = gmsh.model.mesh.getElements(
-                _dim,
-                gmsh.model.getEntitiesForPhysicalGroup(_dim, _tag)[i],
-            )
-            #@show size(tmpTags[1])
-            #@show tmpTags
-            if length(tmpTags) > 0
-                v = vcat(v, Int[i for i in tmpTags[1]])
+
+        for iEntity in gmsh.model.getEntitiesForPhysicalGroup(_dim, _tag)
+            tmpTypes, tmpTags, tmpNodeTags = gmsh.model.mesh.getElements(_dim, iEntity)
+
+            # Notes : a PhysicalGroup "entity" can contain different types of elements.
+            # So `tmpTags` is an array of the cell indices of each type in the Physical group.
+            for _tmpTags in tmpTags
+                v = vcat(v, Int.(_tmpTags))
             end
         end
         el_cells[_tag] = v
-
-        #for i=1:length(v)
-        #    el_cells_inv[glo2loc_cell_indices[v[i]]] = _tag
-        #end
     end
 
     absolute_cell_indices = absolute_indices(mesh, :cell)
     _, glo2loc_cell_indices = densify(absolute_cell_indices; permute_back = true)
-
-    #el_cells = Dict( convert(Int,_tag) => Int[i for i in gmsh.model.mesh.getElementsByType(spaceDim,_tag)] for (_tag,_name) in el_names)
 
     # free gmsh
     gmsh.finalize()
@@ -196,53 +187,7 @@ function _compute_space_dim(verbose::Bool)
     ly = box[5] - box[2]
     lz = box[6] - box[3]
 
-    # Maximum dimension and default value for number of space dimensions
-    lmax = maximum([lx, ly, lz])
-
-    # Now checking several case (complex `if` cascade for comprehensive warning messages)
-
-    # If the topology is 3D, useless to continue, the space dim must be 3
-    topodim == 3 && (return 3)
-
-    if topodim == 2
-        if (lz / lmax < tol)
-            msg = "Warning : the mesh is flat on the z-axis. It is now considered 2D."
-            msg *= " (use `spacedim` argument of `read_msh` if you want to keep 3D coordinates.)"
-            msg *= " Disable this warning with `verbose = false`"
-            verbose && println(msg)
-
-            return 2
-        else
-            # otherwise, it is a surface in a 3D space, we keep 3 coordinates
-            return 3
-        end
-    end
-
-    if topodim == 1
-        if (ly / lmax < tol && lz / lmax < tol)
-            msg = "Warning : the mesh is flat on the y and z axis. It is now considered 1D."
-            msg *= " (use `spacedim` argument of `read_msh` if you want to keep 2D or 3D coordinates.)"
-            msg *= " Disable this warning with `verbose = false`"
-            verbose && println(msg)
-
-            return 1
-        elseif (ly / lmax < tol && lz / lmax > tol)
-            error(
-                "You have a flat y-axis but a non flat z-axis, this is not supported. Consider rotating your mesh.",
-            )
-
-        elseif (ly / lmax > tol && lz / lmax < tol)
-            msg = "Warning : the mesh is flat on the z-axis. It is now considered as a 1D mesh in a 2D space."
-            msg *= " (use `spacedim` argument of `read_msh` if you want to keep 3D coordinates.)"
-            msg *= " Disable this warning with `verbose = false`"
-            verbose && println(msg)
-
-            return 2
-        else
-            # otherwise, it is a line in a 3D space, we keep 3 coordinates
-            return 3
-        end
-    end
+    return _compute_space_dim(topodim, lx, ly, lz, tol, verbose)
 end
 
 function _apply_gmsh_options(;

@@ -88,7 +88,7 @@ Open from `Bcube.jl/` a REPL and type:
 
 ```julia
 pkg> activate --temp
-pkg> add PkgBenchmark BenchmarkTools
+pkg> add BenchmarkTools PkgBenchmark StaticArrays WriteVTK UnPack
 pkg> dev .
 using PkgBenchmark
 import Bcube
@@ -101,7 +101,7 @@ Then checkout the `main` branch. Start a fresh REPL and type (almost the same):
 
 ```julia
 pkg> activate --temp
-pkg> add PkgBenchmark BenchmarkTools
+pkg> add BenchmarkTools PkgBenchmark StaticArrays WriteVTK UnPack
 pkg> dev .
 using PkgBenchmark
 import Bcube
@@ -151,7 +151,7 @@ Open from `Bcube.jl/` a REPL and type:
 
 ```julia
 pkg> activate --temp
-pkg> add PkgBenchmark
+pkg> add BenchmarkTools PkgBenchmark StaticArrays WriteVTK UnPack
 pkg> dev .
 using PkgBenchmark
 import Bcube

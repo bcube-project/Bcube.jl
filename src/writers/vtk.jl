@@ -325,17 +325,40 @@ end
         basename::String,
         vars::Dict{String, F},
         mesh::AbstractMesh,
-        U_export::AbstractFESpace,
         it::Integer = -1,
         time::Real = 0.0;
-        collection_append = false,
+        mesh_degree::Integer = 1,
+        discontinuous::Bool = true,
+        functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
+        collection_append::Bool = false,
         vtk_kwargs...,
     ) where {F <: AbstractLazy}
 
-Write the provided FEFunction/MeshCellData/CellFunction on the mesh with
-the precision of the Lagrange FESpace provided.
+    write_vtk_lagrange(
+        basename::String,
+        vars::Dict{String, F},
+        mesh::AbstractMesh,
+        U_export::AbstractFESpace,
+        it::Integer = -1,
+        time::Real = 0.0;
+        collection_append::Bool = false,
+        vtk_kwargs...,
+    ) where {F <: AbstractLazy}
+
+Write the provided FEFunction/MeshCellData/CellFunction on a mesh of order `mesh_degree` with the nodes
+defined by the `functionSpaceType` (only `Lagrange{:Uniform}` supported for now). The boolean `discontinuous`
+indicate if the node values should be discontinuous or not.
 
 `vars` is a dictionnary of variable name => Union{FEFunction,MeshCellData,CellFunction} to write.
+
+Cell-centered data should be wrapped as `MeshCellData` in the `vars` dict. To convert an `AbstractLazy` to
+a `MeshCellData`, simply use `Bcube.cell_mean` or `MeshCellData ∘ Bcube.var_on_centers`.
+
+# Remarks:
+* If `mesh` is of degree `d`, the solution will be written on a mesh of degree `mesh_degree`, even if this
+number is different from `d`.
+* The degree of the input FEFunction (P1, P2, P3, ...) is not used to define the nodes where the solution is
+written, only `mesh` and `mesh_degree` matter. The FEFunction is simply evaluated on the aforementionned nodes.
 
 # Example
 ```julia
@@ -346,13 +369,13 @@ projection_l2!(u, f_u, mesh)
 
 vars = Dict("f_u" => f_u, "u" => u, "grad_u" => ∇(u))
 
-for degree_export in 1:5
-    U_export = TrialFESpace(FunctionSpace(:Lagrange, degree_export), mesh)
+for mesh_degree in 1:5
     Bcube.write_vtk_lagrange(
         joinpath(@__DIR__, "output"),
         vars,
-        mesh,
-        U_export,
+        mesh;
+        mesh_degree,
+        discontinuous = false
     )
 end
 ```
@@ -366,24 +389,53 @@ function write_vtk_lagrange(
     basename::String,
     vars::Dict{String, F},
     mesh::AbstractMesh,
+    it::Integer = -1,
+    time::Real = 0.0;
+    mesh_degree::Integer = 1,
+    discontinuous::Bool = true,
+    functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
+    collection_append::Bool = false,
+    vtk_kwargs...,
+) where {F <: AbstractLazy}
+    U_export = TrialFESpace(
+        FunctionSpace(functionSpaceType, mesh_degree),
+        mesh;
+        isContinuous = !discontinuous,
+    )
+    write_vtk_lagrange(
+        basename,
+        vars,
+        mesh,
+        U_export,
+        it,
+        time;
+        collection_append,
+        vtk_kwargs...,
+    )
+end
+
+function write_vtk_lagrange(
+    basename::String,
+    vars::Dict{String, F},
+    mesh::AbstractMesh,
     U_export::AbstractFESpace,
     it::Integer = -1,
     time::Real = 0.0;
     collection_append = false,
     vtk_kwargs...,
 ) where {F <: AbstractLazy}
-    # extract all `MeshCellData` in `vars` as this type of variable
-    # will not be interpolated to nodes and will be written with
-    # the `VTKCellData` attribute.
-    vars_cell = filter(((k, v),) -> v isa MeshData{<:CellData}, vars)
-    vars_point = filter(((k, v),) -> k ∉ keys(vars_cell), vars)
-
     # FE space stuff
     fs_export = get_function_space(U_export)
     @assert get_type(fs_export) <: Lagrange "Only FunctionSpace of type Lagrange are supported for now"
     degree_export = get_degree(fs_export)
     dhl_export = Bcube._get_dhl(U_export)
     nd = get_ndofs(dhl_export)
+
+    # extract all `MeshCellData` in `vars` as this type of variable
+    # will not be interpolated to nodes and will be written with
+    # the `VTKCellData` attribute.
+    vars_cell = filter(((k, v),) -> v isa MeshData{<:CellData}, vars)
+    vars_point = filter(((k, v),) -> k ∉ keys(vars_cell), vars)
 
     # Get ncomps and type of each `point` variable
     type_dim = map(var -> get_return_type_and_codim(var, mesh), values(vars_point))
@@ -475,4 +527,39 @@ Append the number of iteration (if positive) to the basename
 """
 function _build_fname_with_iterations(basename::String, it::Integer)
     it >= 0 ? @sprintf("%s_%08i", basename, it) : basename
+end
+
+function write_file(
+    ::Bcube.VTKIoHandler,
+    basename::String,
+    mesh::AbstractMesh,
+    U_export::AbstractFESpace,
+    data = nothing,
+    it::Integer = -1,
+    time::Real = 0.0;
+    collection_append = false,
+    kwargs...,
+)
+
+    # Remove extension from filename
+    _basename = first(splitext(basename))
+
+    # Just write the mesh if `data` is `nothing`
+    if isnothing(data)
+        write_vtk(_basename, mesh)
+        return
+    end
+
+    # We don't use FlowSolution names in VTK, so we flatten everything
+    _data = data
+    if valtype(data) <: Dict
+        _keys = map(d -> collect(keys(d)), values(data))
+        _keys = vcat(_keys...)
+        _values = map(d -> collect(values(d)), values(data))
+        _values = vcat(_values...)
+        _data = Dict(_keys .=> _values)
+    end
+
+    # Write !
+    write_vtk_lagrange(_basename, _data, mesh, U_export, it, time; collection_append)
 end

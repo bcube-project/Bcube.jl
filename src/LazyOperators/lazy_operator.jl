@@ -9,6 +9,9 @@ and optionally:
 """
 abstract type AbstractLazy end
 
+# default rule : materialize of `a` is `a`
+materialize(a, x0, x1...) = a
+
 # default rule on tuple is to apply materialize on each element of the tuple
 materialize(t::Tuple, x::Vararg{Any, N}) where {N} = LazyWrap(_materialize(t, x...))
 function _materialize(t::Tuple, x::Vararg{Any, N}) where {N}
@@ -159,7 +162,7 @@ materialize_op(op::O, args::Vararg{Any, N}) where {O, N} = op(args...)
 # else:
 #      the result is the application of the function (i.e args1)
 #      to its args.
-@inline function materialize_op(op::typeof(∘), args::Vararg{Any, N}) where {N}
+@inline function materialize_op(op::typeof(lazy_compose), args::Vararg{Any, N}) where {N}
     _materialize_op_compose(op, args...)
 end
 @inline function _materialize_op_compose(
@@ -286,6 +289,11 @@ pretty_name(::NullOperator) = "∅"
 get_operator(a::NullOperator) = nothing
 get_args(a::NullOperator) = (nothing,)
 materialize(a::NullOperator, x) = a
+
+# Base.length(::NullOperator) = 1
+# Base.iterate(a::NullOperator) = (a, nothing)
+# Base.iterate(a::NullOperator, state) = nothing
+Base.map(f, a::NullOperator) = f(a)
 
 function show_lazy_operator(op::NullOperator; level = 1, indent = 4, islast = (true,))
     level == 1 && println("\n---------------")

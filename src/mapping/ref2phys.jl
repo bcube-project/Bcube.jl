@@ -148,7 +148,7 @@ function ∂fξ_∂x(f::F, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) wher
     return ForwardDiff.jacobian(f, ξ) * mapping_jacobian_inv(ctype, cnodes, ξ)
 end
 
-function ∂fξ_∂x_hypersurface(f, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ)
+function ∂fξ_∂x_hypersurface(f::F, ::Val{1}, ctype::AbstractEntityType, cnodes, ξ) where {F}
     # Gradient in the reference domain. Add missing dimensions. Warning : we always
     # consider a hypersurface (topodim = spacedim - 1) and not a line in R^3 for instance.
     # Hence we always add only one 0.
@@ -161,7 +161,13 @@ function ∂fξ_∂x_hypersurface(f, ::Val{1}, ctype::AbstractEntityType, cnodes
     return transpose(inv(J)) * ∇f
 end
 
-function ∂fξ_∂x_hypersurface(f, ::Val{N}, ctype::AbstractEntityType, cnodes, ξ) where {N}
+function ∂fξ_∂x_hypersurface(
+    f::F,
+    ::Val{N},
+    ctype::AbstractEntityType,
+    cnodes,
+    ξ,
+) where {F, N}
     # Gradient in the reference domain. Add missing dimensions. Warning : we always
     # consider a hypersurface (topodim = spacedim - 1) and not a line in R^3 for instance.
     # Hence we always add only one 0.
