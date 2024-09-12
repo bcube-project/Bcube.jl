@@ -11,8 +11,8 @@ Bcube is a Julia library providing tools for the spatial discretization of parti
 The main features are:
 
 - high-level api : `a(u, v) = ∫(η * ∇(u) ⋅ ∇(v))dΩ`
-- 1D, 2D, 3D unstructured mesh with high-order geometrical elements (gmsh format)
-- Lagrange (continuous & discontinuous) and Taylor (discontinuous) finite elements (line, quad, tri, hexa, penta)
+- 1D, 2D, 3D unstructured mesh with high-order geometrical elements (gmsh or cgns format)
+- Lagrange (continuous & discontinuous) and Taylor (discontinuous) finite elements (line, quad, tri, hexa, tetra, penta, pyra)
 - arbitrary order for hypercube Lagrange elements
 
 Browse the [documentation](https://bcube-project.github.io/Bcube.jl) for more information about the code architecture and API. Commented tutorials as well as various examples can be found in the dedicated project [BcubeTutorials.jl](https://github.com/bcube-project/BcubeTutorials.jl).
