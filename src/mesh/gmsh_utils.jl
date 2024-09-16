@@ -383,7 +383,8 @@ end
 
 """
     gen_mesh_around_disk(
-        output;
+        output,
+        type;
         r_in = 1.0,
         r_ext = 10.0,
         nθ = 360,
@@ -396,13 +397,14 @@ end
         kwargs...
     )
 
-Mesh the 2D domain around a disk.
+Mesh the 2D domain around a disk. `type` can be `:quad` or `:tri`.
 
 For kwargs, see [`gen_line_mesh`](@ref).
 """
 function gen_mesh_around_disk(
-    output;
-    r_in = 1.0,
+    output,
+    type;
+    r_int = 1.0,
     r_ext = 10.0,
     nθ = 360,
     nr = 100,
@@ -411,23 +413,29 @@ function gen_mesh_around_disk(
     recombine = true,
     bnd_names = ("Farfield", "Wall"),
     n_partitions = 0,
+    write_geo = false,
     kwargs...,
 )
+    @assert type ∈ (:tri, :quad)
+
     gmsh.initialize()
     _apply_gmsh_options(; kwargs...)
+
+    lc_ext = 2π * r_ext / (nθ - 1)
+    lc_int = 2π * r_int / (nθ - 1)
 
     # Points
     O = gmsh.model.geo.addPoint(0.0, 0.0, 0.0)
 
-    Ae = gmsh.model.geo.addPoint(r_ext * cos(-3π / 4), r_ext * sin(-3π / 4), 0.0)
-    Be = gmsh.model.geo.addPoint(r_ext * cos(-π / 4), r_ext * sin(-π / 4), 0.0)
-    Ce = gmsh.model.geo.addPoint(r_ext * cos(π / 4), r_ext * sin(π / 4), 0.0)
-    De = gmsh.model.geo.addPoint(r_ext * cos(3π / 4), r_ext * sin(3π / 4), 0.0)
+    Ae = gmsh.model.geo.addPoint(r_ext * cos(-3π / 4), r_ext * sin(-3π / 4), 0.0, lc_ext)
+    Be = gmsh.model.geo.addPoint(r_ext * cos(-π / 4), r_ext * sin(-π / 4), 0.0, lc_ext)
+    Ce = gmsh.model.geo.addPoint(r_ext * cos(π / 4), r_ext * sin(π / 4), 0.0, lc_ext)
+    De = gmsh.model.geo.addPoint(r_ext * cos(3π / 4), r_ext * sin(3π / 4), 0.0, lc_ext)
 
-    Ai = gmsh.model.geo.addPoint(r_in * cos(-3π / 4), r_in * sin(-3π / 4), 0.0)
-    Bi = gmsh.model.geo.addPoint(r_in * cos(-π / 4), r_in * sin(-π / 4), 0.0)
-    Ci = gmsh.model.geo.addPoint(r_in * cos(π / 4), r_in * sin(π / 4), 0.0)
-    Di = gmsh.model.geo.addPoint(r_in * cos(3π / 4), r_in * sin(3π / 4), 0.0)
+    Ai = gmsh.model.geo.addPoint(r_int * cos(-3π / 4), r_int * sin(-3π / 4), 0.0, lc_int)
+    Bi = gmsh.model.geo.addPoint(r_int * cos(-π / 4), r_int * sin(-π / 4), 0.0, lc_int)
+    Ci = gmsh.model.geo.addPoint(r_int * cos(π / 4), r_int * sin(π / 4), 0.0, lc_int)
+    Di = gmsh.model.geo.addPoint(r_int * cos(3π / 4), r_int * sin(3π / 4), 0.0, lc_int)
 
     # Curves
     AOBe = gmsh.model.geo.addCircleArc(Ae, O, Be)
@@ -438,33 +446,48 @@ function gen_mesh_around_disk(
     BOCi = gmsh.model.geo.addCircleArc(Bi, O, Ci)
     CODi = gmsh.model.geo.addCircleArc(Ci, O, Di)
     DOAi = gmsh.model.geo.addCircleArc(Di, O, Ai)
-    AiAe = gmsh.model.geo.addLine(Ai, Ae)
-    BiBe = gmsh.model.geo.addLine(Bi, Be)
-    CiCe = gmsh.model.geo.addLine(Ci, Ce)
-    DiDe = gmsh.model.geo.addLine(Di, De)
-
-    # Contours
-    _AB = gmsh.model.geo.addCurveLoop([AiAe, AOBe, -BiBe, -AOBi])
-    _BC = gmsh.model.geo.addCurveLoop([BiBe, BOCe, -CiCe, -BOCi])
-    _CD = gmsh.model.geo.addCurveLoop([CiCe, CODe, -DiDe, -CODi])
-    _DA = gmsh.model.geo.addCurveLoop([DiDe, DOAe, -AiAe, -DOAi])
 
     # Surfaces
-    AB = gmsh.model.geo.addPlaneSurface([_AB])
-    BC = gmsh.model.geo.addPlaneSurface([_BC])
-    CD = gmsh.model.geo.addPlaneSurface([_CD])
-    DA = gmsh.model.geo.addPlaneSurface([_DA])
+    if type == :quad
+        # Curves
+        AiAe = gmsh.model.geo.addLine(Ai, Ae)
+        BiBe = gmsh.model.geo.addLine(Bi, Be)
+        CiCe = gmsh.model.geo.addLine(Ci, Ce)
+        DiDe = gmsh.model.geo.addLine(Di, De)
 
-    # Mesh settings
-    for arc in [AOBe, BOCe, CODe, DOAe, AOBi, BOCi, CODi, DOAi]
-        gmsh.model.geo.mesh.setTransfiniteCurve(arc, round(Int, nθ / 4))
-    end
-    for rad in [AiAe, BiBe, CiCe, DiDe]
-        gmsh.model.geo.mesh.setTransfiniteCurve(rad, nr, "Progression", nr_prog)
-    end
-    for surf in [AB, BC, CD, DA]
-        gmsh.model.geo.mesh.setTransfiniteSurface(surf)
-        recombine && gmsh.model.geo.mesh.setRecombine(2, surf)
+        # Contours
+        _AB = gmsh.model.geo.addCurveLoop([AiAe, AOBe, -BiBe, -AOBi])
+        _BC = gmsh.model.geo.addCurveLoop([BiBe, BOCe, -CiCe, -BOCi])
+        _CD = gmsh.model.geo.addCurveLoop([CiCe, CODe, -DiDe, -CODi])
+        _DA = gmsh.model.geo.addCurveLoop([DiDe, DOAe, -AiAe, -DOAi])
+
+        # Surfaces
+        AB = gmsh.model.geo.addPlaneSurface([_AB])
+        BC = gmsh.model.geo.addPlaneSurface([_BC])
+        CD = gmsh.model.geo.addPlaneSurface([_CD])
+        DA = gmsh.model.geo.addPlaneSurface([_DA])
+
+        # Mesh settings
+        for arc in [AOBe, BOCe, CODe, DOAe, AOBi, BOCi, CODi, DOAi]
+            gmsh.model.geo.mesh.setTransfiniteCurve(arc, round(Int, nθ / 4))
+        end
+        for rad in [AiAe, BiBe, CiCe, DiDe]
+            gmsh.model.geo.mesh.setTransfiniteCurve(rad, nr, "Progression", nr_prog)
+        end
+        for surf in [AB, BC, CD, DA]
+            gmsh.model.geo.mesh.setTransfiniteSurface(surf)
+            recombine && gmsh.model.geo.mesh.setRecombine(2, surf)
+        end
+
+        surfaces = [AB, BC, CD, DA]
+
+    elseif type == :tri
+        # Contours
+        loop_ext = gmsh.model.geo.addCurveLoop([AOBe, BOCe, CODe, DOAe])
+        loop_int = gmsh.model.geo.addCurveLoop([AOBi, BOCi, CODi, DOAi])
+
+        # Surface
+        surfaces = [gmsh.model.geo.addPlaneSurface([loop_ext, loop_int])]
     end
 
     # Synchronize
@@ -473,7 +496,7 @@ function gen_mesh_around_disk(
     # Define boundaries (`1` stands for 1D, i.e lines)
     farfield = gmsh.model.addPhysicalGroup(1, [AOBe, BOCe, CODe, DOAe])
     wall = gmsh.model.addPhysicalGroup(1, [AOBi, BOCi, CODi, DOAi])
-    domain = gmsh.model.addPhysicalGroup(2, [AB, BC, CD, DA])
+    domain = gmsh.model.addPhysicalGroup(2, surfaces)
     gmsh.model.setPhysicalName(1, farfield, bnd_names[1])
     gmsh.model.setPhysicalName(1, wall, bnd_names[2])
     gmsh.model.setPhysicalName(2, domain, "Domain")
@@ -485,6 +508,11 @@ function gen_mesh_around_disk(
 
     # Write result
     gmsh.write(output)
+    if write_geo
+        output_geo = first(splitext(output)) * ".geo_unrolled"
+        rm(output_geo; force = true)
+        gmsh.write(output_geo)
+    end
 
     # End
     gmsh.finalize()
