@@ -130,6 +130,19 @@ function read_msh_with_cell_names(path::String, spaceDim = 0; verbose = false)
     gmsh.option.setNumber("General.Terminal", Int(verbose))
     gmsh.open(path)
 
+    mesh, el_names, el_names_inv, el_cells, glo2loc_cell_indices =
+        _read_msh_with_cell_names(spaceDim, verbose)
+
+    # free gmsh
+    gmsh.finalize()
+
+    return mesh, el_names, el_names_inv, el_cells, glo2loc_cell_indices
+end
+
+"""
+To use this function, the `gmsh` file must have been opened already (see `read_msh_with_cell_names(path::String)` for instance).
+"""
+function _read_msh_with_cell_names(spaceDim::Int, verbose::Bool)
     # build mesh
     _spaceDim = spaceDim > 0 ? spaceDim : _compute_space_dim(verbose)
     mesh = _read_msh(_spaceDim, verbose)
@@ -163,9 +176,6 @@ function read_msh_with_cell_names(path::String, spaceDim = 0; verbose = false)
 
     absolute_cell_indices = absolute_indices(mesh, :cell)
     _, glo2loc_cell_indices = densify(absolute_cell_indices; permute_back = true)
-
-    # free gmsh
-    gmsh.finalize()
 
     return mesh, el_names, el_names_inv, el_cells, glo2loc_cell_indices
 end
