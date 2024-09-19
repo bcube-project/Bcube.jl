@@ -376,7 +376,7 @@
             @test err < 1.0e-14
 
             mesh_path = joinpath(tempdir, "tmp2.msh")
-            gen_hexa_mesh(mesh_path, :hexa; n = [5, 5, 5])
+            gen_hexa_mesh(mesh_path, :hexa; nx = 5, ny = 5, nz = 5)
             mesh = read_msh(mesh_path)
             degree = 2
             dirichlet_dict = Dict("xmin" => 260.0)
