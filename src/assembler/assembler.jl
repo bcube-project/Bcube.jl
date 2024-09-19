@@ -191,7 +191,7 @@ function assemble_linear(
     V::Union{TestFESpace, AbstractMultiTestFESpace};
     T = Float64,
 )
-    b = zeros(T, get_ndofs(V))
+    b = allocate_dofs(V, T)
     assemble_linear!(b, l, V)
     return b
 end
