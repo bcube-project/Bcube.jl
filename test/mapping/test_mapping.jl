@@ -472,7 +472,7 @@
 
         # For two Hexa8 side-by-side
         path = joinpath(tempdir, "mesh.msh")
-        gen_hexa_mesh(path, :hexa; n = [3, 2, 2])
+        gen_hexa_mesh(path, :hexa; nx = 3, ny = 2, nz = 2)
         mesh = read_msh(path)
         _check_face_parametrization(mesh)
     end
