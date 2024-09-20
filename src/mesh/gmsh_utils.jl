@@ -658,7 +658,6 @@ For kwargs, see [`gen_line_mesh`](@ref).
 function gen_hexa_mesh(
     output,
     type;
-    transfinite = false,
     nx = 2,
     ny = 2,
     nz = 2,
@@ -672,7 +671,8 @@ function gen_hexa_mesh(
     bnd_names = ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"),
     n_partitions = 0,
     write_geo = false,
-    transfinite_lines = true,
+    transfinite = (type == :hexa),
+    transfinite_lines = (type == :hexa),
     lc = 1e-1,
     kwargs...,
 )
