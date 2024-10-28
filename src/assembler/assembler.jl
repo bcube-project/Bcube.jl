@@ -38,9 +38,12 @@ function assemble_bilinear(
     J = Int[]
     X = T[] # TODO : could be ComplexF64 or Dual
 
+    # Pre-allocate I, J, X
+    n = _count_n_elts(U, V, a)
+    foreach(Base.Fix2(sizehint!, n), (I, J, X))
+
     # Compute
     assemble_bilinear!(I, J, X, a, U, V)
-
     nrows = get_ndofs(V)
     ncols = get_ndofs(U)
     return sparse(I, J, X, nrows, ncols)
@@ -482,12 +485,20 @@ function _count_n_elts(
     return n
 end
 
-function _count_n_elts(
-    U::TrialFESpace,
-    V::TestFESpace,
-    domain::BoundaryFaceDomain{M, BC, L, C},
-) where {M, BC, L, C}
+# todo
+function _count_n_elts(U::TrialFESpace, V::TestFESpace, domain::AbstractFaceDomain)
     return 1
+end
+
+function _count_n_elts(U, V, a::Function)
+    integration = a(_null_operator(U), _null_operator(V))
+    _count_n_elts(U, V, integration)
+end
+function _count_n_elts(U, V, integration::Integration)
+    return _count_n_elts(U, V, get_domain(get_measure(integration)))
+end
+function _count_n_elts(U, V, integrations::MultiIntegration)
+    return sum(i -> _count_n_elts(U, V, i), integrations)
 end
 
 maywrap(x) = LazyWrap(x)
