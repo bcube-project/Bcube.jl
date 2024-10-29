@@ -151,7 +151,7 @@ Same as above, but with a Tuple of matrix
 # Dev notes:
 Use temporary transposed matrices for indexing efficiency
 """
-function apply_dirichlet_to_matrix2!(
+function apply_dirichlet_to_matrix!(
     matrices::Tuple{Vararg{AbstractMatrix, N}},
     U,
     V,
