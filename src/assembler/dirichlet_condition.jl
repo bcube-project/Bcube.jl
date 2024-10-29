@@ -147,22 +147,33 @@ end
 
 """
 Same as above, but with a Tuple of matrix
+
+# Dev notes:
+Use temporary transposed matrices for indexing efficiency
 """
-function apply_dirichlet_to_matrix!(
+function apply_dirichlet_to_matrix2!(
     matrices::Tuple{Vararg{AbstractMatrix, N}},
     U,
     V,
     mesh::AbstractMesh;
     diag_values::Tuple{Vararg{Number, N}} = ntuple(i -> 1.0, N),
 ) where {N}
+    # nullify given row (i.e column for the transposed matrix)
+    # and set the diagonal value
     callbacks = ntuple(
-        i -> callback!(array, iglob, _, _) = begin
-            array[iglob, :] .= 0.0
-            array[iglob, iglob] = diag_values[i]
-        end,
+        i ->
+            callback!(array, iglob, _, _) = begin
+                array[:, iglob] .= zero(diag_values[i])
+                array[iglob, iglob] = diag_values[i]
+            end,
         N,
     )
-    _apply_dirichlet!(matrices, callbacks, U, V, mesh)
+    _mat = map(copy ∘ transpose, matrices)
+    _apply_dirichlet!(_mat, callbacks, U, V, mesh)
+    for (m, _m) in zip(matrices, _mat)
+        m .= transpose(_m)
+    end
+    nothing
 end
 
 function _apply_dirichlet!(
