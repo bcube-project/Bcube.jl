@@ -80,6 +80,48 @@ coords = lagrange_dof_to_coords(mesh, 1)
 @show coords[2] # coordinates of dof '2' in the global numbering
 ```
 
+## Loop over the cells or faces of a mesh
+Let's say you have `AbstractMesh` with one or several limits
+```julia
+using Bcube
+mesh = rectangle_mesh(2, 3)
+Ω = CellDomain(mesh)
+Γ = InteriorFaceDomain(mesh)
+Λ = BoundaryFaceDomain(mesh, ("xmin", "ymin"))
+```
+
+You can loop over faces using the `DomainIterator` iterator associated to any "domain". Each item is either a `CellInfo` or a `FaceInfo` depending on the nature of the domain. This information contains all the geometric information about the entity:
+```julia
+# For cells in Ω
+for cell in Bcube.DomainIterator(Ω)
+    println("")
+    @show Bcube.cellindex(cell) # index of the cell in the mesh
+    @show Bcube.nodes(cell) # array of the "Node" forming this cell
+    @show Bcube.get_element_type(cell) # cell "entity type" (Bar2_t, Quad4_t etc)
+    @show Bcube.get_nodes_index(cell) # show the nodes index forming this face
+    @show Bcube.center(Bcube.get_element_type(cell), Bcube.nodes(cell)) # coordinates of the cell center
+end
+
+# For faces in Λ
+for face in Bcube.DomainIterator(Λ)
+    println("")
+    @show Bcube.faceindex(face) # index of the face in the mesh
+    @show Bcube.nodes(face) # array of the "Node" forming this face
+    @show Bcube.get_element_type(face) # face "entity type" (Bar2_t, Quad4_t etc)
+    @show Bcube.shape(Bcube.get_element_type(face)) # face "shape" (Line, Square, etc)
+    @show Bcube.get_nodes_index(face) # show the nodes index forming this face
+    @show Bcube.center(Bcube.shape(Bcube.get_element_type(face))) # coordinates of the face center in the Reference domain (of the face)
+    @show Bcube.center(Bcube.get_element_type(face), Bcube.nodes(face)) # coordinates of the face center in the Physical domain
+
+    # Face "normal" vector considering the face as hypersurface
+    @show Bcube.cell_normal(
+        Bcube.get_element_type(face),
+        Bcube.nodes(face),
+        Bcube.center(Bcube.shape(Bcube.get_element_type(face))),
+    )
+end
+```
+
 ## Comparing manually the benchmarks with `main`
 
 Let's say you want to compare the performance of your current branch (named "target" hereafter) with the `main` branch (named "baseline" hereafter).

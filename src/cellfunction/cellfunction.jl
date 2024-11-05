@@ -513,7 +513,9 @@ See [`cell_normal`]@ref for the computation method.
 """
 struct CellNormal <: AbstractLazy
     function CellNormal(mesh::AbstractMesh)
-        @assert topodim(mesh) < spacedim(mesh) "CellNormal has only sense when dealing with hypersurface, maybe you confused it with FaceNormal?"
+        if topodim(mesh) == spacedim(mesh)
+            @warn "CellNormal has only sense when dealing with hypersurface, make sure you didn't confused it with FaceNormal"
+        end
         return new()
     end
 end
