@@ -560,7 +560,7 @@ function LazyOperators.materialize(
 end
 
 _tangential_projector(ν) = I - (ν ⊗ ν)
-tangential_projector(mesh) = _tangential_projector ∘ CellNormal(mesh)
+tangential_projector() = _tangential_projector ∘ CellNormal()
 
 LazyOperators.materialize(f::Function, ::CellInfo) = f
 LazyOperators.materialize(f::Function, ::CellPoint) = f
