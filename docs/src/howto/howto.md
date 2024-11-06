@@ -139,6 +139,58 @@ for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces 
 end
 ```
 
+## Export face normals to a CSV file
+
+Imagine that you want to export some face normals (of one boundary for instance) in a CSV file to check their orientation. You can get inspiration from this script:
+```julia
+using Bcube
+using DelimitedFiles
+using SparseArrays
+
+# Build a toy mesh and extract some boundaries
+mesh = rectangle_mesh(3, 4)
+Ω = CellDomain(mesh)
+Λ = BoundaryFaceDomain(mesh, ("xmin", "ymin"))
+
+# Get face normals
+nΛ = get_face_normals(Λ)
+
+# Compute : location of face centers, normals and surface of each face
+dΛ = Measure(Λ, 1)
+x = Bcube.compute(∫(side_n(PhysicalFunction(x -> x)))dΛ)
+n = Bcube.compute(∫(side_n(nΛ))dΛ)
+s = Bcube.compute(∫(side_n(PhysicalFunction(x -> 1)))dΛ)
+
+# Get non-zeros values (results are sparse vectors from now)
+_, x = findnz(x)
+_, n = findnz(n)
+_, s = findnz(s)
+
+# Use surface to "correct" x and n
+x = x ./ s
+n = n ./ s
+
+# Prepare data for output
+x = transpose(hcat(x...))
+n = transpose(hcat(n...))
+y = hcat(x, n)
+
+# Write normals as CSV
+a = ("x", "y", "z")[1:Bcube.spacedim(mesh)]
+header = join(a, ",") * "," * join("n" .* a, ",")
+open(joinpath(@__DIR__, "output.csv"), "w") do io
+    println(io, header)
+    writedlm(io, y, ",")
+end
+
+# Write mesh as VTK
+write_vtk(joinpath(@__DIR__, "output"), mesh)
+```
+Note that once the CSV file is obtained, the normals can be visualized for instance with Paraview by using three consecutive filters:
+* `TableToPoints` to convert coordinates into points
+* `Calculator` to convert "normals columns" into vectors (using `iHat`, `jHat` etc)
+* `Glyph` to visualized these vectors
+
 ## Comparing manually the benchmarks with `main`
 
 Let's say you want to compare the performance of your current branch (named "target" hereafter) with the `main` branch (named "baseline" hereafter).
