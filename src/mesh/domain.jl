@@ -408,8 +408,26 @@ function opposite_side(fInfo::FaceInfo)
     )
 end
 
-""" Return a LazyOperator representing a face normal """
+"""
+    get_face_normals(::AbstractFaceDomain)
+    get_face_normals(::Measure{<:AbstractFaceDomain})
+
+Return a LazyOperator representing a face normal
+"""
 get_face_normals(::AbstractFaceDomain) = FaceNormal()
+
+"""
+    get_cell_normals(::AbstractCellDomain)
+    get_cell_normals(::Measure{<:AbstractCellDomain})
+
+Return a LazyOperator representing a cell normal in the context of hypersurfaces (see [`cell_normal`]@ref for more details)
+
+"""
+function get_cell_normals(domain::AbstractCellDomain)
+    mesh = get_mesh(domain)
+    @assert topodim(mesh) < spacedim(mesh) "get_cell_normals on a CellDomain has only sense when dealing with hypersurface, maybe you confused it with get_face_normals?"
+    return CellNormal()
+end
 
 abstract type AbstractDomainIterator{D <: AbstractDomain} end
 get_domain(iter::AbstractDomainIterator) = iter.domain

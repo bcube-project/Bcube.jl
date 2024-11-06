@@ -47,20 +47,10 @@ function Measure(domain::AbstractDomain, degree::Val{D}) where {D}
     Measure(domain, Quadrature(degree))
 end
 
-""" Return a LazyOperator representing a face normal """
-get_face_normals(::Measure{<:AbstractFaceDomain}) = FaceNormal()
-
-""" 
-    get_cell_normals(measure::Measure{<:AbstractDomain})
-
-Return a LazyOperator representing a cell normal (see [`cell_normal`]@ref for more details)
-
-"""
-function get_cell_normals(measure::Measure{<:AbstractCellDomain})
-    domain = get_domain(measure)
-    mesh = get_mesh(domain)
-    @assert topodim(mesh) < spacedim(mesh) "get_cell_normals on a CellDomain has only sense when dealing with hypersurface, maybe you confused it with get_face_normals?"
-    return CellNormal()
+function get_face_normals(measure::Measure{<:AbstractFaceDomain})
+    get_face_normals(get_domain(measure))
 end
 
-get_cell_normals(::Measure{<:AbstractFaceDomain}) = CellNormal()
+function get_cell_normals(measure::Measure{<:AbstractCellDomain})
+    get_cell_normals(get_domain(measure))
+end
