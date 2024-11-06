@@ -81,7 +81,12 @@ export read_msh,
 
 include("./mesh/domain.jl")
 export AbstractDomain,
-    CellDomain, InteriorFaceDomain, BoundaryFaceDomain, get_mesh, get_face_normals
+    CellDomain,
+    InteriorFaceDomain,
+    BoundaryFaceDomain,
+    get_mesh,
+    get_face_normals,
+    get_cell_normals
 
 include("./quadrature/quadrature.jl")
 export QuadratureLobatto, QuadratureLegendre, QuadratureUniform, Quadrature, QuadratureRule

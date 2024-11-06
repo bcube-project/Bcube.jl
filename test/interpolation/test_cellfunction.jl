@@ -205,6 +205,7 @@ end
         cell2nnodes = [4, 4]
 
         mesh = Mesh(_nodes, ctypes, Connectivity(cell2nnodes, cell2nodes))
+        ν = get_cell_normals(CellDomain(mesh))
 
         fInfo = FaceInfo(mesh, 2) # 2 is the good one, cf `Bcube.get_nodes_index(fInfo)`
         fPoint = Bcube.FacePoint([0.0, 0.0], fInfo, ReferenceDomain())
@@ -220,12 +221,14 @@ end
         R = Bcube.CoplanarRotation()
 
         _R = Bcube.materialize(side_n(R), fPoint)
+        _ν = Bcube.materialize(side_n(ν), fPoint)
         v2 = normalize(get_coords(F) - get_coords(E)) * 2
         u = normalize(get_coords(C) - get_coords(B))
         v2_in_1 = _R * v2
         ν1 = Bcube.cell_normal(ctype_n, cnodes_n, ξ_n)
         @test v2 ⋅ u ≈ v2_in_1 ⋅ u
         @test abs(ν1 ⋅ v2_in_1) < 1e-16
+        @test _ν == ν1
 
         _R = Bcube.materialize(side_p(R), fPoint)
         v1 = normalize(get_coords(D) - get_coords(B)) * 2

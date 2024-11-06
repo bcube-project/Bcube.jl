@@ -513,12 +513,7 @@ Normal of a facet of a hypersurface.
 
 See [`cell_normal`]@ref for the computation method.
 """
-struct CellNormal <: AbstractLazy
-    function CellNormal(mesh::AbstractMesh)
-        @assert topodim(mesh) < spacedim(mesh) "CellNormal has only sense when dealing with hypersurface, maybe you confused it with FaceNormal?"
-        return new()
-    end
-end
+struct CellNormal <: AbstractLazy end
 
 LazyOperators.materialize(ν::CellNormal, ::CellInfo) = ν
 
@@ -565,7 +560,7 @@ function LazyOperators.materialize(
 end
 
 _tangential_projector(ν) = I - (ν ⊗ ν)
-tangential_projector(mesh) = _tangential_projector ∘ CellNormal(mesh)
+tangential_projector() = _tangential_projector ∘ CellNormal()
 
 LazyOperators.materialize(f::Function, ::CellInfo) = f
 LazyOperators.materialize(f::Function, ::CellPoint) = f
