@@ -182,7 +182,9 @@ function get_function(f::CellShapeFunctions)
         shape_functions(get_function_space(f), valS, get_cell_shape(f))
 end
 
-@generated function _reshape_cell_shape_functions(a::SMatrix{Ndof, Ndim}) where {Ndof, Ndim}
+@generated function _reshape_cell_shape_functions(
+    a::Union{SMatrix{Ndof, Ndim}, SizedMatrix{Ndof, Ndim}},
+) where {Ndof, Ndim}
     _exprs = [[:(a[$i, $j]) for j in 1:Ndim] for i in 1:Ndof]
     exprs = [:(SA[$(_expr...)]) for _expr in _exprs]
     return :(tuple($(exprs...)))
