@@ -5,14 +5,21 @@ struct JLD2IoHandler <: AbstractIoHandler end
 struct VTKIoHandler <: AbstractIoHandler end
 
 """
-    read_file([handler::AbstractIoHandler,] filepath::String; domainNames = nothing, varnames = nothing, topodim = 0, kwargs...,)
+    read_file(
+        [handler::AbstractIoHandler,]
+        filepath::String;
+        domainNames = String[],
+        varnames = nothing,
+        topodim = 0,
+        spacedim = 0,
+        kwargs...,
+    )
 
 Read the mesh and associated data in the given file.
 
 Returns a NamedTuple with the following keys:
 * mesh -> the Bcube mesh
 * data -> dictionnary of FlowSolutionName => (dictionnary of VariableName => MeshData)
-* to be defined : stuff related to subdomains
 
 If `domainNames` is an empty list/array, all the domains found will be read and merged. Otherwise, `domainNames` can be
 a filtered list/array of the domain names to retain.
@@ -67,7 +74,7 @@ end
 """
     write_file(
         [handler::AbstractIoHandler,]
-        basename::String,
+        filepath::String,
         mesh::AbstractMesh,
         data = nothing,
         it::Integer = -1,
@@ -86,14 +93,14 @@ Write a set of `AbstractLazy` to a file.
 Dict type described.
 
 To write cell-centered data, wrapped your input into a `MeshCellData` (for instance
-using Bcube.cell_mean).
+using `Bcube.cell_mean`).
 
 
 # Implementation
 To specialize this method, please specialize:
 write_file(
     handler::AbstractIoHandler,
-    basename::String,
+    filepath::String,
     mesh::AbstractMesh,
     U_export::AbstractFESpace,
     data = nothing,
@@ -105,7 +112,7 @@ write_file(
 """
 function write_file(
     handler::AbstractIoHandler,
-    basename::String,
+    filepath::String,
     mesh::AbstractMesh,
     data = nothing,
     it::Integer = -1,
@@ -127,7 +134,7 @@ function write_file(
     # Call version with U_export
     write_file(
         handler,
-        basename,
+        filepath,
         mesh,
         U_export,
         data,
@@ -140,7 +147,7 @@ end
 
 function write_file(
     handler::AbstractIoHandler,
-    basename::String,
+    filepath::String,
     mesh::AbstractMesh,
     U_export::AbstractFESpace,
     data = nothing,
@@ -152,8 +159,8 @@ function write_file(
     error("'write_file' is not implemented for $(typeof(handler))")
 end
 
-function write_file(basename::String, args...; kwargs...)
-    write_file(_filename_to_handler(basename), basename, args...; kwargs...)
+function write_file(filepath::String, args...; kwargs...)
+    write_file(_filename_to_handler(filepath), filepath, args...; kwargs...)
 end
 
 """
