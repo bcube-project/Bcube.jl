@@ -258,6 +258,7 @@ end
 @inline nodes(c::CellInfo) = c.nodes
 @inline get_nodes_index(c::CellInfo) = c.c2n
 get_element_type(c::CellInfo) = celltype(c)
+get_element_index(c::CellInfo) = cellindex(c)
 
 """ Legacy constructor for CellInfo : no information about node indices """
 CellInfo(icell, ctype, nodes) = CellInfo(icell, ctype, nodes, nothing)
@@ -294,6 +295,7 @@ end
 @inline nodes(c::CellSide) = c.nodes
 @inline cell2nodes(c::CellSide) = c.c2n
 get_element_type(c::CellSide) = celltype(c)
+get_element_index(c::CellSide) = cellindex(c)
 
 abstract type AbstractFaceInfo <: AbstractDomainIndex end
 
@@ -390,7 +392,8 @@ get_cellinfo_p(faceInfo::FaceInfo) = faceInfo.cellinfo_p
 @inline get_nodes_index(faceInfo::FaceInfo) = faceInfo.f2n
 get_cell_side_n(faceInfo::FaceInfo) = faceInfo.cellside_n
 get_cell_side_p(faceInfo::FaceInfo) = faceInfo.cellside_p
-get_element_type(c::FaceInfo) = facetype(c)
+get_element_type(f::FaceInfo) = facetype(f)
+get_element_index(f::FaceInfo) = faceindex(f)
 
 """
 Return the opposite side of the `FaceInfo` : cellside "n" because cellside "p"

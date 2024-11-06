@@ -90,35 +90,52 @@ mesh = rectangle_mesh(2, 3)
 Λ = BoundaryFaceDomain(mesh, ("xmin", "ymin"))
 ```
 
-You can loop over faces using the `DomainIterator` iterator associated to any "domain". Each item is either a `CellInfo` or a `FaceInfo` depending on the nature of the domain. This information contains all the geometric information about the entity:
+You can loop over the mesh cell and/or faces using the `DomainIterator` iterator associated to any "domain". Each item is either a `CellInfo` or a `FaceInfo` (or a `CellSide`) depending on the nature of the domain. This information contains all the geometric information about the entity:
 ```julia
-# For cells in Ω
-for cell in Bcube.DomainIterator(Ω)
-    println("")
-    @show Bcube.cellindex(cell) # index of the cell in the mesh
-    @show Bcube.nodes(cell) # array of the "Node" forming this cell
-    @show Bcube.get_element_type(cell) # cell "entity type" (Bar2_t, Quad4_t etc)
-    @show Bcube.get_nodes_index(cell) # show the nodes index forming this face
-    @show Bcube.center(Bcube.get_element_type(cell), Bcube.nodes(cell)) # coordinates of the cell center
-end
+# Loop over the different domains (to illustrate that it works for different kind of domains)
+for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces in Λ"))
+    println("\n-----------")
+    println(legend)
+    println("-----------")
 
-# For faces in Λ
-for face in Bcube.DomainIterator(Λ)
-    println("")
-    @show Bcube.faceindex(face) # index of the face in the mesh
-    @show Bcube.nodes(face) # array of the "Node" forming this face
-    @show Bcube.get_element_type(face) # face "entity type" (Bar2_t, Quad4_t etc)
-    @show Bcube.shape(Bcube.get_element_type(face)) # face "shape" (Line, Square, etc)
-    @show Bcube.get_nodes_index(face) # show the nodes index forming this face
-    @show Bcube.center(Bcube.shape(Bcube.get_element_type(face))) # coordinates of the face center in the Reference domain (of the face)
-    @show Bcube.center(Bcube.get_element_type(face), Bcube.nodes(face)) # coordinates of the face center in the Physical domain
+    # Loop over the elements (cells of faces) in this domain
+    for element in Bcube.DomainIterator(domain)
 
-    # Face "normal" vector considering the face as hypersurface
-    @show Bcube.cell_normal(
-        Bcube.get_element_type(face),
-        Bcube.nodes(face),
-        Bcube.center(Bcube.shape(Bcube.get_element_type(face))),
-    )
+        # index of the cell/face in the mesh
+        println("")
+        println("Element $(Bcube.get_element_index(element))")
+
+        # show the nodes index forming this face
+        @show Bcube.get_nodes_index(element)
+
+        # array of the "Node" forming this element
+        elt_nodes = Bcube.nodes(element)
+        @show elt_nodes
+
+        # element "entity type" (Bar2_t, Quad4_t etc)
+        elt_type = Bcube.get_element_type(element)
+        @show elt_type
+
+        # element center
+        elt_center = Bcube.center(elt_type, elt_nodes)
+        @show elt_center
+
+        # Additionnal info for faces
+        if element isa Bcube.FaceInfo
+            # Access the CellInfo of the neighbor cell ("negative" cell)
+            # For interior faces only, the "positive" side can be retrieved
+            # as well (with get_cellinfo_p)
+            neighbor_cell_n = Bcube.get_cellinfo_n(element)
+
+            # We can also retrieve the local index of the face in the neighbor cell
+            kside = Bcube.get_cell_side_n(element)
+
+            # Normal of the face at the face center
+            cell_type = Bcube.get_element_type(neighbor_cell_n)
+            cell_nodes = Bcube.nodes(neighbor_cell_n)
+            @show Bcube.normal(cell_type, cell_nodes, kside, elt_center)
+        end
+    end
 end
 ```
 
