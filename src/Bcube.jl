@@ -8,7 +8,6 @@ using FEMQuad
 using FastGaussQuadrature
 using ForwardDiff
 using LinearAlgebra
-using WriteVTK
 using Printf # just for tmp vtk, to be removed
 # import LinearSolve: solve, solve!, LinearProblem
 import LinearSolve
@@ -151,8 +150,5 @@ export linear_scaling_limiter
 
 include("./io/io_interface.jl")
 export read_file, read_mesh, write_file
-
-include("./writers/vtk.jl")
-export write_vtk
 
 end

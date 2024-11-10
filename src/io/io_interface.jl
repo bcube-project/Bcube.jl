@@ -1,8 +1,7 @@
 abstract type AbstractIoHandler end
-struct GMSHIoHandler <: AbstractIoHandler end
-struct HDF5IoHandler <: AbstractIoHandler end
-struct JLD2IoHandler <: AbstractIoHandler end
-struct VTKIoHandler <: AbstractIoHandler end
+struct GMSHIoHandler <: AbstractIoHandler end # to be removed
+struct HDF5IoHandler <: AbstractIoHandler end # to be removed
+struct JLD2IoHandler <: AbstractIoHandler end # to be removed
 
 """
     read_file(
@@ -93,10 +92,9 @@ Write a set of `AbstractLazy` to a file.
 Dict type described.
 
 To write cell-centered data, wrapped your input into a `MeshCellData` (for instance
-using `Bcube.cell_mean`).
+using `Bcube.cell_mean` or `var_on_centers`).
 
-
-# Implementation
+# Dev notes
 To specialize this method, please specialize:
 write_file(
     handler::AbstractIoHandler,
@@ -174,12 +172,13 @@ check_input_file(filename::String) = check_input_file(_filename_to_handler(filen
 
 function _filename_to_handler(filename::String)
     ext = last(splitext(filename))
-    if ext in (".msh",)
-        return GMSHIoHandler()
-    elseif ext in (".pvd", ".vtk", ".vtu")
-        return VTKIoHandler()
-    elseif ext in (".cgns", ".hdf", ".hdf5")
-        return HDF5IoHandler()
-    end
-    error("Could not find a handler for the filename $filename")
+    _filename_to_handler(ext[2:end]) # remove the "dot"
 end
+
+function _filename_to_handler(extension)
+    error("Could not find a handler for the extension $extension")
+end
+
+# to be removed :
+_filename_to_handler(::Val(:msh)) = GMSHIoHandler()
+_filename_to_handler(::Union{Val(:cgns), Val(:hdf), Val(:hdf5)}) = HDF5IoHandler()
