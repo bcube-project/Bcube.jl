@@ -81,7 +81,7 @@ coords = lagrange_dof_to_coords(mesh, 1)
 ```
 
 ## Loop over the cells or faces of a mesh
-Let's say you have `AbstractMesh` with one or several limits
+Let's say you have a `Mesh` with one or several limits
 ```julia
 using Bcube
 mesh = rectangle_mesh(2, 3)
@@ -105,7 +105,7 @@ for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces 
         println("")
         println("Element $(Bcube.get_element_index(element))")
 
-        # show the nodes index forming this face
+        # show the nodes index forming this element
         @show Bcube.get_nodes_index(element)
 
         # array of the "Node" forming this element
@@ -124,13 +124,13 @@ for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces 
         if element isa Bcube.FaceInfo
             # Access the CellInfo of the neighbor cell ("negative" cell)
             # For interior faces only, the "positive" side can be retrieved
-            # as well (with get_cellinfo_p)
-            neighbor_cell_n = Bcube.get_cellinfo_n(element)
+            # as well (with side_p)
+            neighbor_cell_n = side_n(element)
 
             # We can also retrieve the local index of the face in the neighbor cell
             kside = Bcube.get_cell_side_n(element)
 
-            # Normal of the face at the face center
+            # Normal of the face at the face center using the low level API
             cell_type = Bcube.get_element_type(neighbor_cell_n)
             cell_nodes = Bcube.nodes(neighbor_cell_n)
             @show Bcube.normal(cell_type, cell_nodes, kside, elt_center)
