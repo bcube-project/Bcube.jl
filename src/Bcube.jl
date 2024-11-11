@@ -49,7 +49,8 @@ include("./mesh/shape.jl")
 include("./mesh/connectivity.jl")
 
 include("./mesh/mesh.jl")
-export ncells, nnodes, boundary_names, nboundaries, boundary_tag, get_nodes
+export ncells,
+    nnodes, boundary_names, nboundaries, boundary_tag, get_nodes, spacedim, topodim
 
 include("./mesh/mesh_generator.jl")
 export basic_mesh,

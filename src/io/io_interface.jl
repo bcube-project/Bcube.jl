@@ -80,7 +80,7 @@ end
         time::Real = 0.0;
         mesh_degree::Integer = 1,
         functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
-        discontinuous::Bool = true,
+        discontinuous::Bool = false,
         collection_append::Bool = false,
         kwargs...,
     )
@@ -92,7 +92,33 @@ Write a set of `AbstractLazy` to a file.
 Dict type described.
 
 To write cell-centered data, wrapped your input into a `MeshCellData` (for instance
-using `Bcube.cell_mean` or `var_on_centers`).
+using `cell_mean` or `MeshCellData ∘ var_on_centers`).
+
+# Example
+```julia
+mesh = rectangle_mesh(6, 7; xmin = -1, xmax = 1.0, ymin = -1, ymax = 1.0)
+f_u = PhysicalFunction(x -> x[1]^2 + x[2]^2)
+u = FEFunction(TrialFESpace(FunctionSpace(:Lagrange, 4), mesh))
+projection_l2!(u, f_u, mesh)
+
+vars = Dict("f_u" => f_u, "u" => u, "grad_u" => ∇(u))
+
+for mesh_degree in 1:5
+    write_file(
+        joinpath(@__DIR__, "output"),
+        mesh,
+        vars;
+        mesh_degree,
+        discontinuous = false
+    )
+end
+```
+
+# Remarks:
+* If `mesh` is of degree `d`, the solution will be written on a mesh of degree `mesh_degree`, even if this
+number is different from `d`.
+* The degree of the input FEFunction (P1, P2, P3, ...) is not used to define the nodes where the solution is
+written, only `mesh` and `mesh_degree` matter. The FEFunction is simply evaluated on the aforementionned nodes.
 
 # Dev notes
 To specialize this method, please specialize:
@@ -117,7 +143,7 @@ function write_file(
     time::Real = 0.0;
     mesh_degree::Integer = 1,
     functionSpaceType::AbstractFunctionSpaceType = Lagrange(),
-    discontinuous::Bool = true,
+    discontinuous::Bool = false,
     collection_append::Bool = false,
     kwargs...,
 )
@@ -172,7 +198,7 @@ check_input_file(filename::String) = check_input_file(_filename_to_handler(filen
 
 function _filename_to_handler(filename::String)
     ext = last(splitext(filename))
-    _filename_to_handler(ext[2:end]) # remove the "dot"
+    _filename_to_handler(Val(Symbol(ext[2:end]))) # remove the "dot"
 end
 
 function _filename_to_handler(extension)
