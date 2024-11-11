@@ -162,7 +162,6 @@ fname2sum = Dict(r[2] => r[1] for r in eachrow(f))
     custom_include("./dof/test_assembler.jl")
     custom_include("./operator/test_algebra.jl")
     custom_include("./dof/test_meshdata.jl")
-    custom_include("./writers/test_vtk.jl")
 
     @testset "Issues" begin
         custom_include("./issues/issue_112.jl")

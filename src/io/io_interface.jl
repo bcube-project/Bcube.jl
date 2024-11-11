@@ -180,5 +180,5 @@ function _filename_to_handler(extension)
 end
 
 # to be removed :
-_filename_to_handler(::Val(:msh)) = GMSHIoHandler()
-_filename_to_handler(::Union{Val(:cgns), Val(:hdf), Val(:hdf5)}) = HDF5IoHandler()
+_filename_to_handler(::Val{:msh}) = GMSHIoHandler()
+_filename_to_handler(::Union{Val{:cgns}, Val{:hdf}, Val{:hdf5}}) = HDF5IoHandler()

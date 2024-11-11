@@ -101,7 +101,7 @@ function get_zone_element_indices(::AbstractMeshMetaData, ::AbstractMesh, name)
     error("not implemented")
 end
 
-struct DefaultMeshMetaData end
+struct DefaultMeshMetaData <: AbstractMeshMetaData end
 get_zone_names(::DefaultMeshMetaData, ::AbstractMesh) = ("Zone",)
 get_zone_element_indices(::DefaultMeshMetaData, mesh::AbstractMesh, name) = 1:ncells(mesh)
 
