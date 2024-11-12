@@ -160,6 +160,7 @@ fname2sum = Dict(r[2] => r[1] for r in eachrow(f))
     # custom_include("./interpolation/test_limiter.jl")
     custom_include("./interpolation/test_cellfunction.jl")
     custom_include("./dof/test_assembler.jl")
+    custom_include("./dof/test_dirichlet.jl")
     custom_include("./operator/test_algebra.jl")
     custom_include("./dof/test_meshdata.jl")
 
