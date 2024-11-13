@@ -8,7 +8,6 @@ using FEMQuad
 using FastGaussQuadrature
 using ForwardDiff
 using LinearAlgebra
-using WriteVTK
 using Printf # just for tmp vtk, to be removed
 # import LinearSolve: solve, solve!, LinearProblem
 import LinearSolve
@@ -50,7 +49,8 @@ include("./mesh/shape.jl")
 include("./mesh/connectivity.jl")
 
 include("./mesh/mesh.jl")
-export ncells, nnodes, boundary_names, nboundaries, boundary_tag, get_nodes
+export ncells,
+    nnodes, boundary_names, nboundaries, boundary_tag, get_nodes, spacedim, topodim
 
 include("./mesh/mesh_generator.jl")
 export basic_mesh,
@@ -140,7 +140,7 @@ include("./assembler/affine_fe_system.jl")
 export AffineFESystem
 
 include("./feoperator/projection_newapi.jl")
-export projection_l2!
+export projection_l2!, cell_mean
 
 include("./feoperator/projection.jl")
 export var_on_centers,
@@ -151,8 +151,5 @@ export linear_scaling_limiter
 
 include("./io/io_interface.jl")
 export read_file, read_mesh, write_file
-
-include("./writers/vtk.jl")
-export write_vtk
 
 end

@@ -72,11 +72,45 @@ function Base.show(io::IO, c::MeshConnectivity)
 end
 
 """
+Mesh metadata intended to store informations about "zones" (or "domains") originally
+stored in the mesh file.
+
+# Devs notes
+All subtypes should implement the following functions:
+* `get_zone_names(::AbstractMeshMetaData, ::AbstractMesh)`
+* `get_zone_element_indices(::AbstractMeshMetaData, ::AbstractMesh, name)`
+"""
+abstract type AbstractMeshMetaData end
+
+"""
+    get_zone_names(::AbstractMeshMetaData)
+
+Return the zone names
+"""
+get_zone_names(mesh::AbstractMesh) = get_zone_names(get_metadata(mesh), mesh)
+get_zone_names(::AbstractMeshMetaData, ::AbstractMesh) = error("not implemented")
+
+"""
+    get_zone_indices(::AbstractMesh, name)
+
+Return the cell indices of a given zone, designated by its name
+"""
+get_zone_element_indices(mesh::AbstractMesh, name) =
+    get_zone_element_indices(get_metadata(mesh), mesh, name)
+function get_zone_element_indices(::AbstractMeshMetaData, ::AbstractMesh, name)
+    error("not implemented")
+end
+
+struct DefaultMeshMetaData <: AbstractMeshMetaData end
+get_zone_names(::DefaultMeshMetaData, ::AbstractMesh) = ("Zone",)
+get_zone_element_indices(::DefaultMeshMetaData, mesh::AbstractMesh, name) = 1:ncells(mesh)
+
+"""
 `bc_names` : <boundary tag> => <boundary names>
 `bc_nodes` : <boundary tag> => <boundary nodes tags>
 `bc_faces` : <boundary tag> => <boundary faces tags>
 """
-mutable struct Mesh{topoDim, spaceDim, C, E, T} <: AbstractMesh{topoDim, spaceDim}
+mutable struct Mesh{topoDim, spaceDim, C, E, T, M} <: AbstractMesh{topoDim, spaceDim}
     nodes::Vector{Node{spaceDim, T}}
     entities::E
     connectivities::C
@@ -87,6 +121,8 @@ mutable struct Mesh{topoDim, spaceDim, C, E, T} <: AbstractMesh{topoDim, spaceDi
 
     absolute_indices::Dict{Symbol, Vector{Int}}
     local_indices::Dict{Symbol, Dict{Int, Int}}
+
+    metadata::M
 end
 
 function Mesh(
@@ -99,6 +135,7 @@ function Mesh(
     bc_names::Dict{Int, String},
     bc_nodes::Dict{Int, Vector{Int}},
     bc_faces::Dict{Int, Vector{Int}},
+    metadata::AbstractMeshMetaData,
 ) where {T <: Real, spaceDim, E <: AbstractEntityType, C <: AbstractConnectivity}
     @assert topoDim ≤ spaceDim
 
@@ -128,7 +165,7 @@ function Mesh(
     absolute_indices = Dict{Symbol, Vector{Int}}()
     local_indices = Dict{Symbol, Dict{Int, Int}}()
 
-    Mesh{topoDim, spaceDim, typeof(connectivities), typeof(entities), T}(
+    Mesh{topoDim, spaceDim, typeof(connectivities), typeof(entities), T, typeof(metadata)}(
         nodes,
         entities,
         connectivities,
@@ -137,6 +174,7 @@ function Mesh(
         _bc_faces,
         absolute_indices,
         local_indices,
+        metadata,
     )
 end
 
@@ -149,6 +187,7 @@ function Mesh(
     bc_names::Dict{Int, String} = Dict{Int, String}(),
     bc_nodes::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
     bc_faces::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
+    metadata::AbstractMeshMetaData = DefaultMeshMetaData(),
 ) where {E <: AbstractEntityType, C <: AbstractConnectivity}
     topoDim = topodim(valtype(celltypes))
     if buildboundaryfaces
@@ -167,10 +206,13 @@ function Mesh(
         bc_names,
         bc_nodes,
         bc_faces,
+        metadata,
     )
 end
 
 Base.parent(mesh::Mesh) = mesh
+
+@inline get_metadata(mesh::Mesh) = mesh.metadata
 
 @inline get_nodes(mesh::Mesh) = mesh.nodes
 @inline get_nodes(mesh::Mesh, i::SVector) = mesh.nodes[i]
