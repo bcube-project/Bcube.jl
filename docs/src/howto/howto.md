@@ -127,7 +127,9 @@ for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces 
             # as well (with side_p)
             neighbor_cell_n = side_n(element)
 
-            # We can also retrieve the local index of the face in the neighbor cell
+            # We can also retrieve the local index of the face in the neighbor cells
+            # Note that boundary faces only have one neighbor cell, which is on the
+            # negative side by convention.
             kside = Bcube.get_cell_side_n(element)
 
             # Normal of the face at the face center using the low level API
