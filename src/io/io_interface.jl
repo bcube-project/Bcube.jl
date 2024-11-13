@@ -34,6 +34,7 @@ The argument `topodim` can be used to force and/or select the elements of this t
 result = read_file("file.cgns"; varnames = ["Temperature", "Density"], verbose = true)
 @show ncells(result.mesh)
 @show keys(result.data)
+```
 """
 function read_file(
     handler::AbstractIoHandler,
@@ -122,6 +123,7 @@ written, only `mesh` and `mesh_degree` matter. The FEFunction is simply evaluate
 
 # Dev notes
 To specialize this method, please specialize:
+```julia
 write_file(
     handler::AbstractIoHandler,
     filepath::String,
@@ -133,6 +135,7 @@ write_file(
     collection_append::Bool = false,
     kwargs...,
 )
+```
 """
 function write_file(
     handler::AbstractIoHandler,
