@@ -336,7 +336,7 @@
         tr4D = @SArray [i == j && k == l ? 1.0 : 0.0 for i in 1:2, j in 1:2, k in 1:2, l in 1:2]
 
         A = rand(2, 2)
-        Id = [i == j for i in 1:m, j in 1:m]
+        Id = [i == j for i in 1:2, j in 1:2]
         @test tr4D ⊡ A == tr(A) * Id
         @test Id4D ⊡ A == A
         @test Id4DSym ⊡ A != A
