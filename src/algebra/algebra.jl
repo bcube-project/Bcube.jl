@@ -9,15 +9,11 @@ A[i,j] ⊗ B[k,l] = C[i,j,k,l]
 such as
 C[i,j,k,l] = A[i,j] * B[k,l]
 """
-function otimes(A::AbstractArray{T1, 2}, B::AbstractArray{T2, 2}) where {T1, T2}
+function otimes(A::AbstractMatrix{T1}, B::AbstractMatrix{T2}) where {T1, T2}
     sA = size(A)
     sB = size(B)
-    C = zeros(sA[1], sA[2], sB[1], sB[2])
-    for k in 1:sB[1]
-        for l in 1:sB[2]
-            C[:, :, k, l] = A .* B[k, l]
-        end
-    end
+    C = zeros(promote_type(T1, T2), sA..., sB...)
+    C = [A[i, j] * B[k, l] for i in 1:sA[1], j in 1:sA[2], k in 1:sB[1], l in 1:sB[2]]
     return C
 end
 
@@ -98,11 +94,7 @@ C[i,j] = A[i,j,k,l] * B[k,l] (Einstein sum)
 function dcontract(A::AbstractArray{T1, 4}, B::AbstractArray{T2, 2}) where {T1, T2}
     sA = size(A)
     C = zeros(promote_type(eltype(A), eltype(B)), sA[1], sA[2])
-    for i in 1:sA[1]
-        for j in 1:sA[2]
-            C[i, j] = sum(A[i, j, :, :] .* B)
-        end
-    end
+    C = [sum(A[i, j, :, :] .* B) for i in 1:sA[1], j in 1:sA[2]]
     return C
 end
 
