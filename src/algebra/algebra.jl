@@ -26,7 +26,9 @@ function otimes(
     A::SMatrix{I1, I2, T1, L1},
     B::SMatrix{I3, I4, T2, L2},
 ) where {I1, I2, I3, I4, T1, T2, L1, L2}
-    return SArray{Tuple{I1,I2,I3,I4}}([A[i, j] * B[k, l] for i in 1:I1, j in 1:I2, k in 1:I3, l in 1:I4])
+    return SArray{Tuple{I1, I2, I3, I4}}([
+        A[i, j] * B[k, l] for i in 1:I1, j in 1:I2, k in 1:I3, l in 1:I4
+    ])
 end
 
 const ⊗ = otimes

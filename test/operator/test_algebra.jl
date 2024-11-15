@@ -283,14 +283,17 @@
 
     @testset "Tensors" begin
         # otimes
-            # 1D ⊗ 1D = 2D
+        # 1D ⊗ 1D = 2D
         V = rand(rand(2:5))
         @test V ⊗ V == [V[i] * V[j] for i in eachindex(V), j in eachindex(V)]
 
-            # 2D ⊗ 2D = 4D
+        # 2D ⊗ 2D = 4D
         A = rand(rand(2:5), rand(2:5))
         B = rand(rand(2:5), rand(2:5))
-        @test A ⊗ B == [A[i, j] * B[k, l] for i in axes(A, 1), j in axes(A, 2), k in axes(B, 1), l in axes(B, 2)]
+        @test A ⊗ B == [
+            A[i, j] * B[k, l] for i in axes(A, 1), j in axes(A, 2), k in axes(B, 1),
+            l in axes(B, 2)
+        ]
         A_SA = SMatrix{size(A)...}(A)
         B_SA = SMatrix{size(B)...}(B)
         @test A_SA ⊗ B_SA == A ⊗ B
@@ -299,52 +302,66 @@
         # dcontract
         m, n = rand(2:5, 2)
 
-            # 2D ⊡ 2D = 0D
+        # 2D ⊡ 2D = 0D
         A = rand(m, m)
-        Id = [i == j for i in 1:m, j = 1:m]
+        Id = [i == j for i in 1:m, j in 1:m]
         @test A ⊡ Id == tr(A)
 
         A = rand(m, n)
         B = rand(m, n)
-        @test A ⊡ B == sum(A[j,k] * B[j,k] for j in 1:m, k in 1:n)
+        @test A ⊡ B == sum(A[j, k] * B[j, k] for j in 1:m, k in 1:n)
 
-            # 3D ⊡ 2D = 1D
+        # 3D ⊡ 2D = 1D
         A = rand(rand(2:5), m, n)
         B = rand(m, n)
-        @test A ⊡ B == [sum(A[i,j,k] * B[j,k] for j in 1:m, k in 1:n) for i in axes(A,1)]
+        @test A ⊡ B ==
+              [sum(A[i, j, k] * B[j, k] for j in 1:m, k in 1:n) for i in axes(A, 1)]
         A_SA = SArray{Tuple{size(A)...}}(A)
         B_SA = SMatrix{size(B)...}(B)
         @test A_SA ⊡ B_SA == A ⊡ B
         @test typeof(A_SA ⊡ B_SA) <: SVector
 
-            # 3D ⊡ 3D = 2D
+        # 3D ⊡ 3D = 2D
         A = rand(rand(2:5), m, n)
         B = rand(rand(2:5), m, n)
-        @test A ⊡ B == [sum(A[i,j,k] * B[l,j,k] for j in 1:m, k in 1:n) for i in axes(A,1), l in axes(B,1)]
+        @test A ⊡ B == [
+            sum(A[i, j, k] * B[l, j, k] for j in 1:m, k in 1:n) for i in axes(A, 1),
+            l in axes(B, 1)
+        ]
         A_SA = SArray{Tuple{size(A)...}}(A)
         B_SA = SArray{Tuple{size(B)...}}(B)
         @test A_SA ⊡ B_SA == A ⊡ B
         @test typeof(A_SA ⊡ B_SA) <: SMatrix
 
-            # 4D ⊡ 2D = 2D
+        # 4D ⊡ 2D = 2D
 
         # 4D Identity tensor : Id4D ⊡ A = A
-        Id4D = @SArray [i == k && j == l ? 1.0 : 0.0 for i in 1:2, j in 1:2, k in 1:2, l in 1:2]
+        Id4D = @SArray [
+            i == k && j == l ? 1.0 : 0.0 for i in 1:2, j in 1:2, k in 1:2, l in 1:2
+        ]
         # 4D Symmetrical identity tensor : Id4DSym ⊡ A = A, with A symmetrical
-        Id4DSym = @SArray [i == j == k == l ? 1.0 : i != j && k != l ? 0.5 : 0.0 for i in 1:2, j in 1:2, k in 1:2, l in 1:2]
+        Id4DSym = @SArray [
+            i == j == k == l ? 1.0 : i != j && k != l ? 0.5 : 0.0 for i in 1:2,
+            j in 1:2, k in 1:2, l in 1:2
+        ]
         # 4D Trace tensor : tr4D ⊡ A = tr(A) * Id2D
-        tr4D = @SArray [i == j && k == l ? 1.0 : 0.0 for i in 1:2, j in 1:2, k in 1:2, l in 1:2]
+        tr4D = @SArray [
+            i == j && k == l ? 1.0 : 0.0 for i in 1:2, j in 1:2, k in 1:2, l in 1:2
+        ]
 
         A = rand(2, 2)
         Id = [i == j for i in 1:2, j in 1:2]
         @test tr4D ⊡ A == tr(A) * Id
         @test Id4D ⊡ A == A
         @test Id4DSym ⊡ A != A
-        @test Id4DSym ⊡ (A*A') == A*A'
+        @test Id4DSym ⊡ (A * A') == A * A'
 
         A = rand(rand(2:5), rand(2:5), m, n)
         B = rand(m, n)
-        @test A ⊡ B == [sum(A[i,j,k,l] * B[k,l] for k in 1:m, l in 1:n) for i in axes(A,1), j in axes(A,2)]
+        @test A ⊡ B == [
+            sum(A[i, j, k, l] * B[k, l] for k in 1:m, l in 1:n) for i in axes(A, 1),
+            j in axes(A, 2)
+        ]
         A_SA = SArray{Tuple{size(A)...}}(A)
         B_SA = SMatrix{size(B)...}(B)
         @test A_SA ⊡ B_SA == A ⊡ B
