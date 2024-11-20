@@ -555,3 +555,73 @@ function _get_index(domain::BoundaryFaceDomain{M, <:PeriodicBCType}, i::Integer)
 
     return FaceInfo(cellinfo1, cellinfo2, cside_i, cside_j, ftype, fnodes, _f2n, iface)
 end
+
+"""
+    domain_to_mesh(::AbstractDomain)
+
+Convert an `AbstractDomain` to a `Mesh`.
+"""
+domain_to_mesh(::AbstractDomain) = error("not implemented yet")
+
+function domain_to_mesh(domain::CellDomain)
+    # Note : `_o2n` means "old to new" while `_n2o` means "new to old"
+
+    # Alias
+    mesh = get_mesh(domain)
+    I_cells_n2o = indices(domain)
+    c2n = connectivities_indices(mesh, :c2n)
+    f2c = connectivities_indices(mesh, :f2c)
+    f2n = connectivities_indices(mesh, :f2n)
+
+    # Build a boolean array indicating if a given cell belongs to the new mesh
+    # (could use sparse vector, but is it necessary for Bool?)
+    hasCell = zeros(Bool, ncells(mesh))
+    hasCell[I_cells_n2o] .= true
+
+    # Build the node correspondances new -> old and old -> new
+    n2c = connectivities_indices(mesh, :n2c)
+    I_nodes_n2o = findall(inode -> any(view(hasCell, n2c[inode])), keys(n2c))
+    I_nodes_o2n = zeros(eltype(I_nodes_n2o), 1:nnodes(mesh))
+    I_nodes_o2n[I_nodes_n2o] .= collect(1:length(I_nodes_n2o))
+
+    # Build a boolean array indicating if a given node belongs to the new mesh
+    # (could use sparse vector, but is it necessary for Bool?)
+    hasNode = zeros(Bool, nnodes(mesh))
+    hasNode[I_nodes_n2o] .= true
+
+    # Cell connectivity and types
+    _c2n_new = [I_nodes_o2n[c2n[icell]] for icell in I_cells_n2o]
+    c2n_new = vcat(_c2n_new...)
+    ctypes = cells(mesh)[I_cells_n2o]
+
+    # Filter bc nodes
+    # First, we filter to remove bnd conditions that does not exist in the new mesh
+    # Second, we remove non-existing nodes from the boundary
+    d1 = filter(((tag, inodes),) -> any(view(hasNode, inodes)), boundary_nodes(mesh))
+    bnd_nodes = Dict(keys(d1) .=> filter(inode -> hasNode[inode], values(d1)))
+    bnd_names = boundary_names(mesh, keys(bnd_nodes))
+
+    # Assign boundary condition to nodes that were not boundary nodes in the old mesh
+    # but are bnd nodes in the new mesh
+
+    exterior_nodes = Int[]
+    for (iface, icells) in enumerate(f2c)
+        # If the face has only neighbor cell from the new mesh, it means
+        # that it is a boundary face
+        if count(view(hasCell, icells)) == 1
+            push!(exterior_nodes, f2n[iface]...)
+        end
+    end
+    tag = maximum(keys(bnd_nodes)) + 1
+    bnd_nodes[tag] = exterior_nodes
+    bnd_names[tag] = "CLIPPED_BND"
+
+    # New mesh
+    return Mesh(
+        get_nodes(mesh)[I_nodes_n2o],
+        ctypes,
+        c2n_new;
+        bc_names = bnd_names,
+        bc_nodes = bnd_nodes,
+    )
+end
