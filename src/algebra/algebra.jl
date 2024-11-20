@@ -2,6 +2,8 @@ otimes(x::AbstractVector, y::AbstractVector) = x * y'
 otimes(x::AbstractVector) = otimes(x, x)
 
 """
+    otimes(A,B)
+
 Tensors product between second order tensors
 
 # Implementation
@@ -88,6 +90,8 @@ function dcontract(A::AbstractArray{T1, 3}, B::AbstractArray{T2, 3}) where {T1, 
 end
 
 """
+    dcontract(A,B)
+
 Tensors double contraction between fourth order tensor and second order tensor
 
 # Implementation
