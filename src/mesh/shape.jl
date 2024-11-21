@@ -332,3 +332,13 @@ measure(::Cube) = 8.0
 measure(::Tetra) = 1.0 / 6
 measure(::Prism) = 1.0
 measure(::Pyramid) = 4.0 / 3.0
+
+function is_point_in_shape(shape::AbstractShape, x)
+    # a point is outside if it is on the exterior side
+    # of one of the face at least
+    for (normal, f2n) in zip(normals(shape), faces2nodes(shape))
+        dx = (x - get_coords(shape)[first(f2n)])
+        (dx ⋅ normal > 0) && (return false)
+    end
+    return true
+end

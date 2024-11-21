@@ -299,25 +299,22 @@ end
         Uspace = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh; size = 2)
         Vspace = TestFESpace(Uspace)
         dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
-
-        pointFinder = Bcube.PointFinder(mesh)
-
         u = FEFunction(Uspace)
         f1((x, y)) = SA[x + 4y + 1, 7x * x + 2y * x + 2y * y + 3y + 12]
         projection_l2!(u, PhysicalFunction(f1), dΩ)
+
+        pf_strict = Bcube.PointFinder(mesh; strategy = Bcube.StrictPointFinderStrategy())
+        pf_closest = Bcube.PointFinder(mesh; strategy = Bcube.ClosestPointFinderStrategy())
+
         npoints = 20
         xp = [rand(SVector{2}) for i in 1:npoints]
-        icells = map(Base.Fix1(Bcube.find_cell, pointFinder), xp)
-        cpoints = map(
-            (x, i) ->
-                Bcube.CellPoint(x, Bcube.CellInfo(mesh, i), Bcube.PhysicalDomain()),
-            xp,
-            icells,
-        )
-        up = map(cpoints) do cpoint
-            uᵢ = Bcube.materialize(u, Bcube.get_cellinfo(cpoint))
-            Bcube.materialize(uᵢ, cpoint)
-        end
-        @test all(f1.(xp) .≈ up)
+        xp = [xp..., SA[1.5, 2.0]]
+
+        up_strict = [Bcube.interpolate_at_point(pf_strict, x, u) for x in xp]
+        @test all(f1.(xp[1:(end - 1)]) .≈ up_strict[1:(end - 1)])
+        @test ismissing(up_strict[end])
+
+        up_closest = [Bcube.interpolate_at_point(pf_closest, x, u) for x in xp]
+        @test all(f1.(xp) .≈ up_closest)
     end
 end
