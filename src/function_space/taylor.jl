@@ -57,7 +57,7 @@ end
 
 # Shared functions for all Taylor elements of some kind
 function _scalar_shape_functions(::FunctionSpace{<:Taylor, 0}, ::AbstractShape, ξ)
-    return SA[1.0]
+    return SA[one(eltype(ξ))]
 end
 
 # Functions for Line shape
@@ -89,7 +89,7 @@ end
 ```
 """
 function ∂λξ_∂ξ(::FunctionSpace{<:Taylor, 0}, ::Val{1}, ::Line, ξ)
-    return SA[0.0]
+    return SA[zero(eltype(ξ))]
 end
 
 function _scalar_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Line, ξ)
@@ -108,7 +108,8 @@ end
 
 # Functions for Square shape
 function ∂λξ_∂ξ(::FunctionSpace{<:Taylor, 0}, ::Val{1}, ::Union{Square, Triangle}, ξ)
-    return SA[0.0 0.0]
+    _zero = zero(eltype(ξ))
+    return SA[_zero _zero]
 end
 
 function _scalar_shape_functions(::FunctionSpace{<:Taylor, 1}, ::Square, ξ)

@@ -11,8 +11,8 @@ Bcube is a Julia library providing tools for the spatial discretization of parti
 The main features are:
 
 - high-level api : `a(u, v) = ∫(η * ∇(u) ⋅ ∇(v))dΩ`
-- 1D, 2D, 3D unstructured mesh with high-order geometrical elements (gmsh format)
-- Lagrange (continuous & discontinuous) and Taylor (discontinuous) finite elements (line, quad, tri, hexa, penta)
+- 1D, 2D, 3D unstructured mesh with high-order geometrical elements (gmsh or cgns format)
+- Lagrange (continuous & discontinuous) and Taylor (discontinuous) finite elements (line, quad, tri, hexa, tetra, penta, pyra)
 - arbitrary order for hypercube Lagrange elements
 
 Browse the [documentation](https://bcube-project.github.io/Bcube.jl) for more information about the code architecture and API. Commented tutorials as well as various examples can be found in the dedicated project [BcubeTutorials.jl](https://github.com/bcube-project/BcubeTutorials.jl).
@@ -40,7 +40,9 @@ Any contribution(s) and/or remark(s) are welcome! Don't hesitate to open an issu
 ## Gallery
 | [Helmholtz equation](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/helmholtz) | [Phase field solidification](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/phase_field_supercooled) | [Linear transport equation](https://bcube-project.github.io/BcubeTutorials.jl/dev/tutorial/linear_transport) |
 |-|-|-|
-| ![](https://bcube-project.github.io/BcubeTutorials.jl/dev/assets/helmholtz_x21_y21_vp6.png) | ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/phase-field-supercooled-rectangle.gif) | ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/linear_transport.gif) |
+| ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/helmholtz_x21_y21_vp6.png?raw=true) | ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/phase-field-supercooled-rectangle.gif?raw=true) | ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/linear_transport.gif?raw=true) |
+| [Heat equation on a sphere](https://bcube-project.github.io/BcubeTutorials.jl/stable/example/heat_equation_sphere) | [Transport equation on hypersurfaces](https://bcube-project.github.io/BcubeTutorials.jl/stable/example/transport_hypersurface) | [Linear thermo-elasticity](https://bcube-project.github.io/BcubeTutorials.jl/stable/example/linear_thermoelasticity) |
+| ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/heat_equation_sphere.gif?raw=true) | ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/transport-torus-mesh2-degree1.gif?raw=true) | ![](https://github.com/bcube-project/BcubeTutorials.jl/blob/main/docs/src/assets/thermo_elasticity.gif?raw=true) |
 
 ## Authors
 Ghislain Blanchard, Lokman Bennani and Maxime Bouyges

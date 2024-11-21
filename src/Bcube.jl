@@ -21,11 +21,12 @@ include("LazyOperators/LazyOperators.jl")
 using .LazyOperators
 import .LazyOperators:
     materialize, materialize_args, AbstractLazyOperator, get_args, get_operator, unwrap
+export lazy_compose
 
 include("utils.jl")
 
 include("./mesh/transformation.jl")
-export Translation
+export Translation, Rotation
 
 include("./mesh/boundary_condition.jl")
 export BoundaryCondition, PeriodicBCType
@@ -52,18 +53,6 @@ include("./mesh/connectivity.jl")
 include("./mesh/mesh.jl")
 export ncells, nnodes, boundary_names, nboundaries, boundary_tag, get_nodes
 
-include("./mesh/gmsh_utils.jl")
-export read_msh,
-    read_msh_with_cell_names,
-    gen_line_mesh,
-    gen_rectangle_mesh,
-    gen_hexa_mesh,
-    gen_disk_mesh,
-    gen_star_disk_mesh,
-    gen_cylinder_mesh,
-    read_partitions,
-    gen_rectangle_mesh_with_tri_and_quad
-
 include("./mesh/mesh_generator.jl")
 export basic_mesh,
     one_cell_mesh,
@@ -79,9 +68,26 @@ export basic_mesh,
     translate,
     translate!
 
+include("./mesh/gmsh_utils.jl")
+export read_msh,
+    read_msh_with_cell_names,
+    gen_line_mesh,
+    gen_rectangle_mesh,
+    gen_hexa_mesh,
+    gen_disk_mesh,
+    gen_star_disk_mesh,
+    gen_cylinder_mesh,
+    read_partitions,
+    gen_rectangle_mesh_with_tri_and_quad
+
 include("./mesh/domain.jl")
 export AbstractDomain,
-    CellDomain, InteriorFaceDomain, BoundaryFaceDomain, get_mesh, get_face_normals
+    CellDomain,
+    InteriorFaceDomain,
+    BoundaryFaceDomain,
+    get_mesh,
+    get_face_normals,
+    get_cell_normals
 
 include("./quadrature/quadrature.jl")
 export QuadratureLobatto, QuadratureLegendre, QuadratureUniform, Quadrature, QuadratureRule
@@ -150,6 +156,9 @@ export var_on_centers,
 
 include("./feoperator/limiter.jl")
 export linear_scaling_limiter
+
+include("./io/io_interface.jl")
+export read_file, read_mesh, write_file
 
 include("./writers/vtk.jl")
 export write_vtk

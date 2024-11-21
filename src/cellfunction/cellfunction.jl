@@ -182,7 +182,9 @@ function get_function(f::CellShapeFunctions)
         shape_functions(get_function_space(f), valS, get_cell_shape(f))
 end
 
-@generated function _reshape_cell_shape_functions(a::SMatrix{Ndof, Ndim}) where {Ndof, Ndim}
+@generated function _reshape_cell_shape_functions(
+    a::Union{SMatrix{Ndof, Ndim}, SizedMatrix{Ndof, Ndim}},
+) where {Ndof, Ndim}
     _exprs = [[:(a[$i, $j]) for j in 1:Ndim] for i in 1:Ndof]
     exprs = [:(SA[$(_expr...)]) for _expr in _exprs]
     return :(tuple($(exprs...)))
@@ -215,7 +217,7 @@ end
 
 `S` is the codomain size of `f`.
 """
-function CellFunction(f::Function, ds::DomainStyle, ::Val{S}) where {S}
+function CellFunction(f::F, ds::DomainStyle, ::Val{S}) where {F <: Function, S}
     CellFunction{typeof(ds), S, typeof(f)}(f)
 end
 
@@ -511,12 +513,7 @@ Normal of a facet of a hypersurface.
 
 See [`cell_normal`]@ref for the computation method.
 """
-struct CellNormal <: AbstractLazy
-    function CellNormal(mesh::AbstractMesh)
-        @assert topodim(mesh) < spacedim(mesh) "CellNormal has only sense when dealing with hypersurface, maybe you confused it with FaceNormal?"
-        return new()
-    end
-end
+struct CellNormal <: AbstractLazy end
 
 LazyOperators.materialize(ν::CellNormal, ::CellInfo) = ν
 
@@ -563,7 +560,7 @@ function LazyOperators.materialize(
 end
 
 _tangential_projector(ν) = I - (ν ⊗ ν)
-tangential_projector(mesh) = _tangential_projector ∘ CellNormal(mesh)
+tangential_projector() = _tangential_projector ∘ CellNormal()
 
 LazyOperators.materialize(f::Function, ::CellInfo) = f
 LazyOperators.materialize(f::Function, ::CellPoint) = f

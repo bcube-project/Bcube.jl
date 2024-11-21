@@ -130,12 +130,24 @@ function read_msh_with_cell_names(path::String, spaceDim = 0; verbose = false)
     gmsh.option.setNumber("General.Terminal", Int(verbose))
     gmsh.open(path)
 
+    mesh, el_names, el_names_inv, el_cells, glo2loc_cell_indices =
+        _read_msh_with_cell_names(spaceDim, verbose)
+
+    # free gmsh
+    gmsh.finalize()
+
+    return mesh, el_names, el_names_inv, el_cells, glo2loc_cell_indices
+end
+
+"""
+To use this function, the `gmsh` file must have been opened already (see `read_msh_with_cell_names(path::String)` for instance).
+"""
+function _read_msh_with_cell_names(spaceDim::Int, verbose::Bool)
     # build mesh
     _spaceDim = spaceDim > 0 ? spaceDim : _compute_space_dim(verbose)
     mesh = _read_msh(_spaceDim, verbose)
 
-    #----- Read cell names
-    # Read elements
+    # Read volumic physical groups (build a dict tag -> name)
     el_tags = gmsh.model.getPhysicalGroups(_spaceDim)
     _el_names = [gmsh.model.getPhysicalName(_dim, _tag) for (_dim, _tag) in el_tags]
     el = [
@@ -145,36 +157,25 @@ function read_msh_with_cell_names(path::String, spaceDim = 0; verbose = false)
     el_names = Dict(convert(Int, _tag) => _name for (_tag, _name) in el)
     el_names_inv = Dict(_name => convert(Int, _tag) for (_tag, _name) in el)
 
-    #@show _el_names
+    # Read cell indices associated to each volumic physical group
     el_cells = Dict{Int, Array{Int}}()
-    #el_cells_inv = Dict{Int,Int}()
     for (_dim, _tag) in el_tags
         v = Int[]
-        for i in 1:length(gmsh.model.getEntitiesForPhysicalGroup(_dim, _tag))
-            tmpTypes, tmpTags, tmpNodeTags = gmsh.model.mesh.getElements(
-                _dim,
-                gmsh.model.getEntitiesForPhysicalGroup(_dim, _tag)[i],
-            )
-            #@show size(tmpTags[1])
-            #@show tmpTags
-            if length(tmpTags) > 0
-                v = vcat(v, Int[i for i in tmpTags[1]])
+
+        for iEntity in gmsh.model.getEntitiesForPhysicalGroup(_dim, _tag)
+            tmpTypes, tmpTags, tmpNodeTags = gmsh.model.mesh.getElements(_dim, iEntity)
+
+            # Notes : a PhysicalGroup "entity" can contain different types of elements.
+            # So `tmpTags` is an array of the cell indices of each type in the Physical group.
+            for _tmpTags in tmpTags
+                v = vcat(v, Int.(_tmpTags))
             end
         end
         el_cells[_tag] = v
-
-        #for i=1:length(v)
-        #    el_cells_inv[glo2loc_cell_indices[v[i]]] = _tag
-        #end
     end
 
     absolute_cell_indices = absolute_indices(mesh, :cell)
     _, glo2loc_cell_indices = densify(absolute_cell_indices; permute_back = true)
-
-    #el_cells = Dict( convert(Int,_tag) => Int[i for i in gmsh.model.mesh.getElementsByType(spaceDim,_tag)] for (_tag,_name) in el_names)
-
-    # free gmsh
-    gmsh.finalize()
 
     return mesh, el_names, el_names_inv, el_cells, glo2loc_cell_indices
 end
@@ -196,53 +197,7 @@ function _compute_space_dim(verbose::Bool)
     ly = box[5] - box[2]
     lz = box[6] - box[3]
 
-    # Maximum dimension and default value for number of space dimensions
-    lmax = maximum([lx, ly, lz])
-
-    # Now checking several case (complex `if` cascade for comprehensive warning messages)
-
-    # If the topology is 3D, useless to continue, the space dim must be 3
-    topodim == 3 && (return 3)
-
-    if topodim == 2
-        if (lz / lmax < tol)
-            msg = "Warning : the mesh is flat on the z-axis. It is now considered 2D."
-            msg *= " (use `spacedim` argument of `read_msh` if you want to keep 3D coordinates.)"
-            msg *= " Disable this warning with `verbose = false`"
-            verbose && println(msg)
-
-            return 2
-        else
-            # otherwise, it is a surface in a 3D space, we keep 3 coordinates
-            return 3
-        end
-    end
-
-    if topodim == 1
-        if (ly / lmax < tol && lz / lmax < tol)
-            msg = "Warning : the mesh is flat on the y and z axis. It is now considered 1D."
-            msg *= " (use `spacedim` argument of `read_msh` if you want to keep 2D or 3D coordinates.)"
-            msg *= " Disable this warning with `verbose = false`"
-            verbose && println(msg)
-
-            return 1
-        elseif (ly / lmax < tol && lz / lmax > tol)
-            error(
-                "You have a flat y-axis but a non flat z-axis, this is not supported. Consider rotating your mesh.",
-            )
-
-        elseif (ly / lmax > tol && lz / lmax < tol)
-            msg = "Warning : the mesh is flat on the z-axis. It is now considered as a 1D mesh in a 2D space."
-            msg *= " (use `spacedim` argument of `read_msh` if you want to keep 3D coordinates.)"
-            msg *= " Disable this warning with `verbose = false`"
-            verbose && println(msg)
-
-            return 2
-        else
-            # otherwise, it is a line in a 3D space, we keep 3 coordinates
-            return 3
-        end
-    end
+    return _compute_space_dim(topodim, lx, ly, lz, tol, verbose)
 end
 
 function _apply_gmsh_options(;
@@ -438,7 +393,8 @@ end
 
 """
     gen_mesh_around_disk(
-        output;
+        output,
+        type;
         r_in = 1.0,
         r_ext = 10.0,
         nθ = 360,
@@ -451,13 +407,14 @@ end
         kwargs...
     )
 
-Mesh the 2D domain around a disk.
+Mesh the 2D domain around a disk. `type` can be `:quad` or `:tri`.
 
 For kwargs, see [`gen_line_mesh`](@ref).
 """
 function gen_mesh_around_disk(
-    output;
-    r_in = 1.0,
+    output,
+    type;
+    r_int = 1.0,
     r_ext = 10.0,
     nθ = 360,
     nr = 100,
@@ -466,23 +423,29 @@ function gen_mesh_around_disk(
     recombine = true,
     bnd_names = ("Farfield", "Wall"),
     n_partitions = 0,
+    write_geo = false,
     kwargs...,
 )
+    @assert type ∈ (:tri, :quad)
+
     gmsh.initialize()
     _apply_gmsh_options(; kwargs...)
+
+    lc_ext = 2π * r_ext / (nθ - 1)
+    lc_int = 2π * r_int / (nθ - 1)
 
     # Points
     O = gmsh.model.geo.addPoint(0.0, 0.0, 0.0)
 
-    Ae = gmsh.model.geo.addPoint(r_ext * cos(-3π / 4), r_ext * sin(-3π / 4), 0.0)
-    Be = gmsh.model.geo.addPoint(r_ext * cos(-π / 4), r_ext * sin(-π / 4), 0.0)
-    Ce = gmsh.model.geo.addPoint(r_ext * cos(π / 4), r_ext * sin(π / 4), 0.0)
-    De = gmsh.model.geo.addPoint(r_ext * cos(3π / 4), r_ext * sin(3π / 4), 0.0)
+    Ae = gmsh.model.geo.addPoint(r_ext * cos(-3π / 4), r_ext * sin(-3π / 4), 0.0, lc_ext)
+    Be = gmsh.model.geo.addPoint(r_ext * cos(-π / 4), r_ext * sin(-π / 4), 0.0, lc_ext)
+    Ce = gmsh.model.geo.addPoint(r_ext * cos(π / 4), r_ext * sin(π / 4), 0.0, lc_ext)
+    De = gmsh.model.geo.addPoint(r_ext * cos(3π / 4), r_ext * sin(3π / 4), 0.0, lc_ext)
 
-    Ai = gmsh.model.geo.addPoint(r_in * cos(-3π / 4), r_in * sin(-3π / 4), 0.0)
-    Bi = gmsh.model.geo.addPoint(r_in * cos(-π / 4), r_in * sin(-π / 4), 0.0)
-    Ci = gmsh.model.geo.addPoint(r_in * cos(π / 4), r_in * sin(π / 4), 0.0)
-    Di = gmsh.model.geo.addPoint(r_in * cos(3π / 4), r_in * sin(3π / 4), 0.0)
+    Ai = gmsh.model.geo.addPoint(r_int * cos(-3π / 4), r_int * sin(-3π / 4), 0.0, lc_int)
+    Bi = gmsh.model.geo.addPoint(r_int * cos(-π / 4), r_int * sin(-π / 4), 0.0, lc_int)
+    Ci = gmsh.model.geo.addPoint(r_int * cos(π / 4), r_int * sin(π / 4), 0.0, lc_int)
+    Di = gmsh.model.geo.addPoint(r_int * cos(3π / 4), r_int * sin(3π / 4), 0.0, lc_int)
 
     # Curves
     AOBe = gmsh.model.geo.addCircleArc(Ae, O, Be)
@@ -493,33 +456,48 @@ function gen_mesh_around_disk(
     BOCi = gmsh.model.geo.addCircleArc(Bi, O, Ci)
     CODi = gmsh.model.geo.addCircleArc(Ci, O, Di)
     DOAi = gmsh.model.geo.addCircleArc(Di, O, Ai)
-    AiAe = gmsh.model.geo.addLine(Ai, Ae)
-    BiBe = gmsh.model.geo.addLine(Bi, Be)
-    CiCe = gmsh.model.geo.addLine(Ci, Ce)
-    DiDe = gmsh.model.geo.addLine(Di, De)
-
-    # Contours
-    _AB = gmsh.model.geo.addCurveLoop([AiAe, AOBe, -BiBe, -AOBi])
-    _BC = gmsh.model.geo.addCurveLoop([BiBe, BOCe, -CiCe, -BOCi])
-    _CD = gmsh.model.geo.addCurveLoop([CiCe, CODe, -DiDe, -CODi])
-    _DA = gmsh.model.geo.addCurveLoop([DiDe, DOAe, -AiAe, -DOAi])
 
     # Surfaces
-    AB = gmsh.model.geo.addPlaneSurface([_AB])
-    BC = gmsh.model.geo.addPlaneSurface([_BC])
-    CD = gmsh.model.geo.addPlaneSurface([_CD])
-    DA = gmsh.model.geo.addPlaneSurface([_DA])
+    if type == :quad
+        # Curves
+        AiAe = gmsh.model.geo.addLine(Ai, Ae)
+        BiBe = gmsh.model.geo.addLine(Bi, Be)
+        CiCe = gmsh.model.geo.addLine(Ci, Ce)
+        DiDe = gmsh.model.geo.addLine(Di, De)
 
-    # Mesh settings
-    for arc in [AOBe, BOCe, CODe, DOAe, AOBi, BOCi, CODi, DOAi]
-        gmsh.model.geo.mesh.setTransfiniteCurve(arc, round(Int, nθ / 4))
-    end
-    for rad in [AiAe, BiBe, CiCe, DiDe]
-        gmsh.model.geo.mesh.setTransfiniteCurve(rad, nr, "Progression", nr_prog)
-    end
-    for surf in [AB, BC, CD, DA]
-        gmsh.model.geo.mesh.setTransfiniteSurface(surf)
-        recombine && gmsh.model.geo.mesh.setRecombine(2, surf)
+        # Contours
+        _AB = gmsh.model.geo.addCurveLoop([AiAe, AOBe, -BiBe, -AOBi])
+        _BC = gmsh.model.geo.addCurveLoop([BiBe, BOCe, -CiCe, -BOCi])
+        _CD = gmsh.model.geo.addCurveLoop([CiCe, CODe, -DiDe, -CODi])
+        _DA = gmsh.model.geo.addCurveLoop([DiDe, DOAe, -AiAe, -DOAi])
+
+        # Surfaces
+        AB = gmsh.model.geo.addPlaneSurface([_AB])
+        BC = gmsh.model.geo.addPlaneSurface([_BC])
+        CD = gmsh.model.geo.addPlaneSurface([_CD])
+        DA = gmsh.model.geo.addPlaneSurface([_DA])
+
+        # Mesh settings
+        for arc in [AOBe, BOCe, CODe, DOAe, AOBi, BOCi, CODi, DOAi]
+            gmsh.model.geo.mesh.setTransfiniteCurve(arc, round(Int, nθ / 4))
+        end
+        for rad in [AiAe, BiBe, CiCe, DiDe]
+            gmsh.model.geo.mesh.setTransfiniteCurve(rad, nr, "Progression", nr_prog)
+        end
+        for surf in [AB, BC, CD, DA]
+            gmsh.model.geo.mesh.setTransfiniteSurface(surf)
+            recombine && gmsh.model.geo.mesh.setRecombine(2, surf)
+        end
+
+        surfaces = [AB, BC, CD, DA]
+
+    elseif type == :tri
+        # Contours
+        loop_ext = gmsh.model.geo.addCurveLoop([AOBe, BOCe, CODe, DOAe])
+        loop_int = gmsh.model.geo.addCurveLoop([AOBi, BOCi, CODi, DOAi])
+
+        # Surface
+        surfaces = [gmsh.model.geo.addPlaneSurface([loop_ext, loop_int])]
     end
 
     # Synchronize
@@ -528,7 +506,7 @@ function gen_mesh_around_disk(
     # Define boundaries (`1` stands for 1D, i.e lines)
     farfield = gmsh.model.addPhysicalGroup(1, [AOBe, BOCe, CODe, DOAe])
     wall = gmsh.model.addPhysicalGroup(1, [AOBi, BOCi, CODi, DOAi])
-    domain = gmsh.model.addPhysicalGroup(2, [AB, BC, CD, DA])
+    domain = gmsh.model.addPhysicalGroup(2, surfaces)
     gmsh.model.setPhysicalName(1, farfield, bnd_names[1])
     gmsh.model.setPhysicalName(1, wall, bnd_names[2])
     gmsh.model.setPhysicalName(2, domain, "Domain")
@@ -540,6 +518,11 @@ function gen_mesh_around_disk(
 
     # Write result
     gmsh.write(output)
+    if write_geo
+        output_geo = first(splitext(output)) * ".geo_unrolled"
+        rm(output_geo; force = true)
+        gmsh.write(output_geo)
+    end
 
     # End
     gmsh.finalize()
@@ -658,148 +641,129 @@ end
     gen_hexa_mesh(
         output,
         type;
-        recombine = false,
-        n = [2, 2, 2],
-        l = [1.0, 1.0, 1.0],
-        center = [0.0, 0.0, 0.0],
+        transfinite = false,
+        nx = 2,
+        ny = 2,
+        nz = 2,
+        lx = 1.0,
+        ly = 1.0,
+        lz = 1.0,
+        xc = -1.0,
+        yc = -1.0,
+        zc = -1.0,
         order = 1,
-        kwargs...
+        bnd_names = ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"),
+        n_partitions = 0,
+        write_geo = false,
+        transfinite_lines = true,
+        lc = 1e-1,
+        kwargs...,
     )
 
 Generate a 3D mesh of a hexahedral domain and write the mesh to `output`. Use `type` to specify the element types:
 `:tetra` or `:hexa`.
 
 For kwargs, see [`gen_line_mesh`](@ref).
-
-# Implementation
-Notations from https://cgns.github.io/CGNS_docs_current/sids/conv.html
-We could also use extrusion.
 """
 function gen_hexa_mesh(
     output,
     type;
-    recombine = false,
-    n = [2, 2, 2],
-    l = [1.0, 1.0, 1.0],
-    center = [0.0, 0.0, 0.0],
+    nx = 2,
+    ny = 2,
+    nz = 2,
+    lx = 1.0,
+    ly = 1.0,
+    lz = 1.0,
+    xc = -1.0,
+    yc = -1.0,
+    zc = -1.0,
     order = 1,
+    bnd_names = ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"),
+    n_partitions = 0,
+    write_geo = false,
+    transfinite = (type == :hexa),
+    transfinite_lines = (type == :hexa),
+    lc = 1e-1,
     kwargs...,
 )
-    gmsh.initialize()
-    _apply_gmsh_options(; kwargs...)
-    lc = 1e-1
+    @assert type ∈ (:tetra, :hexa) "`type` can only be :tetra or :hexa"
+    @assert !((type == :hexa) && !transfinite_lines) "Cannot mix :hexa option with transfinite_lines=false"
 
-    # Unpack
-    nx, ny, nz = n
-    lx, ly, lz = l
-    xc, yc, zc = center
+    isHexa = type == :hexa
+
+    gmsh.initialize()
+    gmsh.model.add("model") # helps debugging
+    _apply_gmsh_options(; kwargs...)
 
     # Points
-    P1 = gmsh.model.geo.addPoint(xc - lx / 2, yc - ly / 2, zc - lz / 2, lc)
-    P2 = gmsh.model.geo.addPoint(xc + lx / 2, yc - ly / 2, zc - lz / 2, lc)
-    P3 = gmsh.model.geo.addPoint(xc + lx / 2, yc + ly / 2, zc - lz / 2, lc)
-    P4 = gmsh.model.geo.addPoint(xc - lx / 2, yc + ly / 2, zc - lz / 2, lc)
-    P5 = gmsh.model.geo.addPoint(xc - lx / 2, yc - ly / 2, zc + lz / 2, lc)
-    P6 = gmsh.model.geo.addPoint(xc + lx / 2, yc - ly / 2, zc + lz / 2, lc)
-    P7 = gmsh.model.geo.addPoint(xc + lx / 2, yc + ly / 2, zc + lz / 2, lc)
-    P8 = gmsh.model.geo.addPoint(xc - lx / 2, yc + ly / 2, zc + lz / 2, lc)
+    A = gmsh.model.geo.addPoint(xc - lx / 2, yc - ly / 2, zc - lz / 2, lc)
+    B = gmsh.model.geo.addPoint(xc + lx / 2, yc - ly / 2, zc - lz / 2, lc)
+    C = gmsh.model.geo.addPoint(xc + lx / 2, yc + ly / 2, zc - lz / 2, lc)
+    D = gmsh.model.geo.addPoint(xc - lx / 2, yc + ly / 2, zc - lz / 2, lc)
 
     # Lines
-    E1 = gmsh.model.geo.addLine(P1, P2)
-    E2 = gmsh.model.geo.addLine(P2, P3)
-    E3 = gmsh.model.geo.addLine(P3, P4)
-    E4 = gmsh.model.geo.addLine(P4, P1)
-    E5 = gmsh.model.geo.addLine(P1, P5)
-    E6 = gmsh.model.geo.addLine(P2, P6)
-    E7 = gmsh.model.geo.addLine(P3, P7)
-    E8 = gmsh.model.geo.addLine(P4, P8)
-    E9 = gmsh.model.geo.addLine(P5, P6)
-    E10 = gmsh.model.geo.addLine(P6, P7)
-    E11 = gmsh.model.geo.addLine(P7, P8)
-    E12 = gmsh.model.geo.addLine(P8, P5)
+    AB = gmsh.model.geo.addLine(A, B)
+    BC = gmsh.model.geo.addLine(B, C)
+    CD = gmsh.model.geo.addLine(C, D)
+    DA = gmsh.model.geo.addLine(D, A)
 
-    # Contours
-    F1c = gmsh.model.geo.addCurveLoop([-E4, -E3, -E2, -E1])
-    F2c = gmsh.model.geo.addCurveLoop([E1, E6, -E9, -E5])
-    F3c = gmsh.model.geo.addCurveLoop([E2, E7, -E10, -E6])
-    F4c = gmsh.model.geo.addCurveLoop([E3, E8, -E11, -E7])
-    F5c = gmsh.model.geo.addCurveLoop([E5, -E12, -E8, E4])
-    F6c = gmsh.model.geo.addCurveLoop([E9, E10, E11, E12])
+    # Contour
+    loop = gmsh.model.geo.addCurveLoop([AB, BC, CD, DA])
 
-    # Surfaces
-    F1 = gmsh.model.geo.addPlaneSurface([F1c])
-    F2 = gmsh.model.geo.addPlaneSurface([F2c])
-    F3 = gmsh.model.geo.addPlaneSurface([F3c])
-    F4 = gmsh.model.geo.addPlaneSurface([F4c])
-    F5 = gmsh.model.geo.addPlaneSurface([F5c])
-    F6 = gmsh.model.geo.addPlaneSurface([F6c])
+    # Surface
+    ABCD = gmsh.model.geo.addPlaneSurface([loop])
 
-    # Surface loop
-    surfaceLoop = gmsh.model.geo.addSurfaceLoop([F1, F2, F3, F4, F5, F6])
+    # Extrusion
+    nlayers = (transfinite || isHexa || transfinite_lines) ? [nz - 1] : []
+    recombine = (transfinite || isHexa)
+    out = gmsh.model.geo.extrude([(2, ABCD)], 0, 0, lz, nlayers, [], recombine)
 
-    # Volume
-    volume = gmsh.model.geo.addVolume([surfaceLoop])
+    # Identification
+    zmin = ABCD
+    zmax = out[1][2]
+    vol = out[2][2]
+    ymin = out[3][2]
+    xmax = out[4][2]
+    ymax = out[5][2]
+    xmin = out[6][2]
 
     # Mesh settings
-    if (type == :hexa)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E1, nx)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E2, ny)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E3, nx)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E4, ny)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E5, nz)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E6, nz)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E7, nz)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E8, nz)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E9, nx)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E10, ny)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E11, nx)
-        gmsh.model.geo.mesh.setTransfiniteCurve(E12, ny)
-
-        gmsh.model.geo.mesh.setTransfiniteSurface(F1)
-        gmsh.model.geo.mesh.setTransfiniteSurface(F2)
-        gmsh.model.geo.mesh.setTransfiniteSurface(F3)
-        gmsh.model.geo.mesh.setTransfiniteSurface(F4)
-        gmsh.model.geo.mesh.setTransfiniteSurface(F5)
-        gmsh.model.geo.mesh.setTransfiniteSurface(F6)
-
-        gmsh.model.geo.mesh.setTransfiniteVolume(volume)
+    if transfinite_lines
+        gmsh.model.geo.mesh.setTransfiniteCurve(AB, nx)
+        gmsh.model.geo.mesh.setTransfiniteCurve(BC, ny)
+        gmsh.model.geo.mesh.setTransfiniteCurve(CD, nx)
+        gmsh.model.geo.mesh.setTransfiniteCurve(DA, ny)
     end
-    if (recombine || type == :hexa)
-        gmsh.model.geo.mesh.setRecombine(2, F1)
-        gmsh.model.geo.mesh.setRecombine(2, F2)
-        gmsh.model.geo.mesh.setRecombine(2, F3)
-        gmsh.model.geo.mesh.setRecombine(2, F4)
-        gmsh.model.geo.mesh.setRecombine(2, F5)
-        gmsh.model.geo.mesh.setRecombine(2, F6)
-    end
+
+    (transfinite || isHexa) && gmsh.model.geo.mesh.setTransfiniteSurface(ABCD)
+
+    isHexa && gmsh.model.geo.mesh.setRecombine(2, ABCD)
 
     # Synchronize
     gmsh.model.geo.synchronize()
 
-    # Define boundaries (`2` stands for 2D, i.e faces)
-    xmin = gmsh.model.addPhysicalGroup(2, [F5])
-    xmax = gmsh.model.addPhysicalGroup(2, [F3])
-    ymin = gmsh.model.addPhysicalGroup(2, [F2])
-    ymax = gmsh.model.addPhysicalGroup(2, [F4])
-    zmin = gmsh.model.addPhysicalGroup(2, [F1])
-    zmax = gmsh.model.addPhysicalGroup(2, [F6])
-
-    domain = gmsh.model.addPhysicalGroup(3, [surfaceLoop])
-
-    gmsh.model.setPhysicalName(2, xmin, "xmin")
-    gmsh.model.setPhysicalName(2, xmax, "xmax")
-    gmsh.model.setPhysicalName(2, ymin, "ymin")
-    gmsh.model.setPhysicalName(2, ymax, "ymax")
-    gmsh.model.setPhysicalName(2, zmin, "zmin")
-    gmsh.model.setPhysicalName(2, zmax, "zmax")
-    gmsh.model.setPhysicalName(3, domain, "Domain")
+    # Define boundaries (`1` stands for 1D, i.e lines)
+    gmsh.model.addPhysicalGroup(2, [xmin], -1, bnd_names[1])
+    gmsh.model.addPhysicalGroup(2, [xmax], -1, bnd_names[2])
+    gmsh.model.addPhysicalGroup(2, [ymin], -1, bnd_names[3])
+    gmsh.model.addPhysicalGroup(2, [ymax], -1, bnd_names[4])
+    gmsh.model.addPhysicalGroup(2, [zmin], -1, bnd_names[5])
+    gmsh.model.addPhysicalGroup(2, [zmax], -1, bnd_names[6])
+    gmsh.model.addPhysicalGroup(3, [vol], -1, "Domain")
 
     # Gen mesh
     gmsh.model.mesh.generate(3)
     gmsh.model.mesh.setOrder(order)
+    gmsh.model.mesh.partition(n_partitions)
 
     # Write result
+    rm(output; force = true)
     gmsh.write(output)
+    if write_geo
+        output_geo = first(splitext(output)) * ".geo_unrolled"
+        rm(output_geo; force = true)
+        gmsh.write(output_geo)
+    end
 
     # End
     gmsh.finalize()
@@ -1240,12 +1204,15 @@ function gen_cylinder_shell_mesh(
     # Mesh settings
     if transfinite
         _nθ = round(Int, nθ / 3)
-        map(
+        foreach(
             line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, _nθ),
             (AOB1, BOC1, COA1, AOB2, BOC2, COA2),
         )
-        map(line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, nz), (A1A2, B1B2, C1C2))
-        map(surf -> gmsh.model.geo.mesh.setTransfiniteSurface(surf), surfs)
+        foreach(
+            line -> gmsh.model.geo.mesh.setTransfiniteCurve(line, nz),
+            (A1A2, B1B2, C1C2),
+        )
+        foreach(gmsh.model.geo.mesh.setTransfiniteSurface, surfs)
     end
     recombine && map(surf -> gmsh.model.geo.mesh.setRecombine(2, surf), surfs)
 

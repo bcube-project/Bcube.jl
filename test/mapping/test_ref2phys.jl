@@ -1,4 +1,4 @@
-@testset "ref2loc" begin
+@testset "ref2phys" begin
 
     # TODO : add more test for gradients, waiting for Ghislain's commit
 

@@ -38,9 +38,12 @@ function assemble_bilinear(
     J = Int[]
     X = T[] # TODO : could be ComplexF64 or Dual
 
+    # Pre-allocate I, J, X
+    n = _count_n_elts(U, V, a)
+    foreach(Base.Fix2(sizehint!, n), (I, J, X))
+
     # Compute
     assemble_bilinear!(I, J, X, a, U, V)
-
     nrows = get_ndofs(V)
     ncols = get_ndofs(U)
     return sparse(I, J, X, nrows, ncols)
@@ -191,7 +194,7 @@ function assemble_linear(
     V::Union{TestFESpace, AbstractMultiTestFESpace};
     T = Float64,
 )
-    b = zeros(T, get_ndofs(V))
+    b = allocate_dofs(V, T)
     assemble_linear!(b, l, V)
     return b
 end
@@ -283,15 +286,11 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::CellInfo, dom
     icell = cellindex(elementInfo)
     nU = Val(get_ndofs(U, shape(celltype(elementInfo))))
     nV = Val(get_ndofs(V, shape(celltype(elementInfo))))
-    jdofs = get_dofs(U, icell, nU) # columns correspond to the TrialFunction
-    idofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
-    _idofs, _jdofs = _cartesian_product(idofs, jdofs)
+    Udofs = get_dofs(U, icell, nU) # columns correspond to the TrialFunction
+    Vdofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
     unwrapValues = _unwrap_cell_integrate(V, values)
-    append!(I, _idofs)
-    append!(J, _jdofs)
-    for _v in unwrapValues
-        append!(X, _v)
-    end
+    matrixvalues = _pack_bilinear_cell_contribution(unwrapValues, Udofs, Vdofs)
+    _append_bilinear!(I, J, X, Vdofs, Udofs, matrixvalues)
     return nothing
 end
 
@@ -346,6 +345,14 @@ function _append_bilinear!(
     vals::Union{T, SMatrix{M, N, T}},
 ) where {M, N, T <: NullOperator}
     nothing
+end
+
+function _pack_bilinear_cell_contribution(
+    values,
+    col_dofs_U::SVector{NU},
+    row_dofs_V::SVector{NV},
+) where {NU, NV}
+    return SMatrix{NV, NU}(values[j][i] for i in 1:NV, j in 1:NU)
 end
 
 function _pack_bilinear_face_contribution(
@@ -478,12 +485,20 @@ function _count_n_elts(
     return n
 end
 
-function _count_n_elts(
-    U::TrialFESpace,
-    V::TestFESpace,
-    domain::BoundaryFaceDomain{M, BC, L, C},
-) where {M, BC, L, C}
+# todo
+function _count_n_elts(U::TrialFESpace, V::TestFESpace, domain::AbstractFaceDomain)
     return 1
+end
+
+function _count_n_elts(U, V, a::Function)
+    integration = a(_null_operator(U), _null_operator(V))
+    _count_n_elts(U, V, integration)
+end
+function _count_n_elts(U, V, integration::Integration)
+    return _count_n_elts(U, V, get_domain(get_measure(integration)))
+end
+function _count_n_elts(U, V, integrations::MultiIntegration)
+    return sum(i -> _count_n_elts(U, V, i), integrations)
 end
 
 maywrap(x) = LazyWrap(x)

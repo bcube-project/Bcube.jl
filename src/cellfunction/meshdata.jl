@@ -60,7 +60,7 @@ function LazyOperators.materialize(
 end
 
 _wrap_value(value) = value
-_wrap_value(value::Union{Number, AbstractArray}) = ReferenceFunction(ξ -> value)
+_wrap_value(value::Union{Number, AbstractArray}) = ReferenceFunction(ξ -> value, Val(1))
 
 MeshCellData(values::AbstractVector) = MeshData(CellData(), values)
 MeshFaceData(values::AbstractVector) = MeshData(FaceData(), values)

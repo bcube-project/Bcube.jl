@@ -72,7 +72,22 @@
         _a = assemble_linear(l, V)
         @test all(isapprox.(_a, [0.0, 0.0, 0.0, 0.0]; atol = 100 * eps()))
 
+        # Shape functions gradient
+        mesh = one_cell_mesh(:line)
+        ctype = first(Bcube.cells(mesh))
+        cnodes = get_nodes(mesh)
+        fs = FunctionSpace(:Lagrange, 2)
+        n1 = Val(1)
+        n2 = Val(2)
+
+        ∇sca = Bcube.∂λξ_∂x(fs, n1, ctype, cnodes, [0.0])
+        ∇vec = Bcube.∂λξ_∂x(fs, n2, ctype, cnodes, [0.0])
+
+        @test all(isapprox.(∇sca, ∇vec[1:3, 1, 1]))
+        @test all(isapprox.(∇sca, ∇vec[4:6, 2, 1]))
+
         @testset "TangentialGradient" begin
+            # Topodim = 1
             ctype = Bar2_t()
 
             nodes = [Node([-1.0]), Node([1.0])]
@@ -96,6 +111,61 @@
             ∇_volumic = Bcube.∂fξ_∂x(h, n, ctype, nodes, [0.0])
             ∇_hyper = Bcube.∂fξ_∂x_hypersurface(h, n, ctype, nodes_hypersurface, [0.0])
             @test ∇_volumic[1] == ∇_hyper[2]
+
+            # Topodim = 2
+            function rotMat(θx, θy, θz)
+                Rx = [
+                    1.0 0.0 0.0
+                    0.0 cos(θx) sin(θx)
+                    0.0 (-sin(θx)) cos(θx)
+                ]
+                Ry = [
+                    cos(θy) 0.0 (-sin(θy))
+                    0.0 1.0 0.0
+                    sin(θy) 0.0 cos(θy)
+                ]
+                Rz = [
+                    cos(θz) sin(θz) 0.0
+                    -sin(θz) cos(θz) 0.0
+                    0.0 0.0 1.0
+                ]
+                return Rx * Ry * Rz
+            end
+
+            R = rotMat(π / 2, π / 3, π / 4)
+
+            ctype = Quad4_t()
+
+            nodes =
+                [Node([-1.0, -1.0]), Node([1.0, -1.0]), Node([1.0, 1.0]), Node([-1.0, 1.0])]
+            celltypes = [ctype]
+            cell2node = Bcube.Connectivity([4], [1, 2, 3, 4])
+            mesh = Bcube.Mesh(nodes, celltypes, cell2node)
+
+            nodes_hypersurface =
+                [Node(R * [get_coords(n)..., 0.0]) for n in get_nodes(mesh)]
+            mesh_hypersurface = Bcube.Mesh(nodes_hypersurface, celltypes, cell2node)
+
+            fs = FunctionSpace(:Lagrange, 1)
+            n = Val(1)
+
+            ∇_volumic = Bcube.∂λξ_∂x(fs, n, ctype, nodes, [0.0, 0.0])
+            ∇_hyper =
+                Bcube.∂λξ_∂x_hypersurface(fs, n, ctype, nodes_hypersurface, [0.0, 0.0])
+
+            ∇_volumic = transpose(hcat([R * [row..., 0] for row in eachrow(∇_volumic)]...))
+
+            @test all(isapprox.(vec(∇_volumic), vec(∇_hyper), atol = 1e-16))
+
+            n = Val(2)
+            h2(x) = x
+            ∇_volumic = Bcube.∂fξ_∂x(h2, n, ctype, nodes, [0.0, 0.0])
+            ∇_hyper =
+                Bcube.∂fξ_∂x_hypersurface(h2, n, ctype, nodes_hypersurface, [0.0, 0.0])
+
+            ∇_volumic = transpose(hcat([R * [row..., 0] for row in eachrow(∇_volumic)]...))
+
+            @test all(isapprox.(vec(∇_volumic), vec(∇_hyper), atol = 1e-15))
         end
 
         @testset "AbstractLazy" begin

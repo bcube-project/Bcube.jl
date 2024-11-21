@@ -101,6 +101,7 @@ end
 end
 _apply_quadrature2(wu) = reduce(_mapsum, wu)
 _mapsum(a, b) = map(+, a, b)
+_mapsum(a::NullOperator, b::NullOperator) = a
 _mapquad(ω, u) = map(Base.Fix1(*, ω), u)
 
 """

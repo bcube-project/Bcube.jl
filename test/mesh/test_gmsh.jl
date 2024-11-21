@@ -164,8 +164,11 @@ end
     end
 
     # gen_mesh_around_disk
-    fname = "gmsh_mesh_around_disk.msh"
-    Bcube.gen_mesh_around_disk(joinpath(tempdir, fname); nθ = 30, nr = 10)
+    fname = "gmsh_mesh_around_disk_tri.msh"
+    Bcube.gen_mesh_around_disk(joinpath(tempdir, fname), :tri; nθ = 30, nr = 10)
+    @test fname2sum[fname] == bytes2hex(open(sha1, joinpath(tempdir, fname)))
+    fname = "gmsh_mesh_around_disk_quad.msh"
+    Bcube.gen_mesh_around_disk(joinpath(tempdir, fname), :quad; nθ = 30, nr = 10)
     @test fname2sum[fname] == bytes2hex(open(sha1, joinpath(tempdir, fname)))
 
     # gen_mesh_around_disk
