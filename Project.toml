@@ -4,6 +4,7 @@ authors = ["Ghislain Blanchard, Lokman Bennani and Maxime Bouyges"]
 version = "0.2.0"
 
 [deps]
+AcceleratedKernels = "6a4ca0a5-0e36-4168-a932-d9be78d558f1"
 FEMQuad = "be8e8821-3f6f-54c2-987c-d2773c3a52cb"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
@@ -15,10 +16,20 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
+[weakdeps]
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+
+[extensions]
+HDF5Ext = "HDF5"
+JLD2Ext = "JLD2"
+
 [compat]
 FEMQuad = "0.3"
 FastGaussQuadrature = "0.4, 0.5, 1.0"
 ForwardDiff = "0.10"
+HDF5 = "0.17"
+JLD2 = "0.4.47"
 LinearSolve = "1, 2"
 NearestNeighbors = "0.4"
 StaticArrays = "1.2"
