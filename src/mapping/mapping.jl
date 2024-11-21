@@ -17,7 +17,7 @@ F(\\xi) = \\dfrac{x_r - x_l}{2} \\xi + \\dfrac{x_r + x_l}{2}
 # `::Tri3_t`
 Map the reference 3-nodes Triangle [0,1] x [0,1] on the local triangle.
 ```math
-F(\\xi \\\\ \\eta) = (1 - \\xi - \\eta) M_1 + x M_2 + y M_3
+F(\\xi, \\eta) = (1 - \\xi - \\eta) M_1 + \\xi M_2 + \\eta M_3
 ```
 
 # `::Quad4_t`

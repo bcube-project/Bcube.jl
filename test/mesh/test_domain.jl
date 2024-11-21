@@ -20,4 +20,19 @@
     cInfo = CellInfo(mesh, 1)
     res = integrate_on_ref_element(PhysicalFunction(x -> 2 * x), cInfo, Quadrature(Val(2)))
     @test res[1] == 1.0
+
+    @testset "domain-to-mesh" begin
+        mesh = rectangle_mesh(3, 4)
+
+        f(x) = norm(x) > 0.5
+        Ω = CellDomain(mesh, f)
+
+        new_mesh = Bcube.domain_to_mesh(Ω)
+
+        @test nnodes(new_mesh) == 8
+        @test ncells(new_mesh) == 3
+        @test Bcube.inner_faces(new_mesh) == [3, 6]
+        @test Bcube.outer_faces(new_mesh) == [1, 2, 4, 5, 7, 8, 9, 10]
+        @test Bcube.boundary_faces(new_mesh, "CLIPPED_BND") == [1, 4, 5]
+    end
 end
