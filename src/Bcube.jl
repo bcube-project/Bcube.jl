@@ -67,18 +67,6 @@ export basic_mesh,
     translate,
     translate!
 
-include("./mesh/gmsh_utils.jl")
-export read_msh,
-    read_msh_with_cell_names,
-    gen_line_mesh,
-    gen_rectangle_mesh,
-    gen_hexa_mesh,
-    gen_disk_mesh,
-    gen_star_disk_mesh,
-    gen_cylinder_mesh,
-    read_partitions,
-    gen_rectangle_mesh_with_tri_and_quad
-
 include("./mesh/domain.jl")
 export AbstractDomain,
     CellDomain, InteriorFaceDomain, BoundaryFaceDomain, get_mesh, get_face_normals
