@@ -225,10 +225,14 @@
         avg(u) = 0.5 * (side⁺(u) + side⁻(u))
 
         # Build mesh
-        meshParam = (nx = n + 1, ny = n + 1, lx = Lx, ly = Lx, xc = 0.0, yc = 0.0)
-        path = joinpath(tempdir, "mesh.msh")
-        gen_rectangle_mesh(path, :quad; meshParam...)
-        mesh = read_msh(path)
+        mesh = rectangle_mesh(
+            n + 1,
+            n + 1;
+            xmin = -Lx / 2,
+            xmax = Lx / 2,
+            ymin = -Lx / 2,
+            ymax = Lx / 2,
+        )
 
         # Choose degree and define function space, trial space and test space
         fs = FunctionSpace(:Lagrange, degree)
@@ -280,11 +284,15 @@
         Lx = 2.0
 
         # Build mesh
-        meshParam = (nx = n + 1, ny = n + 1, lx = Lx, ly = Lx, xc = 0.0, yc = 0.0)
-        tmp_path = "tmp.msh"
-        gen_rectangle_mesh(tmp_path, :quad; meshParam...)
-        mesh = read_msh(tmp_path)
-        rm(tmp_path)
+        mesh = rectangle_mesh(
+            n + 1,
+            n + 1;
+            xmin = -Lx / 2,
+            xmax = Lx / 2,
+            ymin = -Lx / 2,
+            ymax = Lx / 2,
+            bnd_names = ("West", "East", "South", "North"),
+        )
 
         # Choose degree and define function space, trial space and test space
         degree = 2

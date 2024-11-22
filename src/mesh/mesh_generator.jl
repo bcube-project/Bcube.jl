@@ -759,6 +759,118 @@ function circle_mesh(n; radius = 1.0, order = 1)
 end
 
 """
+    _two_cubes_mesh(; zmin = 0, zmax = 1)
+
+Only for testing purpose.
+
+z=zmin
+4------5------6
+|      |      |
+|      |      |
+1------2------3
+
+z=zmax
+10----11-----12
+|      |      |
+|      |      |
+7------8------9
+"""
+function _two_cubes_mesh(; zmin = 0, zmax = 1)
+    nodes = [
+        Node(SA[0.0, 0.0, zmin]),
+        Node(SA[1.0, 0.0, zmin]),
+        Node(SA[2.0, 0.0, zmin]),
+        Node(SA[0.0, 0.1, zmin]),
+        Node(SA[1.0, 0.1, zmin]),
+        Node(SA[2.0, 0.1, zmin]),
+        Node(SA[0.0, 0.0, zmax]),
+        Node(SA[1.0, 0.0, zmin]),
+        Node(SA[2.0, 0.0, zmin]),
+        Node(SA[0.0, 0.1, zmax]),
+        Node(SA[1.0, 0.1, zmin]),
+        Node(SA[2.0, 0.1, zmin]),
+    ]
+
+    celltypes = [Hexa8_t(), Hexa8_t()]
+
+    cube1 = [1, 2, 5, 4, 7, 8, 11, 10]
+    cube2 = [2, 3, 6, 5, 8, 9, 12, 11]
+    cell2node = vcat(cube1, cube2)
+
+    cell2nnodes = [8, 8]
+
+    return Mesh(nodes, celltypes, Connectivity(cell2nnodes, cell2node))
+end
+
+"""
+    _cube_pile_mesh()
+
+Only for testing purpose.
+
+level 1
+       7------8
+       |      |
+       |      |
+4------5------6
+|      |      |
+|      |      |
+1------2------3
+
+level 2
+       15----16
+       |      |
+       |      |
+12----13-----14
+|      |      |
+|      |      |
+9-----10-----11
+
+level 3
+
+
+
+      19-----20
+       |      |
+       |      |
+      17-----18
+"""
+function _cube_pile_mesh()
+    nodes = [
+        Node(SA[0.0, 0.0, 0.0]),
+        Node(SA[1.0, 0.0, 0.0]),
+        Node(SA[2.0, 0.0, 0.0]),
+        Node(SA[0.0, 1.0, 0.0]),
+        Node(SA[1.0, 1.0, 0.0]),
+        Node(SA[2.0, 1.0, 0.0]),
+        Node(SA[1.0, 2.0, 0.0]),
+        Node(SA[2.0, 2.0, 0.0]),
+        Node(SA[0.0, 0.0, 1.0]),
+        Node(SA[1.0, 0.0, 1.0]),
+        Node(SA[2.0, 0.0, 1.0]),
+        Node(SA[0.0, 1.0, 1.0]),
+        Node(SA[1.0, 1.0, 1.0]),
+        Node(SA[2.0, 1.0, 1.0]),
+        Node(SA[1.0, 2.0, 1.0]),
+        Node(SA[2.0, 2.0, 1.0]),
+        Node(SA[1.0, 1.0, 3.0]),
+        Node(SA[2.0, 1.0, 3.0]),
+        Node(SA[2.0, 1.0, 3.0]),
+    ]
+
+    cube1 = [1, 2, 5, 4, 9, 10, 13, 12]
+    cube2 = [2, 3, 6, 5, 10, 11, 14, 13]
+    cube3 = [5, 6, 8, 7, 13, 14, 16, 15]
+    cube4 = [10, 11, 14, 13, 17, 18, 20, 19]
+    cell2node = vcat(cube1, cube2, cube3, cube4)
+
+    cell2nnodes = fill(8, 4)
+
+    celltypes = fill(Hexa8_t(), 4)
+
+    return Mesh(nodes, celltypes, Connectivity(cell2nnodes, cell2node))
+end
+
+"""
     scale(mesh, factor)
 
 Scale the input mesh nodes coordinates by a given factor and return the resulted mesh. The `factor` can be a number
