@@ -1,5 +1,4 @@
 abstract type AbstractIoHandler end
-struct GMSHIoHandler <: AbstractIoHandler end # to be removed
 struct HDF5IoHandler <: AbstractIoHandler end # to be removed
 struct JLD2IoHandler <: AbstractIoHandler end # to be removed
 
@@ -209,5 +208,4 @@ function _filename_to_handler(extension)
 end
 
 # to be removed :
-_filename_to_handler(::Val{:msh}) = GMSHIoHandler()
 _filename_to_handler(::Union{Val{:cgns}, Val{:hdf}, Val{:hdf5}}) = HDF5IoHandler()

@@ -383,18 +383,17 @@
             err = heat_solver(mesh, degree, dirichlet_dict, q, η, T_analytical)
             @test err < 1.0e-14
 
-            mesh_path = joinpath(tempdir, "tmp2.msh")
-            gen_hexa_mesh(
-                mesh_path,
-                :hexa;
-                nx = 5,
-                ny = 5,
-                nz = 5,
-                xc = 0.0,
-                yc = 0.0,
-                zc = 0.0,
+            mesh = hexa_mesh(
+                5,
+                5,
+                5;
+                xmin = -0.5,
+                xmax = 0.5,
+                ymin = -0.5,
+                ymax = 0.5,
+                zmin = -0.5,
+                zmax = 0.5,
             )
-            mesh = read_msh(mesh_path)
             degree = 2
             dirichlet_dict = Dict("xmin" => 260.0)
             q = 1500.0
