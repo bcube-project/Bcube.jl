@@ -465,15 +465,11 @@
         # Here we test the face parametrization
 
         # Two Quad9 side-by-side
-        path = joinpath(tempdir, "mesh.msh")
-        gen_rectangle_mesh(path, :quad; nx = 3, ny = 2, order = 2)
-        mesh = read_msh(path)
+        mesh = rectangle_mesh(3, 2; order = 2)
         _check_face_parametrization(mesh)
 
         # For two Hexa8 side-by-side
-        path = joinpath(tempdir, "mesh.msh")
-        gen_hexa_mesh(path, :hexa; nx = 3, ny = 2, nz = 2)
-        mesh = read_msh(path)
+        mesh = hexa_mesh(3, 2, 2)
         _check_face_parametrization(mesh)
     end
 end
