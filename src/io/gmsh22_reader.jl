@@ -2,9 +2,17 @@
 
 struct Gmsh22IoHandler <: AbstractIoHandler end
 
-_filename_to_handler(::Val{:msh22}) = GmshIoHandler()
+_filename_to_handler(::Val{:msh22}) = Gmsh22IoHandler()
 
-function read_mesh(::Gmsh22IoHandler, filepath::String, domainNames = String[], kwargs...)
+function read_mesh(
+    ::Gmsh22IoHandler,
+    filepath::String;
+    domainNames = String[],
+    warn = true,
+    kwargs...,
+)
+    warn && @warn "The .msh22 read is experimental, use it at your own risks!"
+
     @assert length(domainNames) == 0
 
     io = open(filepath)
@@ -32,49 +40,108 @@ function read_mesh(::Gmsh22IoHandler, filepath::String, domainNames = String[], 
     read_check(io, "\$Nodes")
     n = parse(Int, readline(io))
     xyz = zeros(n, 3)
-    nodes_indices = zeros(Int, n)
+    node_ids = zeros(Int, n)
     for i in 1:n
         line = readline(io)
         elts = split(line, ' ')
-        nodes_indices[i] = parse(Int, first(elts))
-        xyz[i, :] .= parse.(Float64, elts[2, :])
+        node_ids[i] = parse(Int, first(elts))
+        xyz[i, :] .= parse.(Float64, elts[2:end])
     end
     read_check(io, "\$EndNodes")
 
     # Elements
     read_check(io, "\$Elements")
     n = parse(Int, readline(io))
-    c2n = []
-    elts_indices = zeros(Int, n)
-    elts_types = zeros(Int, n)
-    elts_tags = []
+    elt_ids = zeros(Int, n) # element numbering
+    elt_types = zeros(Int, n) # element type
+    elt_tags = zeros(Int, n) # physical tag (if any)
+    elt_nodes = [] # for element->node connectivity
     for i in 1:n
         line = readline(io)
         elts = split(line, ' ')
-        elts_indices[i] = parse(Int, elts[1])
-        elts_types[i] = parse(Int, elts[2])
+        elt_ids[i] = parse(Int, elts[1])
+        elt_types[i] = parse(Int, elts[2])
         ntags = parse(Int, elts[3])
         if ntags > 0
-            push!(elts_tags, parse.(Int, elts[4:(4 + ntags - 1)]))
+            elt_tags[i] = parse(Int, elts[4])
+            # push!(elt_tags, parse.(Int, elts[4:(4 + ntags - 1)]))
         end
-        push!(c2n, parse.(Int, elts[(4 + ntags):end]))
+        push!(elt_nodes, parse.(Int, elts[(4 + ntags):end]))
     end
     read_check(io, "\$EndElements")
 
     close(io)
 
-    # Now, build Bcube mesh from the collected infos
+    return _msh_to_bcube_mesh(
+        xyz,
+        node_ids,
+        elt_ids,
+        elt_types,
+        elt_tags,
+        elt_nodes,
+        physical_names,
+    )
+end
 
+function _msh_to_bcube_mesh(
+    xyz,
+    node_ids,
+    elt_ids,
+    elt_types,
+    elt_tags,
+    elt_nodes,
+    physical_names,
+)
     # topodim and spacedim
-    topodim = maximum(((k, v),) -> first(v), physical_names)
+    _topodim = maximum(first.(values(physical_names)))
     extr = extrema.(eachcol(xyz))
     lx = extr[1][2] - extr[1][1]
     ly = extr[2][2] - extr[2][1]
     lz = extr[3][2] - extr[3][1]
-    spacedim = _compute_space_dim(topodim, lx, ly, lz, 1e-15, true)
+    _spacedim = _compute_space_dim(_topodim, lx, ly, lz, 1e-15, true)
 
     # nodes
-    nodes = [Node(_xyz[1:spacedim]) for _xyz in eachrow(xyz)]
+    nodes = [Node(_xyz[1:_spacedim]) for _xyz in eachrow(xyz)]
+    absolute_node_indices = node_ids
+    _, glo2loc_node_indices = densify(absolute_node_indices; permute_back = true)
+
+    # filter to retain only "volumic" elements
+    ind = findall(t -> topodim(GMSHTYPE[t]) == _topodim, elt_types)
+
+    # cells
+    absolute_cell_indices = elt_ids[ind]
+    # _, glo2loc_cell_indices = densify(absolute_cell_indices; permute_back = true)
+
+    celltypes = map(t -> GMSHTYPE[t], elt_types[ind])
+
+    # create connectivity
+    c2n_gmsh = Connectivity(
+        nnodes.(celltypes),
+        [glo2loc_node_indices[k] for k in reduce(vcat, elt_nodes[ind])],
+    )
+    c2n = _c2n_gmsh2cgns(celltypes, c2n_gmsh)
+
+    # bnd conditions
+    _physical_names = filter(((tag, (dim, name)),) -> dim == _topodim - 1, physical_names)
+    bc_tags = keys(_physical_names)
+    bc_names = Dict(bc_tags .=> last.(values(_physical_names)))
+    bc_nodes = Dict(tag => Int[] for tag in bc_tags)
+    for (tags, nodes) in zip(elt_tags, elt_nodes) # we could loop only on elements of topodim (n-1)...
+        for tag in tags
+            if tag ∈ bc_tags
+                push!(bc_nodes[tag], nodes...)
+            end
+        end
+    end
+    foreach(x -> unique!(x), values(bc_nodes)) # remove duplicates
+    bc_nodes =
+        Dict(tag => map(i -> glo2loc_node_indices[i], nodes) for (tag, nodes) in bc_nodes)
+
+    mesh = Mesh(nodes, celltypes, c2n; bc_nodes, bc_names)
+    add_absolute_indices!(mesh, :node, absolute_node_indices)
+    add_absolute_indices!(mesh, :cell, absolute_cell_indices)
+
+    return mesh
 end
 
 const GMSHTYPE = Dict(

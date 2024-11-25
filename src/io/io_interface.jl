@@ -58,7 +58,7 @@ Similar as `read_file`, but return only the mesh.
 """
 function read_mesh(
     handler::AbstractIoHandler,
-    filepath::String,
+    filepath::String;
     domainNames = String[],
     kwargs...,
 )

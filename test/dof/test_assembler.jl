@@ -369,9 +369,10 @@
         end
 
         function driver_heat_solver()
-            mesh_path = joinpath(tempdir, "tmp1.msh")
-            gen_hexa_mesh(mesh_path, :tetra; xc = 0.0, yc = 0.0, zc = 0.0)
-            mesh = read_msh(mesh_path)
+            mesh = read_mesh(
+                joinpath(@__DIR__, "..", "assets", "hexa-mesh-tetra-xc0-yc0-zc0.msh22");
+                warn = false,
+            )
 
             λ = 100.0
             η = λ
