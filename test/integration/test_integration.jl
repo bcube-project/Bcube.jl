@@ -14,7 +14,7 @@
         # Mesh with only one triangle of degree 1 : [-1, -1], [1, -1], [-1, 1]
         mesh = Mesh(
             [Node([-1.0, -1.0]), Node([1.0, -1.0]), Node([-1.0, 1.0])],
-            [Tri3_t()],
+            [Bcube.Tri3_t()],
             Connectivity([3], [1, 2, 3]),
         )
         icell = 1
@@ -305,13 +305,13 @@
             Node([xmin - alpha, (ymin + ymax) / 2]),
             Node([(xmin + xmax) / 2, (ymin + ymax) / 2]),
         ]
-        ctype = Quad9_t()
+        ctype = Bcube.Quad9_t()
         quad_mesh = Mesh(cnodes, [ctype], Connectivity([9], collect(1:9)))
 
         # Build P2 line (equivalent to one of the edge above)
         lnodes =
             [Node([0.0, 0.0]), Node([0.0, xmax - xmin]), Node([alpha, (xmax - xmin) / 2])]
-        line_mesh = Mesh(lnodes, [Bar3_t()], Connectivity([3], collect(1:3)))
+        line_mesh = Mesh(lnodes, [Bcube.Bar3_t()], Connectivity([3], collect(1:3)))
 
         # Compute analytic arc length
         b = xmax - xmin
@@ -326,9 +326,10 @@
     end
 
     @testset "Sphere" begin
-        path = joinpath(tempdir, "mesh.msh")
-        Bcube.gen_sphere_mesh(path; radius = 1.0)
-        mesh = read_msh(path) # Radius = 1 => area = 4\pi
+        mesh = read_mesh(
+            joinpath(@__DIR__, "..", "assets", "sphere-mesh-r1.msh22");
+            warn = false,
+        )
         c2n = connectivities_indices(mesh, :c2n)
         S = sum(1:ncells(mesh)) do icell
             cInfo = CellInfo(mesh, icell)
@@ -376,7 +377,7 @@
         # Mesh with only one triangle of degree 1 : [1.0, 0.5], [3.5, 1.0], [2.0, 2.0]
         mesh = Mesh(
             [Node([1.0, 0.5]), Node([3.5, 1.0]), Node([2.0, 2.0])],
-            [Tri3_t()],
+            [Bcube.Tri3_t()],
             Connectivity([3], [1, 2, 3]);
             buildboundaryfaces = true,
             bc_names = Dict(1 => "boundary"),
@@ -409,7 +410,7 @@
                 Node([0.5, 2.0]),
                 Node([2.5, 2.0]),
             ],
-            [Quad9_t()],
+            [Bcube.Quad9_t()],
             Connectivity([9], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
             buildboundaryfaces = true,
             bc_names = Dict(1 => "boundary"),
@@ -442,7 +443,7 @@
                 Node([-0.25, 0.75]),
                 Node([0.75, 0.75]),
             ],
-            [Quad9_t()],
+            [Bcube.Quad9_t()],
             Connectivity([9], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
             buildboundaryfaces = true,
             bc_names = Dict(1 => "boundary"),
@@ -569,10 +570,11 @@
         b = compute(∫(g)dΩ)
         @test b[1] ≈ 0.75
 
-        # Whole cylinder : build a cylinder of radius 1 and length 1, and compute its volume
-        path = joinpath(tempdir, "mesh.msh")
-        gen_cylinder_mesh(path, 1.0, 10)
-        mesh = read_msh(path)
+        # Whole cylinder : read the mesh of a cylinder of radius 1 and length 1, and compute its volume
+        mesh = read_mesh(
+            joinpath(@__DIR__, "..", "assets", "cylinder-mesh-Lz1-nz10.msh22");
+            warn = false,
+        )
 
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)
