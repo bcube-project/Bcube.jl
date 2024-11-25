@@ -1,5 +1,38 @@
 otimes(x::AbstractVector, y::AbstractVector) = x * y'
 otimes(x::AbstractVector) = otimes(x, x)
+
+"""
+    otimes(A,B)
+
+Tensors product between second order tensors
+
+# Implementation
+A[i,j] ⊗ B[k,l] = C[i,j,k,l]
+such as
+C[i,j,k,l] = A[i,j] * B[k,l]
+"""
+function otimes(A::AbstractMatrix{T1}, B::AbstractMatrix{T2}) where {T1, T2}
+    sA = size(A)
+    sB = size(B)
+    C = zeros(promote_type(T1, T2), sA..., sB...)
+    C = [A[i, j] * B[k, l] for i in 1:sA[1], j in 1:sA[2], k in 1:sB[1], l in 1:sB[2]]
+    return C
+end
+
+# otimes for static arrays
+function otimes(
+    A::SMatrix{I1, I2, T1, L1},
+    B::SMatrix{I3, I4, T2, L2},
+) where {I1, I2, I3, I4, T1, T2, L1, L2}
+    M = (A[i, j] * B[k, l] for i in 1:I1, j in 1:I2, k in 1:I3, l in 1:I4)
+    if I1 * I2 * I3 * I4 > 3^4
+        # add collect to avoid stack overflow 
+        return SArray{Tuple{I1, I2, I3, I4}}(collect(M))
+    else
+        return SArray{Tuple{I1, I2, I3, I4}}(M)
+    end
+end
+
 const ⊗ = otimes
 
 """
@@ -56,6 +89,23 @@ function dcontract(A::AbstractArray{T1, 3}, B::AbstractArray{T2, 3}) where {T1, 
     return C
 end
 
+"""
+    dcontract(A,B)
+
+Tensors double contraction between fourth order tensor and second order tensor
+
+# Implementation
+A[i,j,k,l] : B[m,n] = C[i,j]
+such as
+C[i,j] = A[i,j,k,l] * B[k,l] (Einstein sum)
+"""
+function dcontract(A::AbstractArray{T1, 4}, B::AbstractArray{T2, 2}) where {T1, T2}
+    sA = size(A)
+    C = zeros(promote_type(eltype(A), eltype(B)), sA[1], sA[2])
+    C = [sum(view(A, i, j, :, :) .* B) for i in 1:sA[1], j in 1:sA[2]]
+    return C
+end
+
 # dcontract for static arrays
 function dcontract(
     A::SArray{<:Tuple{I1, J, K}, T1, 3, L1},
@@ -75,6 +125,13 @@ function dcontract(
     B::SArray{<:Tuple{I2, J, K}, T2, 3, L2},
 ) where {I1, J, K, I2, T1, T2, L1, L2}
     return SMatrix{I1, I2}(sum(A[i, :, :] .* B[j, :, :]) for i in 1:I1, j in 1:I2)
+end
+
+function dcontract(
+    A::SArray{<:Tuple{I1, I2, K, L}, T1, 4, L1},
+    B::SMatrix{K, L, T2, L2},
+) where {I1, I2, K, L, T1, L1, T2, L2}
+    return SMatrix{I1, I2}(sum(A[i, j, :, :] .* B) for i in 1:I1, j in 1:I2)
 end
 
 const ⊡ = dcontract
