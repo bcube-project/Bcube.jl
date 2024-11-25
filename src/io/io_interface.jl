@@ -10,6 +10,7 @@ struct JLD2IoHandler <: AbstractIoHandler end # to be removed
         varnames = nothing,
         topodim = 0,
         spacedim = 0,
+        verbose = false,
         kwargs...,
     )
 
@@ -42,6 +43,7 @@ function read_file(
     varnames = nothing,
     topodim = 0,
     spacedim = 0,
+    verbose = false,
     kwargs...,
 )
     error(
@@ -49,19 +51,14 @@ function read_file(
     )
 end
 
-function read_file(filepath::String; domainNames = String[], varnames = nothing, kwargs...)
-    read_file(_filename_to_handler(filepath), filepath; domainNames, varnames, kwargs...)
+function read_file(filepath::String; kwargs...)
+    read_file(_filename_to_handler(filepath), filepath; kwargs...)
 end
 
 """
-Similar as `read_file`, but return only the mesh.
+Similar to `read_file`, but return only the mesh.
 """
-function read_mesh(
-    handler::AbstractIoHandler,
-    filepath::String;
-    domainNames = String[],
-    kwargs...,
-)
+function read_mesh(handler::AbstractIoHandler, filepath::String; kwargs...)
     res = read_file(handler, filepath; domainNames, kwargs...)
     return res.mesh
 end
