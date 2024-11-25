@@ -316,5 +316,9 @@ end
 
         up_closest = [Bcube.interpolate_at_point(pf_closest, x, u) for x in xp]
         @test all(f1.(xp) .≈ up_closest)
+
+        up_multiinputs = [Bcube.interpolate_at_point(pf_closest, x, u, 7 * u) for x in xp]
+        @test all(f1.(xp) .≈ getindex.(up_multiinputs, 1))
+        @test all((7 * f1.(xp)) .≈ getindex.(up_multiinputs, 2))
     end
 end
