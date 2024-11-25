@@ -80,6 +80,7 @@ function read_mesh(
         elt_tags,
         elt_nodes,
         physical_names,
+        warn,
     )
 end
 
@@ -91,6 +92,7 @@ function _msh_to_bcube_mesh(
     elt_tags,
     elt_nodes,
     physical_names,
+    warn,
 )
     # topodim and spacedim
     _topodim = maximum(first.(values(physical_names)))
@@ -98,7 +100,7 @@ function _msh_to_bcube_mesh(
     lx = extr[1][2] - extr[1][1]
     ly = extr[2][2] - extr[2][1]
     lz = extr[3][2] - extr[3][1]
-    _spacedim = _compute_space_dim(_topodim, lx, ly, lz, 1e-15, true)
+    _spacedim = _compute_space_dim(_topodim, lx, ly, lz, 1e-15, warn)
 
     # nodes
     nodes = [Node(_xyz[1:_spacedim]) for _xyz in eachrow(xyz)]

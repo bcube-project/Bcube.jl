@@ -126,40 +126,44 @@ import Bcube:
     topodim,
     Triangle,
     ∂λξ_∂ξ,
-    ∂λξ_∂x
+    ∂λξ_∂x,
+    Bar2_t,
+    Tri3_t,
+    Quad4_t,
+    Quad9_t
 
 # This dir will be removed at the end of the tests
 tempdir = mktempdir()
 
 @testset "Bcube.jl" begin
-    # custom_include("./test_utils.jl")
-    # custom_include("./mesh/test_entity.jl")
-    # custom_include("./mesh/test_connectivity.jl")
-    # custom_include("./mesh/test_transformation.jl")
-    # custom_include("./mesh/test_mesh.jl")
-    # custom_include("./mesh/test_mesh_generator.jl")
-    # custom_include("./mesh/test_domain.jl")
-    # custom_include("./mapping/test_mapping.jl")
-    # custom_include("./mapping/test_ref2phys.jl")
-    # custom_include("./interpolation/test_shape.jl")
-    # custom_include("./interpolation/test_lagrange.jl")
-    # custom_include("./interpolation/test_taylor.jl")
-    # custom_include("./fespace/test_dofhandler.jl")
-    # custom_include("./fespace/test_fespace.jl")
-    # custom_include("./fespace/test_fefunction.jl")
-    # custom_include("./interpolation/test_projection.jl")
+    custom_include("./test_utils.jl")
+    custom_include("./mesh/test_entity.jl")
+    custom_include("./mesh/test_connectivity.jl")
+    custom_include("./mesh/test_transformation.jl")
+    custom_include("./mesh/test_mesh.jl")
+    custom_include("./mesh/test_mesh_generator.jl")
+    custom_include("./mesh/test_domain.jl")
+    custom_include("./mapping/test_mapping.jl")
+    custom_include("./mapping/test_ref2phys.jl")
+    custom_include("./interpolation/test_shape.jl")
+    custom_include("./interpolation/test_lagrange.jl")
+    custom_include("./interpolation/test_taylor.jl")
+    custom_include("./fespace/test_dofhandler.jl")
+    custom_include("./fespace/test_fespace.jl")
+    custom_include("./fespace/test_fefunction.jl")
+    custom_include("./interpolation/test_projection.jl")
     custom_include("./integration/test_integration.jl")
-    # # custom_include("./dof/test_variable.jl")  #TODO : update with new API
-    # custom_include("./interpolation/test_shapefunctions.jl")
-    # # custom_include("./interpolation/test_limiter.jl")
-    # custom_include("./interpolation/test_cellfunction.jl")
-    # custom_include("./dof/test_assembler.jl")
-    # custom_include("./dof/test_dirichlet.jl")
-    # custom_include("./operator/test_algebra.jl")
-    # custom_include("./dof/test_meshdata.jl")
+    # custom_include("./dof/test_variable.jl")  #TODO : update with new API
+    custom_include("./interpolation/test_shapefunctions.jl")
+    # custom_include("./interpolation/test_limiter.jl")
+    custom_include("./interpolation/test_cellfunction.jl")
+    custom_include("./dof/test_assembler.jl")
+    custom_include("./dof/test_dirichlet.jl")
+    custom_include("./operator/test_algebra.jl")
+    custom_include("./dof/test_meshdata.jl")
 
-    # @testset "Issues" begin
-    #     custom_include("./issues/issue_112.jl")
-    #     custom_include("./issues/issue_130.jl")
-    # end
+    @testset "Issues" begin
+        custom_include("./issues/issue_112.jl")
+        custom_include("./issues/issue_130.jl")
+    end
 end

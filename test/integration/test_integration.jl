@@ -14,7 +14,7 @@
         # Mesh with only one triangle of degree 1 : [-1, -1], [1, -1], [-1, 1]
         mesh = Mesh(
             [Node([-1.0, -1.0]), Node([1.0, -1.0]), Node([-1.0, 1.0])],
-            [Bcube.Tri3_t()],
+            [Tri3_t()],
             Connectivity([3], [1, 2, 3]),
         )
         icell = 1
@@ -305,7 +305,7 @@
             Node([xmin - alpha, (ymin + ymax) / 2]),
             Node([(xmin + xmax) / 2, (ymin + ymax) / 2]),
         ]
-        ctype = Bcube.Quad9_t()
+        ctype = Quad9_t()
         quad_mesh = Mesh(cnodes, [ctype], Connectivity([9], collect(1:9)))
 
         # Build P2 line (equivalent to one of the edge above)
@@ -377,7 +377,7 @@
         # Mesh with only one triangle of degree 1 : [1.0, 0.5], [3.5, 1.0], [2.0, 2.0]
         mesh = Mesh(
             [Node([1.0, 0.5]), Node([3.5, 1.0]), Node([2.0, 2.0])],
-            [Bcube.Tri3_t()],
+            [Tri3_t()],
             Connectivity([3], [1, 2, 3]);
             buildboundaryfaces = true,
             bc_names = Dict(1 => "boundary"),
@@ -410,7 +410,7 @@
                 Node([0.5, 2.0]),
                 Node([2.5, 2.0]),
             ],
-            [Bcube.Quad9_t()],
+            [Quad9_t()],
             Connectivity([9], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
             buildboundaryfaces = true,
             bc_names = Dict(1 => "boundary"),
@@ -443,7 +443,7 @@
                 Node([-0.25, 0.75]),
                 Node([0.75, 0.75]),
             ],
-            [Bcube.Quad9_t()],
+            [Quad9_t()],
             Connectivity([9], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
             buildboundaryfaces = true,
             bc_names = Dict(1 => "boundary"),

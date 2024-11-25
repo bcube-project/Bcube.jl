@@ -86,7 +86,7 @@
 
         # Bar3_t in 3D (checked graphically, see notebook)
         cnodes = [Node([0.0, 0.0, 1.0]), Node([1.0, 0.0, 3.0]), Node([0.5, 0.5, 2.0])]
-        ctype = Bar3_t()
+        ctype = Bcube.Bar3_t()
         @test normal(ctype, cnodes, 1, rand(1)) ≈ 1.0 / 3.0 .* [-1, -2, -2]
         @test normal(ctype, cnodes, 2, rand(1)) ≈ 1.0 / 3.0 .* [1, -2, 2]
     end
