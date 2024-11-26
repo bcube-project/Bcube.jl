@@ -22,8 +22,6 @@ LinearSolve = "1, 2"
 StaticArrays = "1.2"
 Symbolics = "5"
 julia = "1.6"
-JLD2 = "0.4.47"
-HDF5 = "0.17"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
