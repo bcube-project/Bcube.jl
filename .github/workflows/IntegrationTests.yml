@@ -21,7 +21,7 @@ jobs:
         julia-version: [1]
         os: [ubuntu-latest]
         package:
-          - {user: bcube-project, repo: BcubeTutorials.jl}
+          - {user: bcube-project, repo: BcubeTutorials.jl, rev: 0.2}
 
     steps:
       - uses: actions/checkout@v4
