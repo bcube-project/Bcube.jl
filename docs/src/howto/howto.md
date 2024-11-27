@@ -80,6 +80,119 @@ coords = lagrange_dof_to_coords(mesh, 1)
 @show coords[2] # coordinates of dof '2' in the global numbering
 ```
 
+## Loop over the cells or faces of a mesh
+Let's say you have a `Mesh` with one or several limits
+```julia
+using Bcube
+mesh = rectangle_mesh(2, 3)
+Ω = CellDomain(mesh)
+Γ = InteriorFaceDomain(mesh)
+Λ = BoundaryFaceDomain(mesh, ("xmin", "ymin"))
+```
+
+You can loop over the mesh cell and/or faces using the `DomainIterator` iterator associated to any "domain". Each item is either a `CellInfo` or a `FaceInfo` (or a `CellSide`) depending on the nature of the domain. This information contains all the geometric information about the entity:
+```julia
+# Loop over the different domains (to illustrate that it works for different kind of domains)
+for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces in Λ"))
+    println("\n-----------")
+    println(legend)
+    println("-----------")
+
+    # Loop over the elements (cells of faces) in this domain
+    for element in Bcube.DomainIterator(domain)
+
+        # index of the cell/face in the mesh
+        println("")
+        println("Element $(Bcube.get_element_index(element))")
+
+        # show the nodes index forming this element
+        @show Bcube.get_nodes_index(element)
+
+        # array of the "Node" forming this element
+        elt_nodes = Bcube.nodes(element)
+        @show elt_nodes
+
+        # element "entity type" (Bar2_t, Quad4_t etc)
+        elt_type = Bcube.get_element_type(element)
+        @show elt_type
+
+        # element center
+        elt_center = Bcube.center(elt_type, elt_nodes)
+        @show elt_center
+
+        # Additionnal info for faces
+        if element isa Bcube.FaceInfo
+            # Access the CellInfo of the neighbor cell ("negative" cell)
+            # For interior faces only, the "positive" side can be retrieved
+            # as well (with side_p)
+            neighbor_cell_n = side_n(element)
+
+            # We can also retrieve the local index of the face in the neighbor cells
+            # Note that boundary faces only have one neighbor cell, which is on the
+            # negative side by convention.
+            kside = Bcube.get_cell_side_n(element)
+
+            # Normal of the face at the face center using the low level API
+            cell_type = Bcube.get_element_type(neighbor_cell_n)
+            cell_nodes = Bcube.nodes(neighbor_cell_n)
+            @show Bcube.normal(cell_type, cell_nodes, kside, elt_center)
+        end
+    end
+end
+```
+
+## Export face normals to a CSV file
+
+Imagine that you want to export some face normals (of one boundary for instance) in a CSV file to check their orientation. You can get inspiration from this script:
+```julia
+using Bcube
+using DelimitedFiles
+using SparseArrays
+
+# Build a toy mesh and extract some boundaries
+mesh = rectangle_mesh(3, 4)
+Ω = CellDomain(mesh)
+Λ = BoundaryFaceDomain(mesh, ("xmin", "ymin"))
+
+# Get face normals
+nΛ = get_face_normals(Λ)
+
+# Compute : location of face centers, normals and surface of each face
+dΛ = Measure(Λ, 1)
+x = Bcube.compute(∫(side_n(PhysicalFunction(x -> x)))dΛ)
+n = Bcube.compute(∫(side_n(nΛ))dΛ)
+s = Bcube.compute(∫(side_n(PhysicalFunction(x -> 1)))dΛ)
+
+# Get non-zeros values (results are sparse vectors from now)
+_, x = findnz(x)
+_, n = findnz(n)
+_, s = findnz(s)
+
+# Use surface to "correct" x and n
+x = x ./ s
+n = n ./ s
+
+# Prepare data for output
+x = transpose(hcat(x...))
+n = transpose(hcat(n...))
+y = hcat(x, n)
+
+# Write normals as CSV
+a = ("x", "y", "z")[1:Bcube.spacedim(mesh)]
+header = join(a, ",") * "," * join("n" .* a, ",")
+open(joinpath(@__DIR__, "output.csv"), "w") do io
+    println(io, header)
+    writedlm(io, y, ",")
+end
+
+# Write mesh as VTK
+write_vtk(joinpath(@__DIR__, "output"), mesh)
+```
+Note that once the CSV file is obtained, the normals can be visualized for instance with Paraview by using three consecutive filters:
+* `TableToPoints` to convert coordinates into points
+* `Calculator` to convert "normals columns" into vectors (using `iHat`, `jHat` etc)
+* `Glyph` to visualized these vectors
+
 ## Comparing manually the benchmarks with `main`
 
 Let's say you want to compare the performance of your current branch (named "target" hereafter) with the `main` branch (named "baseline" hereafter).
