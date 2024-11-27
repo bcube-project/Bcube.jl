@@ -962,7 +962,7 @@ function _compute_space_dim(topodim, lx, ly, lz, tol, verbose::Bool)
     if topodim == 1
         if (ly / lmax < tol && lz / lmax < tol)
             msg = "Warning : the mesh is flat on the y and z axis. It is now considered 1D."
-            msg *= " (use `spacedim` argument of `read_msh` if you want to keep 2D or 3D coordinates.)"
+            msg *= " (use `spacedim` argument of `read_mesh` if you want to keep 2D or 3D coordinates.)"
             msg *= " Disable this warning with `verbose = false`"
             verbose && println(msg)
 
@@ -974,7 +974,7 @@ function _compute_space_dim(topodim, lx, ly, lz, tol, verbose::Bool)
 
         elseif (ly / lmax > tol && lz / lmax < tol)
             msg = "Warning : the mesh is flat on the z-axis. It is now considered as a 1D mesh in a 2D space."
-            msg *= " (use `spacedim` argument of `read_msh` if you want to keep 3D coordinates.)"
+            msg *= " (use `spacedim` argument of `read_mesh` if you want to keep 3D coordinates.)"
             msg *= " Disable this warning with `verbose = false`"
             verbose && println(msg)
 

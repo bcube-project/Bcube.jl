@@ -1,6 +1,4 @@
 abstract type AbstractIoHandler end
-struct HDF5IoHandler <: AbstractIoHandler end # to be removed
-struct JLD2IoHandler <: AbstractIoHandler end # to be removed
 
 """
     read_file(
@@ -203,6 +201,3 @@ end
 function _filename_to_handler(extension)
     error("Could not find a handler for the extension $extension")
 end
-
-# to be removed :
-_filename_to_handler(::Union{Val{:cgns}, Val{:hdf}, Val{:hdf5}}) = HDF5IoHandler()
