@@ -18,7 +18,7 @@ purpose is to represent a domain to integrate over.
 
 # Constructors
 CellDomain(mesh::Mesh)
-CellDomain(mesh::Mesh, f::Function, all_nodes = true)
+CellDomain(mesh::Mesh, indices)
 
 # Examples
 ```julia-repl
@@ -37,14 +37,6 @@ end
 
 CellDomain(mesh::AbstractMesh) = CellDomain(parent(mesh))
 CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
-
-function CellDomain(mesh::Mesh, f::Function, all_nodes = true)
-    c2n = connectivities_indices(mesh, :c2n)
-    criteria(nodes_coords) = all_nodes ? all(f.(nodes_coords)) : any(f.(nodes_coords))
-    I_cells =
-        findall(icell -> criteria(get_coords.(get_nodes(mesh, c2n[icell]))), 1:ncells(mesh))
-    return CellDomain(mesh, I_cells)
-end
 
 LazyOperators.pretty_name(domain::CellDomain) = "CellDomain"
 
@@ -571,13 +563,36 @@ function _get_index(domain::BoundaryFaceDomain{M, <:PeriodicBCType}, i::Integer)
 end
 
 """
+    identify_cells(mesh::Mesh, f::Function, all_nodes = true)
+
+Identify the cells verifying a given geometrical criteria.
+
+Return the cells indices. The function `f` takes on argument : x, a spatial coordinate.
+
+If `all_nodes` is `true`, then all cells verifying `f(x_i)==true` where `x_i` are the cell
+nodes are selected. On the contrary, if `all_nodes` is `false`, all cells with at least one
+node verifying the criteria are selected.
+"""
+function identify_cells(mesh::Mesh, f::Function, all_nodes = true)
+    c2n = connectivities_indices(mesh, :c2n)
+    criteria(nodes_coords) = all_nodes ? all(f.(nodes_coords)) : any(f.(nodes_coords))
+    I_cells =
+        findall(icell -> criteria(get_coords.(get_nodes(mesh, c2n[icell]))), 1:ncells(mesh))
+    return I_cells
+end
+
+"""
     domain_to_mesh(::AbstractDomain)
 
 Convert an `AbstractDomain` to a `Mesh`.
-"""
-domain_to_mesh(::AbstractDomain) = error("not implemented yet")
 
-function domain_to_mesh(domain::CellDomain)
+The new boundary faces, if any, obtained by selecting a portion of the original mesh are
+tagged with the value of the argument `clipped_bnd_name`.
+"""
+domain_to_mesh(::AbstractDomain, clipped_bnd_name = "CLIPPED_BND") =
+    error("not implemented yet")
+
+function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
     # Note : `_o2n` means "old to new" while `_n2o` means "new to old"
 
     # Alias
@@ -617,8 +632,6 @@ function domain_to_mesh(domain::CellDomain)
         tag => I_nodes_o2n[filter(inode -> hasNode[inode], inodes)] for (tag, inodes) in d1
     )
     bnd_names = filter(((tag, name),) -> tag ∈ keys(bnd_nodes), boundary_names(mesh))
-    # @show d1
-    # @show bnd_nodes
 
     # Assign boundary condition to nodes that were not boundary nodes in the old mesh
     # but are bnd nodes in the new mesh
@@ -634,7 +647,7 @@ function domain_to_mesh(domain::CellDomain)
     end
     tag = maximum(keys(bnd_nodes)) + 1
     bnd_nodes[tag] = unique(I_nodes_o2n[exterior_nodes])
-    bnd_names[tag] = "CLIPPED_BND"
+    bnd_names[tag] = clipped_bnd_name
 
     # New mesh
     return Mesh(
