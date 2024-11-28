@@ -12,6 +12,7 @@ using Printf # just for tmp vtk, to be removed
 # import LinearSolve: solve, solve!, LinearProblem
 import LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
+using NearestNeighbors
 
 const MAX_LENGTH_STATICARRAY = (10^6)
 
@@ -30,19 +31,7 @@ include("./mesh/boundary_condition.jl")
 export BoundaryCondition, PeriodicBCType
 
 include("./mesh/entity.jl")
-export Node_t,
-    Bar2_t,
-    Bar3_t,
-    Tri3_t,
-    Quad4_t,
-    Quad9_t,
-    Tetra4_t,
-    Hexa8_t,
-    Pyra5_t,
-    Poly2_t,
-    Poly3_t,
-    Node,
-    get_coords
+export Node, get_coords
 
 include("./mesh/shape.jl")
 
@@ -67,21 +56,14 @@ export basic_mesh,
     translate,
     translate!
 
-include("./mesh/gmsh_utils.jl")
-export read_msh,
-    read_msh_with_cell_names,
-    gen_line_mesh,
-    gen_rectangle_mesh,
-    gen_hexa_mesh,
-    gen_disk_mesh,
-    gen_star_disk_mesh,
-    gen_cylinder_mesh,
-    read_partitions,
-    gen_rectangle_mesh_with_tri_and_quad
-
 include("./mesh/domain.jl")
 export AbstractDomain,
-    CellDomain, InteriorFaceDomain, BoundaryFaceDomain, get_mesh, get_face_normals
+    CellDomain,
+    InteriorFaceDomain,
+    BoundaryFaceDomain,
+    get_mesh,
+    get_face_normals,
+    get_cell_normals
 
 include("./quadrature/quadrature.jl")
 export QuadratureLobatto, QuadratureLegendre, QuadratureUniform, Quadrature, QuadratureRule
@@ -96,6 +78,8 @@ include("./mapping/mapping.jl")
 
 include("./mapping/ref2phys.jl")
 export get_cell_centers
+
+include("mapping/findpoint.jl")
 
 include("./cellfunction/eval_point.jl")
 
@@ -151,5 +135,7 @@ export linear_scaling_limiter
 
 include("./io/io_interface.jl")
 export read_file, read_mesh, write_file
+
+include("./io/gmsh22_reader.jl")
 
 end

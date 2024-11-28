@@ -119,7 +119,7 @@ mutable struct Mesh{topoDim, spaceDim, C, E, T, M} <: AbstractMesh{topoDim, spac
     bc_nodes::Dict{Int, Vector{Int}}
     bc_faces::Dict{Int, Vector{Int}}
 
-    absolute_indices::Dict{Symbol, Vector{Int}}
+    absolute_indices::Dict{Symbol, Vector{Int}} # should disappear in favor of MeshMetaData
     local_indices::Dict{Symbol, Dict{Int, Int}}
 
     metadata::M

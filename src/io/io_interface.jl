@@ -1,16 +1,14 @@
 abstract type AbstractIoHandler end
-struct GMSHIoHandler <: AbstractIoHandler end # to be removed
-struct HDF5IoHandler <: AbstractIoHandler end # to be removed
-struct JLD2IoHandler <: AbstractIoHandler end # to be removed
 
 """
     read_file(
         [handler::AbstractIoHandler,]
         filepath::String;
-        domainNames = String[],
+        domains = String[],
         varnames = nothing,
         topodim = 0,
         spacedim = 0,
+        verbose = false,
         kwargs...,
     )
 
@@ -20,7 +18,7 @@ Returns a NamedTuple with the following keys:
 * mesh -> the Bcube mesh
 * data -> dictionnary of FlowSolutionName => (dictionnary of VariableName => MeshData)
 
-If `domainNames` is an empty list/array, all the domains found will be read and merged. Otherwise, `domainNames` can be
+If `domains` is an empty list/array, all the domains found will be read and merged. Otherwise, `domains` can be
 a filtered list/array of the domain names to retain.
 
 If `varnames` is set to `nothing`, no variables will be read, which is the behavior of `read_mesh`. To read all the
@@ -39,10 +37,11 @@ result = read_file("file.cgns"; varnames = ["Temperature", "Density"], verbose =
 function read_file(
     handler::AbstractIoHandler,
     filepath::String;
-    domainNames = String[],
+    domains = String[],
     varnames = nothing,
     topodim = 0,
     spacedim = 0,
+    verbose = false,
     kwargs...,
 )
     error(
@@ -50,20 +49,15 @@ function read_file(
     )
 end
 
-function read_file(filepath::String; domainNames = String[], varnames = nothing, kwargs...)
-    read_file(_filename_to_handler(filepath), filepath; domainNames, varnames, kwargs...)
+function read_file(filepath::String; kwargs...)
+    read_file(_filename_to_handler(filepath), filepath; kwargs...)
 end
 
 """
-Similar as `read_file`, but return only the mesh.
+Similar to `read_file`, but return only the mesh.
 """
-function read_mesh(
-    handler::AbstractIoHandler,
-    filepath::String,
-    domainNames = String[],
-    kwargs...,
-)
-    res = read_file(handler, filepath; domainNames, kwargs...)
+function read_mesh(handler::AbstractIoHandler, filepath::String; kwargs...)
+    res = read_file(handler, filepath; kwargs...)
     return res.mesh
 end
 
@@ -207,7 +201,3 @@ end
 function _filename_to_handler(extension)
     error("Could not find a handler for the extension $extension")
 end
-
-# to be removed :
-_filename_to_handler(::Val{:msh}) = GMSHIoHandler()
-_filename_to_handler(::Union{Val{:cgns}, Val{:hdf}, Val{:hdf5}}) = HDF5IoHandler()

@@ -205,6 +205,7 @@ end
         cell2nnodes = [4, 4]
 
         mesh = Mesh(_nodes, ctypes, Connectivity(cell2nnodes, cell2nodes))
+        ν = get_cell_normals(CellDomain(mesh))
 
         fInfo = FaceInfo(mesh, 2) # 2 is the good one, cf `Bcube.get_nodes_index(fInfo)`
         fPoint = Bcube.FacePoint([0.0, 0.0], fInfo, ReferenceDomain())
@@ -220,12 +221,14 @@ end
         R = Bcube.CoplanarRotation()
 
         _R = Bcube.materialize(side_n(R), fPoint)
+        _ν = Bcube.materialize(side_n(ν), fPoint)
         v2 = normalize(get_coords(F) - get_coords(E)) * 2
         u = normalize(get_coords(C) - get_coords(B))
         v2_in_1 = _R * v2
         ν1 = Bcube.cell_normal(ctype_n, cnodes_n, ξ_n)
         @test v2 ⋅ u ≈ v2_in_1 ⋅ u
         @test abs(ν1 ⋅ v2_in_1) < 1e-16
+        @test _ν == ν1
 
         _R = Bcube.materialize(side_p(R), fPoint)
         v1 = normalize(get_coords(D) - get_coords(B)) * 2
@@ -287,4 +290,36 @@ end
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u
         @test abs(ν2 ⋅ v1_in_2) < 1e-16
     end
+end
+
+@testset "Point interpolation" begin
+    degree = 2
+    mesh = read_mesh(
+        joinpath(@__DIR__, "..", "assets", "rectangle-mesh-tri-quad-nx10-ny10.msh22");
+        warn = false,
+    )
+    Uspace = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh; size = 2)
+    Vspace = TestFESpace(Uspace)
+    dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
+    u = FEFunction(Uspace)
+    f1((x, y)) = SA[x + 4y + 1, 7x * x + 2y * x + 2y * y + 3y + 12]
+    projection_l2!(u, PhysicalFunction(f1), dΩ)
+
+    pf_strict = Bcube.PointFinder(mesh; strategy = Bcube.StrictPointFinderStrategy())
+    pf_closest = Bcube.PointFinder(mesh; strategy = Bcube.ClosestPointFinderStrategy())
+
+    npoints = 20
+    xp = [rand(SVector{2}) for i in 1:npoints]
+    xp = [xp..., SA[1.5, 2.0]]
+
+    up_strict = [Bcube.interpolate_at_point(pf_strict, x, u) for x in xp]
+    @test all(f1.(xp[1:(end - 1)]) .≈ up_strict[1:(end - 1)])
+    @test ismissing(up_strict[end])
+
+    up_closest = [Bcube.interpolate_at_point(pf_closest, x, u) for x in xp]
+    @test all(f1.(xp) .≈ up_closest)
+
+    up_multiinputs = [Bcube.interpolate_at_point(pf_closest, x, u, 7 * u) for x in xp]
+    @test all(f1.(xp) .≈ getindex.(up_multiinputs, 1))
+    @test all((7 * f1.(xp)) .≈ getindex.(up_multiinputs, 2))
 end

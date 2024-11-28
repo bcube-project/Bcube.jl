@@ -46,6 +46,8 @@ rawcat(x::Vector{T}) where {T} = x
 
 """
     matrix_2_vector_of_SA(a)
+
+"Reshape" a matrix of size (m,n) into a `Vector` (of size n) of `StaticVector`` (of size m)
 """
 matrix_2_vector_of_SA(a) = vec(reinterpret(SVector{size(a, 1), eltype(a)}, a))
 
