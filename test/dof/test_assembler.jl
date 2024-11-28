@@ -225,10 +225,14 @@
         avg(u) = 0.5 * (side⁺(u) + side⁻(u))
 
         # Build mesh
-        meshParam = (nx = n + 1, ny = n + 1, lx = Lx, ly = Lx, xc = 0.0, yc = 0.0)
-        path = joinpath(tempdir, "mesh.msh")
-        gen_rectangle_mesh(path, :quad; meshParam...)
-        mesh = read_msh(path)
+        mesh = rectangle_mesh(
+            n + 1,
+            n + 1;
+            xmin = -Lx / 2,
+            xmax = Lx / 2,
+            ymin = -Lx / 2,
+            ymax = Lx / 2,
+        )
 
         # Choose degree and define function space, trial space and test space
         fs = FunctionSpace(:Lagrange, degree)
@@ -280,11 +284,15 @@
         Lx = 2.0
 
         # Build mesh
-        meshParam = (nx = n + 1, ny = n + 1, lx = Lx, ly = Lx, xc = 0.0, yc = 0.0)
-        tmp_path = "tmp.msh"
-        gen_rectangle_mesh(tmp_path, :quad; meshParam...)
-        mesh = read_msh(tmp_path)
-        rm(tmp_path)
+        mesh = rectangle_mesh(
+            n + 1,
+            n + 1;
+            xmin = -Lx / 2,
+            xmax = Lx / 2,
+            ymin = -Lx / 2,
+            ymax = Lx / 2,
+            bnd_names = ("West", "East", "South", "North"),
+        )
 
         # Choose degree and define function space, trial space and test space
         degree = 2
@@ -361,9 +369,10 @@
         end
 
         function driver_heat_solver()
-            mesh_path = joinpath(tempdir, "tmp1.msh")
-            gen_hexa_mesh(mesh_path, :tetra; xc = 0.0, yc = 0.0, zc = 0.0)
-            mesh = read_msh(mesh_path)
+            mesh = read_mesh(
+                joinpath(@__DIR__, "..", "assets", "hexa-mesh-tetra-xc0-yc0-zc0.msh22");
+                warn = false,
+            )
 
             λ = 100.0
             η = λ
@@ -375,18 +384,17 @@
             err = heat_solver(mesh, degree, dirichlet_dict, q, η, T_analytical)
             @test err < 1.0e-14
 
-            mesh_path = joinpath(tempdir, "tmp2.msh")
-            gen_hexa_mesh(
-                mesh_path,
-                :hexa;
-                nx = 5,
-                ny = 5,
-                nz = 5,
-                xc = 0.0,
-                yc = 0.0,
-                zc = 0.0,
+            mesh = hexa_mesh(
+                5,
+                5,
+                5;
+                xmin = -0.5,
+                xmax = 0.5,
+                ymin = -0.5,
+                ymax = 0.5,
+                zmin = -0.5,
+                zmax = 0.5,
             )
-            mesh = read_msh(mesh_path)
             degree = 2
             dirichlet_dict = Dict("xmin" => 260.0)
             q = 1500.0

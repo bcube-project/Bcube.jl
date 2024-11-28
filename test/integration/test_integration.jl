@@ -311,7 +311,7 @@
         # Build P2 line (equivalent to one of the edge above)
         lnodes =
             [Node([0.0, 0.0]), Node([0.0, xmax - xmin]), Node([alpha, (xmax - xmin) / 2])]
-        line_mesh = Mesh(lnodes, [Bar3_t()], Connectivity([3], collect(1:3)))
+        line_mesh = Mesh(lnodes, [Bcube.Bar3_t()], Connectivity([3], collect(1:3)))
 
         # Compute analytic arc length
         b = xmax - xmin
@@ -326,9 +326,10 @@
     end
 
     @testset "Sphere" begin
-        path = joinpath(tempdir, "mesh.msh")
-        Bcube.gen_sphere_mesh(path; radius = 1.0)
-        mesh = read_msh(path) # Radius = 1 => area = 4\pi
+        mesh = read_mesh(
+            joinpath(@__DIR__, "..", "assets", "sphere-mesh-r1.msh22");
+            warn = false,
+        )
         c2n = connectivities_indices(mesh, :c2n)
         S = sum(1:ncells(mesh)) do icell
             cInfo = CellInfo(mesh, icell)
@@ -569,10 +570,11 @@
         b = compute(∫(g)dΩ)
         @test b[1] ≈ 0.75
 
-        # Whole cylinder : build a cylinder of radius 1 and length 1, and compute its volume
-        path = joinpath(tempdir, "mesh.msh")
-        gen_cylinder_mesh(path, 1.0, 10)
-        mesh = read_msh(path)
+        # Whole cylinder : read the mesh of a cylinder of radius 1 and length 1, and compute its volume
+        mesh = read_mesh(
+            joinpath(@__DIR__, "..", "assets", "cylinder-mesh-Lz1-nz10.msh22");
+            warn = false,
+        )
 
         dΩ = Measure(CellDomain(mesh), 2)
         g = PhysicalFunction(x -> 1)
