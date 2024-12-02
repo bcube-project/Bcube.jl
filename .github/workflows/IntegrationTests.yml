@@ -21,11 +21,11 @@ jobs:
         julia-version: [1]
         os: [ubuntu-latest]
         package:
-          - {user: bcube-project, repo: BcubeTutorials.jl}
+          - {user: bcube-project, repo: BcubeTutorials.jl, rev: 0.2}
 
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.julia-version }}
           arch: x64

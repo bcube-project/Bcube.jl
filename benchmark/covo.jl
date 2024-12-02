@@ -5,7 +5,6 @@ const dir = string(@__DIR__, "/")
 using Bcube
 using LinearAlgebra
 using StaticArrays
-using WriteVTK # only for 'VTKCellData'
 using Profile
 using StaticArrays
 using InteractiveUtils
@@ -220,53 +219,6 @@ function covo!(q, dΩ)
     return nothing
 end
 
-"""
-    Tiny struct to ease the VTK output
-"""
-mutable struct VtkHandler
-    basename::Any
-    ite::Any
-    VtkHandler(basename) = new(basename, 0)
-end
-
-"""
-    Write solution to vtk
-    Wrapper for `write_vtk`
-"""
-function append_vtk(vtk, mesh, vars, t, params)
-    ρ, ρu, ρE, ϕ = vars
-
-    mesh_degree = 1
-    vtk_degree = maximum(x -> get_degree(Bcube.get_function_space(get_fespace(x))), vars)
-    vtk_degree = max(1, mesh_degree, vtk_degree)
-
-    _ρ = var_on_nodes_discontinuous(ρ, mesh, vtk_degree)
-    _ρu = var_on_nodes_discontinuous(ρu, mesh, vtk_degree)
-    _ρE = var_on_nodes_discontinuous(ρE, mesh, vtk_degree)
-    _ϕ = var_on_nodes_discontinuous(ϕ, mesh, vtk_degree)
-
-    _p = pressure.(_ρ, _ρu, _ρE, γ)
-    dict_vars_dg = Dict(
-        "rho" => (_ρ, VTKPointData()),
-        "rhou" => (_ρu, VTKPointData()),
-        "rhoE" => (_ρE, VTKPointData()),
-        "phi" => (_ϕ, VTKPointData()),
-        "p" => (_p, VTKPointData()),
-    )
-    Bcube.write_vtk_discontinuous(
-        vtk.basename * "_DG",
-        vtk.ite,
-        t,
-        mesh,
-        dict_vars_dg,
-        vtk_degree;
-        append = vtk.ite > 0,
-    )
-
-    # Update counter
-    vtk.ite += 1
-end
-
 # Settings
 if get(ENV, "BenchmarkMode", "false") == "false" #hide
     const cellfactor = 1
@@ -302,27 +254,32 @@ const l = 0.05 # half-width of the domain
 const Δt = CFL * 2 * l / (nx - 1) / ((1 + β) * U₀ + c₀) / (2 * degree + 1)
 #const Δt = 5.e-7
 const nout = 100 # Number of time steps to save
-const outputpath = "../myout/covo/"
-const output = joinpath(@__DIR__, outputpath, "covo_deg$degree")
 const nite = Int(floor(nperiod * 2 * l / (U₀ * Δt))) + 1
 
 function run_covo()
     println("Starting run_covo...")
 
     # Build mesh
-    meshParam = (nx = nx, ny = ny, lx = 2l, ly = 2l, xc = 0.0, yc = 0.0)
-    tmp_path = "tmp.msh"
-    if get(ENV, "BenchmarkMode", "false") == "false" #hide
-        gen_rectangle_mesh(tmp_path, :quad; meshParam...)
-    else #hide
-        if get(ENV, "MeshConfig", "quad") == "triquad" #hide
-            gen_rectangle_mesh_with_tri_and_quad(tmp_path; meshParam...) #hide
-        else #hide
-            gen_rectangle_mesh(tmp_path, :quad; meshParam...) #hide
-        end #hide
+    mesh = rectangle_mesh(
+        nx,
+        ny;
+        xmin = -l,
+        xmax = l,
+        ymin = -l,
+        ymax = l,
+        bnd_names = ("West", "East", "South", "North"),
+    )
+    if (get(ENV, "BenchmarkMode", "false") == "true") &&
+       (get(ENV, "MeshConfig", "quad") == "triquad") #hide
+        mesh = read_mesh(
+            joinpath(
+                @__DIR__,
+                "assets",
+                "rectangle-mesh-tri-quad-nx129-ny129-lx1e-1-ly1e-1.msh22",
+            );
+            warn = false,
+        )
     end #hide
-    mesh = read_msh(tmp_path)
-    rm(tmp_path)
 
     # Define variables and test functions
     fs = FunctionSpace(fspace, degree)
@@ -351,10 +308,6 @@ function run_covo()
 
     params = (dΩ = dΩ, dΓ = dΓ, dΓ_perio_x = dΓ_perio_x, dΓ_perio_y = dΓ_perio_y)
 
-    # Init vtk
-    isdir(joinpath(@__DIR__, outputpath)) || mkpath(joinpath(@__DIR__, outputpath))
-    vtk = VtkHandler(output)
-
     # Init solution
     t = 0.0
 
@@ -366,9 +319,6 @@ function run_covo()
     if get(ENV, "BenchmarkMode", "false") == "true" #hide
         return u, U, V, params, cache
     end
-
-    # Write initial solution
-    append_vtk(vtk, mesh, u, t, params)
 
     # Time loop
     for i in 1:nite
@@ -389,12 +339,6 @@ function run_covo()
         set_dof_values!(u, unew)
 
         t += Δt
-
-        # Write solution to file
-        if (i % Int(max(floor(nite / nout), 1)) == 0)
-            println("--> VTK export")
-            append_vtk(vtk, mesh, u, t, params)
-        end
     end
 
     # Summary and benchmark                                 # ndofs total = 20480
@@ -418,7 +362,6 @@ function run_covo()
 end
 
 if get(ENV, "BenchmarkMode", "false") == "false"
-    mkpath(outputpath)
     run_covo()
 end
 

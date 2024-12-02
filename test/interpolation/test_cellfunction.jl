@@ -291,3 +291,35 @@ end
         @test abs(ν2 ⋅ v1_in_2) < 1e-16
     end
 end
+
+@testset "Point interpolation" begin
+    degree = 2
+    mesh = read_mesh(
+        joinpath(@__DIR__, "..", "assets", "rectangle-mesh-tri-quad-nx10-ny10.msh22");
+        warn = false,
+    )
+    Uspace = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh; size = 2)
+    Vspace = TestFESpace(Uspace)
+    dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
+    u = FEFunction(Uspace)
+    f1((x, y)) = SA[x + 4y + 1, 7x * x + 2y * x + 2y * y + 3y + 12]
+    projection_l2!(u, PhysicalFunction(f1), dΩ)
+
+    pf_strict = Bcube.PointFinder(mesh; strategy = Bcube.StrictPointFinderStrategy())
+    pf_closest = Bcube.PointFinder(mesh; strategy = Bcube.ClosestPointFinderStrategy())
+
+    npoints = 20
+    xp = [rand(SVector{2}) for i in 1:npoints]
+    xp = [xp..., SA[1.5, 2.0]]
+
+    up_strict = [Bcube.interpolate_at_point(pf_strict, x, u) for x in xp]
+    @test all(f1.(xp[1:(end - 1)]) .≈ up_strict[1:(end - 1)])
+    @test ismissing(up_strict[end])
+
+    up_closest = [Bcube.interpolate_at_point(pf_closest, x, u) for x in xp]
+    @test all(f1.(xp) .≈ up_closest)
+
+    up_multiinputs = [Bcube.interpolate_at_point(pf_closest, x, u, 7 * u) for x in xp]
+    @test all(f1.(xp) .≈ getindex.(up_multiinputs, 1))
+    @test all((7 * f1.(xp)) .≈ getindex.(up_multiinputs, 2))
+end

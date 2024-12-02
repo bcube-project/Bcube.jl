@@ -73,10 +73,12 @@ get_fespace(cache::CellMeanCache) = cache.feSpace
 get_measure(cache::CellMeanCache) = cache.measure
 get_mass_matrix(cache::CellMeanCache) = cache.massMatrix
 
-function build_cell_mean_cache(u::AbstractSingleFieldFEFunction, dΩ::Measure)
+function build_cell_mean_cache(u::AbstractLazy, dΩ::Measure)
     mesh = get_mesh(get_domain(dΩ))
     fs = FunctionSpace(:Lagrange, 0)
-    ncomp = get_ncomponents(get_fespace(u))
+    _, N = get_return_type_and_codim(u, mesh)
+    @assert length(N) == 1 "ncomponents > 1 not supported yet"
+    ncomp = first(N)
     Umean = TrialFESpace(fs, mesh, :discontinuous; size = ncomp)
     Vmean = TestFESpace(Umean)
     mass = factorize(build_mass_matrix(Umean, Vmean, dΩ))
@@ -104,9 +106,11 @@ function cell_mean(u::MultiFieldFEFunction, cache::Tuple{Vararg{CellMeanCache}})
         cell_mean(uᵢ, cacheᵢ)
     end
 end
-function cell_mean(u::AbstractFEFunction, cache::CellMeanCache)
+function cell_mean(u::AbstractLazy, cache::CellMeanCache)
     Umean = get_fespace(cache)
-    u_mean = FEFunction(Umean, get_dof_type(u))
+    dΩ = get_measure(cache)
+    T, _ = get_return_type_and_codim(u, get_domain(dΩ))
+    u_mean = FEFunction(Umean, T)
     projection_l2!(u_mean, u, get_measure(cache); mass = get_mass_matrix(cache))
     values = _reshape_cell_mean(u_mean, Val(get_size(Umean)))
     return MeshCellData(values)

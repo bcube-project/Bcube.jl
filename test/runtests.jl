@@ -4,7 +4,6 @@ using StaticArrays
 using LinearAlgebra
 using DelimitedFiles
 using ForwardDiff
-using SHA: sha1
 using SparseArrays
 using WriteVTK
 
@@ -127,14 +126,14 @@ import Bcube:
     topodim,
     Triangle,
     ∂λξ_∂ξ,
-    ∂λξ_∂x
+    ∂λξ_∂x,
+    Bar2_t,
+    Tri3_t,
+    Quad4_t,
+    Quad9_t
 
 # This dir will be removed at the end of the tests
 tempdir = mktempdir()
-
-# Reading sha1 checksums
-f = readdlm(joinpath(@__DIR__, "checksums.sha1"), String)
-fname2sum = Dict(r[2] => r[1] for r in eachrow(f))
 
 @testset "Bcube.jl" begin
     custom_include("./test_utils.jl")
@@ -143,7 +142,6 @@ fname2sum = Dict(r[2] => r[1] for r in eachrow(f))
     custom_include("./mesh/test_transformation.jl")
     custom_include("./mesh/test_mesh.jl")
     custom_include("./mesh/test_mesh_generator.jl")
-    custom_include("./mesh/test_gmsh.jl")
     custom_include("./mesh/test_domain.jl")
     custom_include("./mapping/test_mapping.jl")
     custom_include("./mapping/test_ref2phys.jl")
@@ -163,7 +161,6 @@ fname2sum = Dict(r[2] => r[1] for r in eachrow(f))
     custom_include("./dof/test_dirichlet.jl")
     custom_include("./operator/test_algebra.jl")
     custom_include("./dof/test_meshdata.jl")
-    custom_include("./writers/test_vtk.jl")
 
     @testset "Issues" begin
         custom_include("./issues/issue_112.jl")

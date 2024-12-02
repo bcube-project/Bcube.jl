@@ -55,9 +55,10 @@
     end
 
     @testset "2D_Triangle" begin
-        path = joinpath(tempdir, "mesh.msh")
-        gen_rectangle_mesh(path, :tri; nx = 3, ny = 4)
-        mesh = read_msh(path)
+        mesh = read_mesh(
+            joinpath(@__DIR__, "..", "assets", "rectangle-mesh-tri-nx3-ny4.msh22");
+            warn = false,
+        )
         Ω = CellDomain(mesh)
         dΩ = Measure(Ω, 2)
 

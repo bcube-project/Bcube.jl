@@ -426,6 +426,7 @@ Return a LazyOperator representing a face normal
 get_face_normals(::AbstractFaceDomain) = FaceNormal()
 
 """
+    get_cell_normals(::AbstractMesh)
     get_cell_normals(::AbstractCellDomain)
     get_cell_normals(::Measure{<:AbstractCellDomain})
 
@@ -437,6 +438,8 @@ function get_cell_normals(domain::AbstractCellDomain)
     @assert topodim(mesh) < spacedim(mesh) "get_cell_normals on a CellDomain has only sense when dealing with hypersurface, maybe you confused it with get_face_normals?"
     return CellNormal()
 end
+
+get_cell_normals(mesh::Mesh) = get_cell_normals(CellDomain(mesh))
 
 abstract type AbstractDomainIterator{D <: AbstractDomain} end
 get_domain(iter::AbstractDomainIterator) = iter.domain
