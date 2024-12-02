@@ -567,7 +567,7 @@ end
 
 Identify the cells verifying a given geometrical criteria.
 
-Return the cells indices. The function `f` takes on argument : x, a spatial coordinate.
+Return the cells indices. The function `f` takes one argument : x, a spatial coordinate.
 
 If `all_nodes` is `true`, then all cells verifying `f(x_i)==true` where `x_i` are the cell
 nodes are selected. On the contrary, if `all_nodes` is `false`, all cells with at least one
