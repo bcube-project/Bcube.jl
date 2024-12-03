@@ -16,6 +16,10 @@ abstract type AbstractCellDomain{M, I} <: AbstractDomain{M} end
 A `CellDomain` is a representation of the cells of a mesh. It's primary
 purpose is to represent a domain to integrate over.
 
+# Constructors
+CellDomain(mesh::Mesh)
+CellDomain(mesh::Mesh, indices)
+
 # Examples
 ```julia-repl
 julia> mesh = rectangle_mesh(10, 10)
@@ -30,8 +34,10 @@ struct CellDomain{M, I} <: AbstractCellDomain{M, I}
     CellDomain(mesh, indices) = new{typeof(mesh), typeof(indices)}(mesh, indices)
 end
 @inline topodim(d::CellDomain) = topodim(get_mesh(d))
+
 CellDomain(mesh::AbstractMesh) = CellDomain(parent(mesh))
 CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
+
 LazyOperators.pretty_name(domain::CellDomain) = "CellDomain"
 
 abstract type AbstractFaceDomain{M} <: AbstractDomain{M} end
@@ -557,4 +563,101 @@ function _get_index(domain::BoundaryFaceDomain{M, <:PeriodicBCType}, i::Integer)
     _f2n = bnd_f2n1[i]
 
     return FaceInfo(cellinfo1, cellinfo2, cside_i, cside_j, ftype, fnodes, _f2n, iface)
+end
+
+"""
+    identify_cells(mesh::Mesh, f::Function, all_nodes = true)
+
+Identify the cells verifying a given geometrical criteria.
+
+Return the cells indices. The function `f` takes one argument : x, a spatial coordinate.
+
+If `all_nodes` is `true`, then all cells verifying `f(x_i)==true` where `x_i` are the cell
+nodes are selected. On the contrary, if `all_nodes` is `false`, all cells with at least one
+node verifying the criteria are selected.
+"""
+function identify_cells(mesh::Mesh, f::Function, all_nodes = true)
+    c2n = connectivities_indices(mesh, :c2n)
+    criteria(nodes_coords) = all_nodes ? all(f.(nodes_coords)) : any(f.(nodes_coords))
+    I_cells =
+        findall(icell -> criteria(get_coords.(get_nodes(mesh, c2n[icell]))), 1:ncells(mesh))
+    return I_cells
+end
+
+"""
+    domain_to_mesh(::AbstractDomain)
+
+Convert an `AbstractDomain` to a `Mesh`.
+
+The new boundary faces, if any, obtained by selecting a portion of the original mesh are
+tagged with the value of the argument `clipped_bnd_name`.
+"""
+domain_to_mesh(::AbstractDomain, clipped_bnd_name = "CLIPPED_BND") =
+    error("not implemented yet")
+
+function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
+    # Note : `_o2n` means "old to new" while `_n2o` means "new to old"
+
+    # Alias
+    mesh = get_mesh(domain)
+    I_cells_n2o = indices(domain)
+    c2n = connectivities_indices(mesh, :c2n)
+    f2c = connectivities_indices(mesh, :f2c)
+    f2n = connectivities_indices(mesh, :f2n)
+
+    # Build a boolean array indicating if a given cell belongs to the new mesh
+    # (could use sparse vector, but is it necessary for Bool?)
+    hasCell = zeros(Bool, ncells(mesh))
+    hasCell[I_cells_n2o] .= true
+
+    # Build the node correspondances new -> old and old -> new
+    n2c, k = inverse_connectivity(c2n)
+    inv_k = invperm(k)
+    I_nodes_n2o = findall(inode -> any(view(hasCell, n2c[inv_k[inode]])), 1:nnodes(mesh))
+    I_nodes_o2n = zeros(eltype(I_nodes_n2o), 1:nnodes(mesh))
+    I_nodes_o2n[I_nodes_n2o] .= collect(1:length(I_nodes_n2o))
+
+    # Build a boolean array indicating if a given node belongs to the new mesh
+    # (could use sparse vector, but is it necessary for Bool?)
+    hasNode = zeros(Bool, nnodes(mesh))
+    hasNode[I_nodes_n2o] .= true
+
+    # Cell connectivity and types
+    _c2n_new = [I_nodes_o2n[c2n[icell]] for icell in I_cells_n2o]
+    c2n_new = Connectivity([length(x) for x in _c2n_new], vcat(_c2n_new...))
+    ctypes = cells(mesh)[I_cells_n2o]
+
+    # Filter bc nodes
+    # First, we filter to remove bnd conditions that does not exist in the new mesh
+    # Second, we remove non-existing nodes from the boundary
+    d1 = filter(((tag, inodes),) -> any(view(hasNode, inodes)), boundary_nodes(mesh))
+    bnd_nodes = Dict(
+        tag => I_nodes_o2n[filter(inode -> hasNode[inode], inodes)] for (tag, inodes) in d1
+    )
+    bnd_names = filter(((tag, name),) -> tag ∈ keys(bnd_nodes), boundary_names(mesh))
+
+    # Assign boundary condition to nodes that were not boundary nodes in the old mesh
+    # but are bnd nodes in the new mesh
+    exterior_nodes = Int[]
+    _inner_faces = inner_faces(mesh)
+    for iface in _inner_faces
+        icells = f2c[iface]
+        # If the face has only neighbor cell from the new mesh, it means
+        # that it is a boundary face
+        if count(view(hasCell, icells)) == 1
+            push!(exterior_nodes, f2n[iface]...)
+        end
+    end
+    tag = maximum(keys(bnd_nodes)) + 1
+    bnd_nodes[tag] = unique(I_nodes_o2n[exterior_nodes])
+    bnd_names[tag] = clipped_bnd_name
+
+    # New mesh
+    return Mesh(
+        get_nodes(mesh)[I_nodes_n2o],
+        ctypes,
+        c2n_new;
+        bc_names = bnd_names,
+        bc_nodes = bnd_nodes,
+    )
 end
