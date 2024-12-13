@@ -19,8 +19,9 @@ where `dΩ` is the measure defined on the `CellDomain` of the `mesh` with a degr
 If `degree` is not given, the default value is set to `2d+1` where `d`
 is the degree of the `function_space` of `u`.
 
-Keyword argument `mass` could be used to give a precomputed matrix for
-the left-hand term ``∫(u ⋅ v)dΩ``.
+Keyword argument `mass` could be used to give a precomputed matrix for the left-hand term ``∫(u ⋅ v)dΩ``.
+Note that if `u` is a `MultiFieldFEFunction`, then `mass` must be a `Tuple` of the mass matrices of each
+FESpace constituting the `MultiFESpace` of `u` (and not the mass matrix of the whole `MultiFESpace`).
 """
 function projection_l2!(u::AbstractSingleFieldFEFunction, f, mesh::AbstractMesh; kwargs...)
     degree = 2 * get_degree(get_function_space(get_fespace(u))) + 1
@@ -47,6 +48,7 @@ function projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass 
         a(u, v) = ∫(u ⋅ v)dΩ
         A = assemble_bilinear(a, U, V)
     else
+        @assert mass isa AbstractMatrix "`mass` must be a matrix. If you use `projection_l2!` on a `MultiFieldFEFunction`, make sure to provide a Tuple of mass matrices and not the whole system matrix."
         A = mass
     end
     l(v) = ∫(f ⋅ v)dΩ
