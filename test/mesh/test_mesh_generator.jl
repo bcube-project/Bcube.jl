@@ -27,9 +27,11 @@
     nx = 3
     ny = 4
     nz = 5
-    mesh = hexa_mesh(3, 4, 5)
+    mesh = hexa_mesh(nx, ny, nz)
     @test nnodes(mesh) == nx * ny * nz
     @test ncells(mesh) == (nx - 1) * (ny - 1) * (nz - 1)
+    @test length(boundary_faces(mesh, "xmin")) == (ny - 1) * (nz - 1)
+    @test length(boundary_faces(mesh, "ymin")) == (nx - 1) * (nz - 1)
 
     # Not working (maybe the structure comparison is too hard,
     # or maybe it does not compare object properties but objects themselves)

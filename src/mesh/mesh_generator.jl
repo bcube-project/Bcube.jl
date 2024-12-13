@@ -383,6 +383,23 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     )
 end
 
+"""
+    hexa_mesh(
+        nx,
+        ny,
+        nz;
+        xmin = 0.0,
+        xmax = 1.0,
+        ymin = 0.0,
+        ymax = 1.0,
+        zmin = 0.0,
+        zmax = 1.0,
+        order = 1,
+        bnd_names = ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"),
+    )
+
+Mesh a hexahedral domain with hexahedral mesh elements.
+"""
 function hexa_mesh(
     nx,
     ny,
@@ -424,13 +441,15 @@ function hexa_mesh(
                     push!(tag2nodes[1], iglob)
                 elseif ix == nx
                     push!(tag2nodes[2], iglob)
-                elseif iy == 1
+                end
+                if iy == 1
                     push!(tag2nodes[3], iglob)
                 elseif iy == ny
                     push!(tag2nodes[4], iglob)
-                elseif iz == 1
+                end
+                if iz == 1
                     push!(tag2nodes[5], iglob)
-                elseif iz == ny
+                elseif iz == nz
                     push!(tag2nodes[6], iglob)
                 end
 
