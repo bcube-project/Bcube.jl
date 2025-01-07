@@ -110,14 +110,14 @@ get_zone_element_indices(::DefaultMeshMetaData, mesh::AbstractMesh, name) = 1:nc
 `bc_nodes` : <boundary tag> => <boundary nodes tags>
 `bc_faces` : <boundary tag> => <boundary faces tags>
 """
-mutable struct Mesh{topoDim, spaceDim, C, E, T, M} <: AbstractMesh{topoDim, spaceDim}
-    nodes::Vector{Node{spaceDim, T}}
+struct Mesh{topoDim, spaceDim, N, C, E, T, M} <: AbstractMesh{topoDim, spaceDim}
+    nodes::N
     entities::E
     connectivities::C
 
-    bc_names::Dict{Int, String}
-    bc_nodes::Dict{Int, Vector{Int}}
-    bc_faces::Dict{Int, Vector{Int}}
+    bc_names::Vector{String}
+    bc_nodes::Vector{Vector{Int}}
+    bc_faces::Vector{Vector{Int}}
 
     absolute_indices::Dict{Symbol, Vector{Int}} # should disappear in favor of MeshMetaData
     local_indices::Dict{Symbol, Dict{Int, Int}}
@@ -127,7 +127,7 @@ end
 
 function Mesh(
     topoDim::Int,
-    nodes::Vector{Node{spaceDim, T}},
+    nodes::AbstractVector{<:Node{spaceDim, T}},
     celltypes::Vector{E},
     cell2node::C,
     buildfaces::Bool,
@@ -165,13 +165,21 @@ function Mesh(
     absolute_indices = Dict{Symbol, Vector{Int}}()
     local_indices = Dict{Symbol, Dict{Int, Int}}()
 
-    Mesh{topoDim, spaceDim, typeof(connectivities), typeof(entities), T, typeof(metadata)}(
+    Mesh{
+        topoDim,
+        spaceDim,
+        typeof(nodes),
+        typeof(connectivities),
+        typeof(entities),
+        T,
+        typeof(metadata),
+    }(
         nodes,
         entities,
         connectivities,
-        bc_names,
-        bc_nodes,
-        _bc_faces,
+        collect(values(bc_names)),
+        collect(values(bc_nodes)),
+        collect(values(_bc_faces)),
         absolute_indices,
         local_indices,
         metadata,
@@ -180,7 +188,7 @@ end
 
 function Mesh(
     nodes,
-    celltypes::Vector{E},
+    celltypes::E,
     cell2nodes::C;
     buildfaces::Bool = true,
     buildboundaryfaces::Bool = false,
@@ -188,7 +196,7 @@ function Mesh(
     bc_nodes::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
     bc_faces::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
     metadata::AbstractMeshMetaData = DefaultMeshMetaData(),
-) where {E <: AbstractEntityType, C <: AbstractConnectivity}
+) where {E <: AbstractVector{<:AbstractEntityType}, C <: AbstractConnectivity}
     topoDim = topodim(valtype(celltypes))
     if buildboundaryfaces
         @assert (!isempty(bc_names) && !isempty(bc_nodes)) "bc_names and bc_nodes must be provided to build boundary faces"
