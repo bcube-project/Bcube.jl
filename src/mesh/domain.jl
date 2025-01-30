@@ -648,7 +648,7 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
             push!(exterior_nodes, f2n[iface]...)
         end
     end
-    tag = maximum(keys(bnd_nodes)) + 1
+    tag = length(bnd_nodes) > 0 ? maximum(keys(bnd_nodes)) + 1 : 1
     bnd_nodes[tag] = unique(I_nodes_o2n[exterior_nodes])
     bnd_names[tag] = clipped_bnd_name
 
