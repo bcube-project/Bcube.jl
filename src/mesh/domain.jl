@@ -601,6 +601,7 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
     # Alias
     mesh = get_mesh(domain)
     I_cells_n2o = indices(domain)
+    @assert length(I_cells_n2o) > 0 "No cells in domain : `indices(domain)` is empty"
     c2n = connectivities_indices(mesh, :c2n)
     f2c = connectivities_indices(mesh, :f2c)
     f2n = connectivities_indices(mesh, :f2n)
