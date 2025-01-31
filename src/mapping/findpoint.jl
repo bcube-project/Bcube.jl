@@ -2,10 +2,11 @@ abstract type AbstractPointFinderStrategy end
 struct StrictPointFinderStrategy <: AbstractPointFinderStrategy end
 struct ClosestPointFinderStrategy <: AbstractPointFinderStrategy end
 
-struct PointFinder{T, M, S}
+struct PointFinder{T, M, S, C}
     tree::T
     mesh::M
     strategy::S
+    c2c_n::C
 end
 
 """
@@ -39,13 +40,18 @@ function PointFinder(
         length(xc0),
     )
     tree = KDTree(xc; leafsize = 10)
-    PointFinder{typeof(tree), typeof(mesh), typeof(strategy)}(tree, mesh, strategy)
+    c2c_n = connectivity_cell2cell_by_nodes(mesh)
+    PointFinder{typeof(tree), typeof(mesh), typeof(strategy), typeof(c2c_n)}(
+        tree,
+        mesh,
+        strategy,
+        c2c_n,
+    )
 end
 
 function find_cell_index(pf::PointFinder, x)
     idxs, dists = knn(pf.tree, x, 1)
-    c2c_n = connectivity_cell2cell_by_nodes(pf.mesh)
-    cellids = [idxs[1], c2c_n[idxs[1]]...]
+    cellids = [idxs[1], pf.c2c_n[idxs[1]]...]
     for icell in cellids
         cinfo = CellInfo(pf.mesh, icell)
         cpoint = CellPoint(x, cinfo, PhysicalDomain())
