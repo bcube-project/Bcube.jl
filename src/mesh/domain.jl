@@ -601,6 +601,7 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
     # Alias
     mesh = get_mesh(domain)
     I_cells_n2o = indices(domain)
+    @assert length(I_cells_n2o) > 0 "No cells in domain : `indices(domain)` is empty"
     c2n = connectivities_indices(mesh, :c2n)
     f2c = connectivities_indices(mesh, :f2c)
     f2n = connectivities_indices(mesh, :f2n)
@@ -648,7 +649,7 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
             push!(exterior_nodes, f2n[iface]...)
         end
     end
-    tag = maximum(keys(bnd_nodes)) + 1
+    tag = length(bnd_nodes) > 0 ? maximum(keys(bnd_nodes)) + 1 : 1
     bnd_nodes[tag] = unique(I_nodes_o2n[exterior_nodes])
     bnd_names[tag] = clipped_bnd_name
 
