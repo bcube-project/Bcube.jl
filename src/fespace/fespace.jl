@@ -590,6 +590,9 @@ function _build_mapping_SoA(feSpaces::Tuple{Vararg{TrialOrTest}}, ncells::Int)
     return ndofs, mapping
 end
 
+function build_jacobian_sparsity_pattern(u::AbstractSingleFESpace, mesh::AbstractMesh)
+    build_jacobian_sparsity_pattern(MultiFESpace(u), mesh)
+end
 function build_jacobian_sparsity_pattern(u::AbstractMultiFESpace, mesh::AbstractMesh)
     build_jacobian_sparsity_pattern(parent(u), parent(mesh))
 end
