@@ -48,7 +48,7 @@ function projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass 
         a(u, v) = ∫(u ⋅ v)dΩ
         A = assemble_bilinear(a, U, V)
     else
-        @assert mass isa AbstractMatrix "`mass` must be a matrix. If you use `projection_l2!` on a `MultiFieldFEFunction`, make sure to provide a Tuple of mass matrices and not the whole system matrix."
+        @assert mass isa Union{AbstractMatrix, Factorization} "`mass` must be a matrix. If you use `projection_l2!` on a `MultiFieldFEFunction`, make sure to provide a Tuple of mass matrices and not the whole system matrix."
         A = mass
     end
     l(v) = ∫(f ⋅ v)dΩ
