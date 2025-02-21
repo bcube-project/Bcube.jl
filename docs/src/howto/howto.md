@@ -61,8 +61,7 @@ Bcube.show_lazy_operator(op_cell)
 ## Get the coordinates of Lagrange dofs
 For a **Lagrange** "uniform" function space, the dofs corresponds to vertices. The following `lagrange_dof_to_coords` function returns a matrix : each line contains the coordinates of the dof corresponding to the line number.
 ```julia
-function lagrange_dof_to_coords(mesh, degree)
-    U = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh)
+function lagrange_dof_to_coords(U, mesh)
     coords = map(1:Bcube.spacedim(mesh)) do i
         f = PhysicalFunction(x -> x[i])
         u = FEFunction(U)
@@ -76,7 +75,8 @@ For instance:
 ```julia
 using Bcube
 mesh = rectangle_mesh(2, 3; xmin = 1, xmax = 2, ymin = 3, ymax = 5)
-coords = lagrange_dof_to_coords(mesh, 1)
+U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+coords = lagrange_dof_to_coords(U, mesh)
 @show coords[2] # coordinates of dof '2' in the global numbering
 ```
 
