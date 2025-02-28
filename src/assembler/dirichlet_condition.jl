@@ -1,6 +1,14 @@
 
 """
-Assemble a vector of zeros dofs except on boundary dofs where they take the Dirichlet values.
+    assemble_dirichlet_vector(
+        U,
+        V,
+        mesh::AbstractMesh,
+        t::Number = 0.0;
+        dt_derivative_order::Int = 0,
+    )
+
+Assemble a `SparseVector` whose entries corresponding to boundary dofs take the Dirichlet values.
 """
 function assemble_dirichlet_vector(
     U,
@@ -9,7 +17,7 @@ function assemble_dirichlet_vector(
     t::Number = 0.0;
     dt_derivative_order::Int = 0,
 )
-    d = allocate_dofs(U)
+    d = spzeros(get_ndofs(U))
     apply_dirichlet_to_vector!(d, U, V, mesh, t; dt_derivative_order)
     return d
 end
