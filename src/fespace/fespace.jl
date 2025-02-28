@@ -639,8 +639,8 @@ function _build_jacobian_sparsity_pattern_AoS(u::AbstractMultiFESpace, mesh)
             end
         end
     end
-
-    return sparse(I, J, 1.0)
+    m = n = get_ndofs(u)
+    return sparse(I, J, 1.0, m, n, max)
 end
 
 function _build_jacobian_sparsity_pattern_SoA(u::MultiFESpace, mesh)

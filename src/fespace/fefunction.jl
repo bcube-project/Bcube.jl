@@ -195,6 +195,13 @@ function set_dof_values!(mfeFunc::MultiFieldFEFunction, u::AbstractVector)
     end
 end
 
+function set_dof_values!(
+    mfeFunc::MultiFieldFEFunction{S, FEF, <:AbstractMultiFESpace{N}},
+    u::Vararg{AbstractVector, N},
+) where {S, FEF, N}
+    foreach(set_dof_values!, get_fe_functions(mfeFunc), u)
+end
+
 Base.iterate(mfeFunc::MultiFieldFEFunction) = iterate(get_fe_functions(mfeFunc))
 function Base.iterate(mfeFunc::MultiFieldFEFunction, state)
     iterate(get_fe_functions(mfeFunc), state)
