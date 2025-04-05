@@ -30,6 +30,7 @@
     @testset "domain-to-mesh" begin
         mesh = rectangle_mesh(3, 4)
 
+        # CellDomain
         f(x) = norm(x) > 0.5
         ind = Bcube.identify_cells(mesh, f)
         Ω = CellDomain(mesh, ind)
@@ -45,6 +46,17 @@
         @test Bcube.boundary_faces(new_mesh, "xmax") == [2, 9]
         @test "ymin" ∉ values(boundary_names(new_mesh))
         @test Bcube.boundary_faces(new_mesh, "ymax") == [7, 10]
+
+        # BoundaryFaceDomain
+        Γ = BoundaryFaceDomain(mesh, ("xmin", "ymax"))
+        new_mesh = Bcube.domain_to_mesh(Γ)
+
+        @test nnodes(new_mesh) == 6
+        @test ncells(new_mesh) == 5
+        @test Bcube.inner_faces(new_mesh) == [1, 3, 4, 5]
+        @test Bcube.outer_faces(new_mesh) == [2, 6]
+        @test Bcube.boundary_faces(new_mesh, "xmax") == [6]
+        @test Bcube.boundary_faces(new_mesh, "ymin") == [2]
     end
 
     @testset "subdomains" begin

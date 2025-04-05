@@ -853,18 +853,18 @@ function identify_cells(mesh::Mesh, f::Function, all_nodes = true)
 end
 
 """
-    domain_to_mesh(::AbstractDomain)
+    domain_to_mesh(::AbstractDomain; kwargs...)
 
 Convert an `AbstractDomain` to a `Mesh`.
 
-The new boundary faces, if any, obtained by selecting a portion of the original mesh are
-tagged with the value of the argument `clipped_bnd_name`.
-"""
-function domain_to_mesh(::AbstractDomain, clipped_bnd_name = "CLIPPED_BND")
-    error("not implemented yet")
-end
+For an `AbstractCellDomain`, The new boundary faces, if any, obtained by selecting a portion of the original mesh are
+tagged with the value of the keyword argument `clipped_bnd_name`.
 
-function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
+For a `BoundaryFaceDomain`, the new boundary faces (with respect to this domain) are tagged.
+"""
+domain_to_mesh(::AbstractDomain; kwargs...) = error("not implemented yet")
+
+function domain_to_mesh(domain::CellDomain; clipped_bnd_name = "CLIPPED_BND")
     # Note : `_o2n` means "old to new" while `_n2o` means "new to old"
 
     # Alias
@@ -936,6 +936,81 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
         bc_names = bnd_names,
         bc_nodes = bnd_nodes,
     )
+end
+
+function domain_to_mesh(domain::AbstractFaceDomain)
+    # Unpack the domain
+    mesh = get_mesh(domain)
+    kfaces = indices(domain)
+
+    @assert topodim(mesh) >= 2
+
+    _f2n = connectivities_indices(mesh, :f2n)
+    f2n = [_f2n[kface] for kface in kfaces]
+
+    # Within the loop below, we:
+    # - identify the subset of nodes needed for the new mesh
+    # - build the node loc -> glo mapping simultaneously
+    # - construct the "c2n" with the new (local) numbering
+    tag = zeros(Bool, nnodes(mesh))
+    offset = 1
+    loc2glo = zeros(Int, nnodes(mesh)) # overdimensionned
+    glo2loc = zero(loc2glo)
+    for inodes in f2n
+        for inode in inodes
+            if !tag[inode]
+                tag[inode] = true
+                loc2glo[offset] = inode
+                offset += 1
+            end
+        end
+    end
+    loc2glo = loc2glo[1:(offset - 1)]
+    glo2loc[loc2glo] .= collect(1:length(loc2glo))
+
+    # New "c2n" with updated nodes
+    c2n = Connectivity(length.(f2n), glo2loc[reduce(vcat, f2n)])
+
+    # "Cell" types
+    ctypes = faces(mesh)[kfaces]
+
+    # Nodes
+    nodes = get_nodes(mesh)[loc2glo]
+
+    # Metadata
+    metadata = ParentMeshMetaData(loc2glo, kfaces)
+
+    # Finished if not a BoundaryFaceDomain
+    (domain isa BoundaryFaceDomain) || return return Mesh(nodes, ctypes, c2n; metadata)
+
+    # Empty bc
+    bc_names = Dict{Int, String}()
+    bc_nodes = Dict{Int, Vector{Int}}()
+
+    for (tag, bnd_name) in boundary_names(mesh)
+        # If the boundary is already part of the domain, we skip it
+        (bnd_name ∈ domain.labels) && continue
+
+        _bc_nodes = Int[]
+        sizehint!(_bc_nodes, length(loc2glo))
+
+        for iface in boundary_faces(mesh, tag)
+            for inode in _f2n[iface]
+                g2l = glo2loc[inode]
+                # If the local number of this node is >0, it means that it belongs
+                # to the mesh we want to extract
+                (g2l > 0) && push!(_bc_nodes, g2l)
+            end
+        end
+
+        if length(_bc_nodes) > 0
+            bc_names[tag] = bnd_name
+            bc_nodes[tag] = _bc_nodes
+        end
+    end
+
+    # New mesh
+    return Mesh(nodes, ctypes, c2n; bc_names, bc_nodes, metadata)
 end
 
 """
