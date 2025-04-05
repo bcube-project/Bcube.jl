@@ -4,6 +4,7 @@ cells, a set of faces etc.
 """
 abstract type AbstractDomain{M <: AbstractMesh} end
 
+@inline Base.parent(domain::AbstractDomain) = domain.parent
 @inline get_mesh(domain::AbstractDomain) = domain.mesh
 @inline indices(domain::AbstractDomain) = domain.indices # with ghislainb's help, `AbstractDomain` could be parametered by `I`
 @inline topodim(::AbstractDomain) = error("undefined")
@@ -11,6 +12,17 @@ abstract type AbstractDomain{M <: AbstractMesh} end
 LazyOperators.pretty_name(domain::AbstractDomain) = "AbstractDomain"
 
 abstract type AbstractCellDomain{M, I} <: AbstractDomain{M} end
+
+"""
+This structure is only used to set the parent of a `CellDomain` who has no "parent" domain.
+On the contrary, a `CellDomain` obtained from a higher-dimension `BoundaryFaceDomain` wouldn't have
+such a parent but rather the mentionned `BoundaryFaceDomain`.
+
+Rq : we could rename this "WholeCellDomain" or even delete this structure and set "nothing" for the parent
+of a "classic" CellDomain.
+"""
+struct OrphanCellDomain{M, I} <: AbstractCellDomain{M, I} end
+OrphanCellDomain(m) = OrphanCellDomain{typeof(m), Nothing}()
 
 """
 A `CellDomain` is a representation of the cells of a mesh. It's primary
@@ -28,46 +40,49 @@ julia> selectedCells = [1,3,5,6]
 julia> Ω_selected = CellDomain(mesh, selectedCells)
 ```
 """
-struct CellDomain{M, I} <: AbstractCellDomain{M, I}
+struct CellDomain{M, I, P} <: AbstractCellDomain{M, I}
     mesh::M
     indices::I
-    CellDomain(mesh, indices) = new{typeof(mesh), typeof(indices)}(mesh, indices)
+    parent::P
 end
 @inline topodim(d::CellDomain) = topodim(get_mesh(d))
 
 CellDomain(mesh::AbstractMesh) = CellDomain(parent(mesh))
 CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
+CellDomain(mesh, indices) = CellDomain(mesh, indices, OrphanCellDomain(mesh))
 
 LazyOperators.pretty_name(domain::CellDomain) = "CellDomain"
 
 abstract type AbstractFaceDomain{M} <: AbstractDomain{M} end
 
-struct InteriorFaceDomain{M, I} <: AbstractFaceDomain{M}
+struct InteriorFaceDomain{M, I, P} <: AbstractFaceDomain{M}
     mesh::M
     indices::I
-    InteriorFaceDomain(mesh, indices) = new{typeof(mesh), typeof(indices)}(mesh, indices)
+    parent::P
 end
 @inline topodim(d::InteriorFaceDomain) = topodim(get_mesh(d)) - 1
 InteriorFaceDomain(mesh::AbstractMesh) = InteriorFaceDomain(parent(mesh))
-InteriorFaceDomain(mesh::Mesh) = InteriorFaceDomain(mesh, inner_faces(mesh))
+function InteriorFaceDomain(mesh::Mesh)
+    InteriorFaceDomain(mesh, inner_faces(mesh), CellDomain(mesh))
+end
 LazyOperators.pretty_name(domain::InteriorFaceDomain) = "InteriorFaceDomain"
 
-struct AllFaceDomain{M, I} <: AbstractFaceDomain{M}
+struct AllFaceDomain{M, I, P} <: AbstractFaceDomain{M}
     mesh::M
     indices::I
-    AllFaceDomain(mesh, indices) = new{typeof(mesh), typeof(indices)}(mesh, indices)
+    parent::P
 end
 @inline topodim(d::AllFaceDomain) = topodim(get_mesh(d)) - 1
-AllFaceDomain(mesh::AbstractMesh) = AllFaceDomain(mesh, 1:nfaces(mesh))
+AllFaceDomain(mesh::AbstractMesh) = AllFaceDomain(mesh, 1:nfaces(mesh), CellDomain(mesh))
 LazyOperators.pretty_name(domain::AllFaceDomain) = "AllFaceDomain"
 
-struct BoundaryFaceDomain{M, BC, L, C} <: AbstractFaceDomain{M}
+struct BoundaryFaceDomain{M, BC, L, C, P} <: AbstractFaceDomain{M}
     mesh::M
     bc::BC
     labels::L
     cache::C
+    parent::P
 end
-@inline get_mesh(d::BoundaryFaceDomain) = d.mesh
 @inline topodim(d::BoundaryFaceDomain) = topodim(get_mesh(d)) - 1
 @inline bctype(::BoundaryFaceDomain{M, BC}) where {M, BC} = BC
 @inline get_bc(d::BoundaryFaceDomain) = d.bc
@@ -80,12 +95,7 @@ function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
     cache =
         _compute_periodicity(mesh, labels_master(bc), labels_slave(bc), transformation(bc))
     labels = unique(vcat(labels_master(bc)..., labels_slave(bc)...))
-    BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(labels), typeof(cache)}(
-        mesh,
-        bc,
-        labels,
-        cache,
-    )
+    BoundaryFaceDomain(mesh, bc, labels, cache, CellDomain(mesh))
 end
 
 function indices(d::BoundaryFaceDomain{M, <:PeriodicBCType}) where {M}
@@ -224,12 +234,7 @@ function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{String, Vararg{String}})
     bndfaces = vcat(map(tag -> boundary_faces(mesh, tag), tags)...)
     cache = bndfaces
     bc = nothing
-    BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(labels), typeof(cache)}(
-        mesh,
-        bc,
-        labels,
-        cache,
-    )
+    BoundaryFaceDomain(mesh, bc, labels, cache, CellDomain(mesh))
 end
 BoundaryFaceDomain(mesh::AbstractMesh, label::String) = BoundaryFaceDomain(mesh, (label,))
 function BoundaryFaceDomain(mesh::AbstractMesh)
