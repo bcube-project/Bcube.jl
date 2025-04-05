@@ -72,7 +72,9 @@ function Base.show(io::IO, c::MeshConnectivity)
 end
 
 """
-Mesh metadata intended to store informations about "zones" (or "domains") originally
+Mesh metadata that can serve several/any purposes.
+
+Initially, it's intended to store informations about "zones" (or "domains") originally
 stored in the mesh file.
 
 # Devs notes
@@ -104,6 +106,17 @@ end
 struct DefaultMeshMetaData <: AbstractMeshMetaData end
 get_zone_names(::DefaultMeshMetaData, ::AbstractMesh) = ("Zone",)
 get_zone_element_indices(::DefaultMeshMetaData, mesh::AbstractMesh, name) = 1:ncells(mesh)
+
+struct ParentMeshMetaData{A, B} <: AbstractMeshMetaData
+    # local mesh node number -> parent mesh node number
+    node_l2g::A
+    # local mesh elt (face, cell) number -> parent mesh elt (face, cell) number
+    # Rq: it can be a local-cell-number -> parent-face-number
+    elt_l2g::B
+end
+
+@inline get_node_loc_to_glob(metadata::ParentMeshMetaData) = metadata.node_l2g
+@inline get_elt_loc_to_glob(metadata::ParentMeshMetaData) = metadata.elt_l2g
 
 """
 `bc_names` : <boundary tag> => <boundary names>
