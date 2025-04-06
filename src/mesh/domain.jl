@@ -236,6 +236,21 @@ function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{String, Vararg{String}})
     bc = nothing
     BoundaryFaceDomain(mesh, bc, labels, cache, CellDomain(mesh))
 end
+function BoundaryFaceDomain(mesh::Mesh, bc, labels, cache, parent)
+    BoundaryFaceDomain{
+        typeof(mesh),
+        typeof(bc),
+        typeof(labels),
+        typeof(cache),
+        typeof(parent),
+    }(
+        mesh,
+        bc,
+        labels,
+        cache,
+        parent,
+    )
+end
 BoundaryFaceDomain(mesh::AbstractMesh, label::String) = BoundaryFaceDomain(mesh, (label,))
 function BoundaryFaceDomain(mesh::AbstractMesh)
     BoundaryFaceDomain(mesh, Tuple(values(boundary_names(mesh))))
