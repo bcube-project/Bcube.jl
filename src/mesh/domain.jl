@@ -28,9 +28,13 @@ OrphanCellDomain(m) = OrphanCellDomain{typeof(m), Nothing}()
 A `CellDomain` is a representation of the cells of a mesh. It's primary
 purpose is to represent a domain to integrate over.
 
+A `CellDomain` can also be build from an `AbstractFaceDomain` of a higher topological mesh.
+In this case, the corresponding mesh is automatically built.
+
 # Constructors
 CellDomain(mesh::Mesh)
 CellDomain(mesh::Mesh, indices)
+CellDomain(domain::AbstractFaceDomain, [indices = 1:ncells(get_mesh(domain))])
 
 # Examples
 ```julia-repl
@@ -52,6 +56,10 @@ CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
 CellDomain(mesh, indices) = CellDomain(mesh, indices, OrphanCellDomain(mesh))
 
 LazyOperators.pretty_name(domain::CellDomain) = "CellDomain"
+
+function CellDomain(domain::AbstractFaceDomain, indices = 1:ncells(get_mesh(domain)))
+    CellDomain(domain_to_mesh(domain), indices, domain)
+end
 
 abstract type AbstractFaceDomain{M} <: AbstractDomain{M} end
 
