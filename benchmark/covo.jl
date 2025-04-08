@@ -48,7 +48,7 @@ function _flux_Ω(u, ∇v)
 
     vel = ρu ./ ρ
     ρuu = ρu * transpose(vel)
-    p   = pressure(ρ, ρu, ρE, γ)
+    p = pressure(ρ, ρu, ρE, γ)
 
     flux_ρ  = ρu
     flux_ρu = ρuu + p * I
