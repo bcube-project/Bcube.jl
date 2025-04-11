@@ -5,7 +5,7 @@ Assemble a vector of zeros dofs except on boundary dofs where they take the Diri
 function assemble_dirichlet_vector(
     U,
     V,
-    mesh::AbstractMesh,
+    mesh,
     t::Number = 0.0;
     dt_derivative_order::Int = 0,
 )
@@ -19,12 +19,7 @@ Apply homogeneous Dirichlet condition on vector `b`
 
 Dirichlet values are applied on dofs lying on a Dirichlet boundary.
 """
-function apply_homogeneous_dirichlet_to_vector!(
-    b::AbstractVector{<:Number},
-    U,
-    V,
-    mesh::AbstractMesh,
-)
+function apply_homogeneous_dirichlet_to_vector!(b::AbstractVector{<:Number}, U, V, mesh)
     # Define callback to apply on `b`
     callback!(array, iglob, _, _) = array[iglob] = 0.0
 
@@ -41,7 +36,7 @@ function apply_homogeneous_dirichlet_to_matrix!(
     matrix::AbstractMatrix,
     U,
     V,
-    mesh::AbstractMesh;
+    mesh;
     diag_value::Number = 1.0,
 )
     apply_homogeneous_dirichlet_to_matrix!(
@@ -60,7 +55,7 @@ function apply_homogeneous_dirichlet_to_matrix!(
     matrices::Tuple{Vararg{AbstractMatrix, N}},
     U,
     V,
-    mesh::AbstractMesh;
+    mesh;
     diag_values::Tuple{Vararg{Number, N}} = ntuple(i -> 1.0, N),
 ) where {N}
     callbacks = ntuple(
@@ -84,7 +79,7 @@ function apply_homogeneous_dirichlet!(
     b::AbstractVector{<:Number},
     U,
     V,
-    mesh::AbstractMesh,
+    mesh,
 )
     # Define callback to apply on `A`
     callback_A!(array, iglob, _, _) = begin
@@ -110,7 +105,7 @@ function apply_dirichlet_to_vector!(
     b::AbstractVector{<:Number},
     U,
     V,
-    mesh::AbstractMesh,
+    mesh,
     t::Number = 0.0;
     dt_derivative_order::Int = 0,
 )
@@ -139,7 +134,7 @@ function apply_dirichlet_to_matrix!(
     matrix::AbstractMatrix,
     U,
     V,
-    mesh::AbstractMesh;
+    mesh;
     diag_value::Number = 1.0,
 )
     apply_dirichlet_to_matrix!((matrix,), U, V, mesh; diag_values = (diag_value,))
@@ -155,7 +150,7 @@ function apply_dirichlet_to_matrix!(
     matrices::Tuple{Vararg{AbstractMatrix, N}},
     U,
     V,
-    mesh::AbstractMesh;
+    mesh;
     diag_values::Tuple{Vararg{Number, N}} = ntuple(i -> 1.0, N),
 ) where {N}
     # nullify given row (i.e column for the transposed matrix)
@@ -196,11 +191,11 @@ function _apply_dirichlet!(
     callbacks::NTuple{P, Function},
     U::AbstractMultiFESpace{N, Tu},
     V::AbstractMultiFESpace{N, Tv},
-    mesh::AbstractMesh,
+    meshes::Tuple{Vararg{AbstractMesh, N}},
     t::Number = 0.0,
 ) where {P, N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}
     for (i, (_U, _V)) in enumerate(zip(U, V))
-        _apply_dirichlet!(arrays, callbacks, get_mapping(U, i), _U, _V, mesh, t)
+        _apply_dirichlet!(arrays, callbacks, get_mapping(U, i), _U, _V, meshes, t)
     end
 end
 
