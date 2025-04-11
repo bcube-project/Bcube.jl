@@ -709,7 +709,7 @@ function domain_to_mesh(domain::AbstractFaceDomain)
     # Finished if not a BoundaryFaceDomain
     (domain isa BoundaryFaceDomain) || return return Mesh(nodes, ctypes, c2n; metadata)
 
-    # Empty bc 
+    # Empty bc
     bc_names = Dict{Int, String}()
     bc_nodes = Dict{Int, Vector{Int}}()
 

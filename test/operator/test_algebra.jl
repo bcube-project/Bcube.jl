@@ -64,7 +64,7 @@
         sizeU = spacedim(mesh)
         U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh; sizeU)
         V = TestFESpace(U)
-        _f = x -> SA[2 * x[1]^2, x[1] * x[2]]
+        _f = x -> SA[2 * x[1] ^ 2, x[1] * x[2]]
         f = PhysicalFunction(_f, sizeU)
         ∇f = PhysicalFunction(x -> ForwardDiff.jacobian(_f, x), (sizeU, spacedim(mesh)))
         dΩ = Measure(CellDomain(mesh), 3)
@@ -291,8 +291,8 @@
         A = rand(rand(2:5), rand(2:5))
         B = rand(rand(2:5), rand(2:5))
         @test A ⊗ B == [
-            A[i, j] * B[k, l] for i in axes(A, 1), j in axes(A, 2), k in axes(B, 1),
-            l in axes(B, 2)
+            A[i, j] * B[k, l] for
+            i in axes(A, 1), j in axes(A, 2), k in axes(B, 1), l in axes(B, 2)
         ]
         A_SA = SMatrix{size(A)...}(A)
         B_SA = SMatrix{size(B)...}(B)
@@ -325,8 +325,8 @@
         A = rand(rand(2:5), m, n)
         B = rand(rand(2:5), m, n)
         @test A ⊡ B == [
-            sum(A[i, j, k] * B[l, j, k] for j in 1:m, k in 1:n) for i in axes(A, 1),
-            l in axes(B, 1)
+            sum(A[i, j, k] * B[l, j, k] for j in 1:m, k in 1:n) for
+            i in axes(A, 1), l in axes(B, 1)
         ]
         A_SA = SArray{Tuple{size(A)...}}(A)
         B_SA = SArray{Tuple{size(B)...}}(B)
@@ -341,8 +341,8 @@
         ]
         # 4D Symmetrical identity tensor : Id4DSym ⊡ A = A, with A symmetrical
         Id4DSym = @SArray [
-            i == j == k == l ? 1.0 : i != j && k != l ? 0.5 : 0.0 for i in 1:2,
-            j in 1:2, k in 1:2, l in 1:2
+            i == j == k == l ? 1.0 : i != j && k != l ? 0.5 : 0.0 for
+            i in 1:2, j in 1:2, k in 1:2, l in 1:2
         ]
         # 4D Trace tensor : tr4D ⊡ A = tr(A) * Id2D
         tr4D = @SArray [
@@ -359,8 +359,8 @@
         A = rand(rand(2:5), rand(2:5), m, n)
         B = rand(m, n)
         @test A ⊡ B == [
-            sum(A[i, j, k, l] * B[k, l] for k in 1:m, l in 1:n) for i in axes(A, 1),
-            j in axes(A, 2)
+            sum(A[i, j, k, l] * B[k, l] for k in 1:m, l in 1:n) for
+            i in axes(A, 1), j in axes(A, 2)
         ]
         A_SA = SArray{Tuple{size(A)...}}(A)
         B_SA = SMatrix{size(B)...}(B)

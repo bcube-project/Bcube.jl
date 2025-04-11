@@ -102,7 +102,7 @@ C[i,j] = A[i,j,k,l] * B[k,l] (Einstein sum)
 function dcontract(A::AbstractArray{T1, 4}, B::AbstractArray{T2, 2}) where {T1, T2}
     sA = size(A)
     C = zeros(promote_type(eltype(A), eltype(B)), sA[1], sA[2])
-    C = [sum(view(A, i, j, :, :) .* B) for i in 1:sA[1], j in 1:sA[2]]
+    C = [sum(view(A,i,j,:,:) .* B) for i in 1:sA[1], j in 1:sA[2]]
     return C
 end
 
