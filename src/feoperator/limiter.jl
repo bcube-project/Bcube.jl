@@ -7,6 +7,7 @@ function linear_scaling_limiter_coef(
     bounds,
     DMPrelax,
     periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}},
+    check = true,
 ) where {N, Me, BC <: PeriodicBCType}
     @assert is_discontinuous(get_fespace(v)) "LinearScalingLimiter only support discontinuous variables"
 
@@ -55,6 +56,7 @@ function linear_scaling_limiter_coef(
             maxval[i],
             minval_mean[i],
             maxval_mean[i],
+            check,
         )
     end
 
@@ -275,7 +277,7 @@ end
 _minmax(f, quadrule::AbstractQuadratureRule) = extrema(f(ξ) for ξ in get_nodes(quadrule))
 
 """
-    _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M)
+    _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, checkmean = true)
 
 v̅ᵢ = mean
 mᵢ = minval
@@ -283,14 +285,19 @@ Mᵢ = maxval
 m = minval_mean
 M = maxval_mean
 """
-function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M)
-    (Mᵢ - v̅ᵢ) < -10eps() && error("Invalid max value :  Mᵢ=$Mᵢ, v̅ᵢ=$v̅ᵢ")
-    (v̅ᵢ - mᵢ) < -10eps() && error("Invalid min value :  mᵢ=$mᵢ, v̅ᵢ=$v̅ᵢ")
+function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, checkmean = true)
+    if checkmean
+        ((Mᵢ - v̅ᵢ) < (-10eps() * max(Mᵢ, one(Mᵢ)))) &&
+            error("Invalid max value :  Mᵢ=$Mᵢ, v̅ᵢ=$v̅ᵢ")
+        ((v̅ᵢ - mᵢ) < (-10eps() * max(v̅ᵢ, one(v̅ᵢ)))) &&
+            error("Invalid min value :  mᵢ=$mᵢ, v̅ᵢ=$v̅ᵢ")
+    end
     (Mᵢ - v̅ᵢ) < eps() && return zero(v̅ᵢ)
     (v̅ᵢ - mᵢ) < eps() && return zero(v̅ᵢ)
+    _v̅ᵢ = max(mᵢ, min(Mᵢ, v̅ᵢ))
     #abs(Mᵢ-v̅ᵢ) > 10*eps(typeof(M)) ? coef⁺ = abs((M-v̅ᵢ)/(Mᵢ-v̅ᵢ)) : coef⁺ = zero(M)
     #abs(v̅ᵢ-mᵢ) > 10*eps(typeof(M)) ? coef⁻ = abs((v̅ᵢ-m)/(v̅ᵢ-mᵢ)) : coef⁻ = zero(M)
-    min(_ratio(M - v̅ᵢ, Mᵢ - v̅ᵢ), _ratio(v̅ᵢ - m, v̅ᵢ - mᵢ), 1.0)
+    return min(_ratio(M - _v̅ᵢ, Mᵢ - _v̅ᵢ), _ratio(_v̅ᵢ - m, _v̅ᵢ - mᵢ), 1.0)
 end
 
 _ratio(x, y) = abs(x / (y + eps(y)))
@@ -303,6 +310,7 @@ _ratio(x, y) = abs(x / (y + eps(y)))
         DMPrelax = 0.0,
         periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}} = nothing,
         mass = nothing,
+        checkmean = true
     ) where {N, Me, BC <: PeriodicBCType}
 
 Apply the linear scaling limiter (see "Maximum-principle-satisfying and positivity-preserving high order schemes for
@@ -319,8 +327,9 @@ function linear_scaling_limiter(
     DMPrelax = 0.0,
     periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}} = nothing,
     mass = nothing,
+    checkmean = true,
 ) where {N, Me, BC <: PeriodicBCType}
-    lim_u, u̅ = linear_scaling_limiter_coef(u, dω, bounds, DMPrelax, periodicBCs)
+    lim_u, u̅ = linear_scaling_limiter_coef(u, dω, bounds, DMPrelax, periodicBCs, checkmean)
     u_lim = FEFunction(get_fespace(u), get_dof_type(u))
     projection_l2!(u_lim, u̅ + lim_u * (u - u̅), dω; mass = mass)
     lim_u, u_lim

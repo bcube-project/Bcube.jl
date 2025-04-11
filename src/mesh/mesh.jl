@@ -95,8 +95,9 @@ get_zone_names(::AbstractMeshMetaData, ::AbstractMesh) = error("not implemented"
 
 Return the cell indices of a given zone, designated by its name
 """
-get_zone_element_indices(mesh::AbstractMesh, name) =
+function get_zone_element_indices(mesh::AbstractMesh, name)
     get_zone_element_indices(get_metadata(mesh), mesh, name)
+end
 function get_zone_element_indices(::AbstractMeshMetaData, ::AbstractMesh, name)
     error("not implemented")
 end
