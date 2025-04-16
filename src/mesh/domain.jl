@@ -592,8 +592,9 @@ Convert an `AbstractDomain` to a `Mesh`.
 The new boundary faces, if any, obtained by selecting a portion of the original mesh are
 tagged with the value of the argument `clipped_bnd_name`.
 """
-domain_to_mesh(::AbstractDomain, clipped_bnd_name = "CLIPPED_BND") =
+function domain_to_mesh(::AbstractDomain, clipped_bnd_name = "CLIPPED_BND")
     error("not implemented yet")
+end
 
 function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
     # Note : `_o2n` means "old to new" while `_n2o` means "new to old"
