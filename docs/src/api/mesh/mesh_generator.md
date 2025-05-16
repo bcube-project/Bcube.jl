@@ -1,4 +1,4 @@
-# Mesh generator
+# [Mesh generator](@id mesh-generator)
 
 ```@autodocs
 Modules = [Bcube]

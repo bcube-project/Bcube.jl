@@ -22,8 +22,9 @@ makedocs(;
             "manual/conventions.md",
             "manual/geometry.md",
             "manual/integration.md",
-            "manual/cellfunction.md",
             "manual/function_space.md",
+            "manual/cellfunction.md",
+            "manual/assembler.md",
             "manual/operator.md",
         ],
         "API Reference" => Any[
