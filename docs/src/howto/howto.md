@@ -1,4 +1,4 @@
-# How to... (FAQ)
+# [How to... (FAQ)](@id how-to)
 
 ## Build your own `LazyOperator`
 Imagine that you want some kind of function (~operator) that has a different behavior depending on the cell (or face) it is applied to. The `PhysicalFunction` won't do the job since it is assumed that the provided function applies the same way in all the different cells. What you want is a `LazyOperator`. Here is how to build a custom one.
