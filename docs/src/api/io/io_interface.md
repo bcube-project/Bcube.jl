@@ -1,4 +1,4 @@
-# IO interface
+# [IO interface](@id io-interface)
 
 ```@autodocs
 Modules = [Bcube]
