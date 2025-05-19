@@ -37,7 +37,8 @@ With a `TrialFESpace`, one can build the representation of a function discretize
 
 ```julia
 U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
-u = FEFunction(U)
+u = FEFunction(U) # an FEFunction with all zeros as the initial value
+u = FEFunction(U, rand(nnodes(mesh))) # a random value at each dof
 
 dofs = get_dof_values(u) # get the values of the FEFunction
 set_dof_values!(u, 2. * dofs) # assign the dof values
