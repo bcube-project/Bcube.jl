@@ -1,12 +1,64 @@
-module gpu1
-using Cthulhu
+module BcubeGPU
+# using Cthulhu
 using Bcube
 using StaticArrays
-using CUDA
 using KernelAbstractions
 using Adapt
 
 const WORKGROUP_SIZE = 32
+
+"""
+Build the connectivity <global dof index> -> <cells surrounding this dof, local index of this dof
+in the cells>
+"""
+function build_dof_to_cells(mesh, U)
+    dof_to_cells = [Tuple{Int, Int}[] for _ in 1:get_ndofs(U)]
+    dhl = Bcube._get_dhl(U)
+    # dof_to_cells = [Int[] for _ in 1:get_ndofs(U)]
+    for icell in 1:ncells(mesh)
+        # foreach(idof -> push!(dof_to_cells[idof], icell), Bcube.get_dofs(U, icell))
+        for iloc in 1:get_ndofs(dhl, icell)
+            idof = Bcube.get_dof(dhl, icell, 1, iloc) # comp = 1
+            push!(dof_to_cells[idof], (icell, iloc))
+        end
+    end
+    return dof_to_cells
+end
+
+function my_line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"))
+    l = xmax - xmin # line length
+    nelts = n - 1 # Number of cells
+
+    Δx = l / (n - 1)
+
+    # Nodes
+    nodes = [Node(Float32.([xmin + (i - 1) * Δx])) for i in 1:n]
+
+    # Cell type is constant
+    celltypes = [Bcube.Bar2_t() for ielt in 1:nelts]
+
+    # Cell -> nodes connectivity
+    cell2node = zeros(Int, 2 * nelts)
+    for ielt in 1:nelts
+        cell2node[2 * ielt - 1] = ielt
+        cell2node[2 * ielt]     = ielt + 1
+    end
+
+    # Number of nodes of each cell : always 2
+    cell2nnodes = 2 * ones(Int, nelts)
+
+    # Boundaries
+    bc_names, bc_nodes = Bcube.one_line_bnd(1, n, names)
+
+    # Mesh
+    return Bcube.Mesh(
+        nodes,
+        celltypes,
+        Bcube.Connectivity(cell2nnodes, cell2node);
+        bc_names,
+        bc_nodes,
+    )
+end
 
 @kernel function my_kernel(res, @Const(g), @Const(cells), @Const(quadrature))
     icell = @index(Global)
@@ -30,14 +82,8 @@ function run_my_kernel(backend, res, g, cells, quadrature)
     return res
 end
 
-function run()
-    mesh = line_mesh(3)
-
-    backend_cuda = get_backend(CUDA.ones(ncells(mesh)))
-    backend_cpu = CPU()
-
-    # backend = backend_cpu
-    backend = backend_cuda
+function run(backend)
+    mesh = my_line_mesh(3)
 
     Ω = CellDomain(mesh)
 
@@ -64,5 +110,4 @@ function run()
     # @cuda cuda_kernel!(res, g, cells, quadrature)
 end
 
-run()
 end
