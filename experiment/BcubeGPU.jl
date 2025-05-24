@@ -7,6 +7,49 @@ using Adapt
 
 const WORKGROUP_SIZE = 32
 
+struct ReverseDofHandler{A, B, C, D}
+    offset::A # 1:ndofs
+    ncells::B # 1:ndofs number of cells owning each dof
+    icells::C # icells[offset[idof]:offset[idof]+ncells[idof]] are cells surrounding idof
+    iloc::D # iloc[offset[idof]:offset[idof]+ncells[idof]] are local indices of the dof in the corresponding cell
+end
+
+function ReverseDofHandler(mesh, U)
+    dof_to_cells = build_dof_to_cells(mesh, U)
+    ndofs = get_ndofs(U)
+    offset = zeros(Int, ndofs)
+    ncells = zeros(Int, ndofs)
+    n = sum(length.(dof_to_cells))
+    icells = zeros(Int, n)
+    iloc = zeros(Int, n)
+    curr = 1
+    for (idof, x) in enumerate(dof_to_cells)
+        ncells[idof] = length(x)
+        for (icell, _iloc) in x
+            icells[curr] = icell
+            iloc[curr] = _iloc
+            curr += 1
+        end
+        (idof > 1) && (offset[idof] = offset[idof - 1] + ncells[idof - 1])
+    end
+    return ReverseDofHandler(offset, ncells, icells, iloc)
+end
+
+Adapt.adapt_structure(to, V::TestFESpace) = TestFESpace(adapt(to, parent(V)))
+function Adapt.adapt_structure(to, feSpace::Bcube.SingleFESpace{S, FS}) where {S, FS}
+    dhl = adapt(to, Bcube._get_dhl(feSpace))
+    tags = adapt(to, Bcube.get_dirichlet_boundary_tags(feSpace))
+    Bcube.SingleFESpace{S, FS, typeof(dhl), typeof(tags)}(
+        Bcube.get_function_space(feSpace),
+        dhl,
+        Bcube.is_continuous(feSpace),
+        tags,
+    )
+end
+
+Adapt.@adapt_structure Bcube.DofHandler
+Adapt.@adapt_structure ReverseDofHandler
+
 """
 Build the connectivity <global dof index> -> <cells surrounding this dof, local index of this dof
 in the cells>
@@ -25,67 +68,73 @@ function build_dof_to_cells(mesh, U)
     return dof_to_cells
 end
 
-function my_line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"))
-    l = xmax - xmin # line length
-    nelts = n - 1 # Number of cells
+struct MyShapeFunction{FE, I} <: Bcube.AbstractLazy where {FE, I}
+    feSpace::FE
+    iloc::I
+end
 
-    Δx = l / (n - 1)
+Bcube.materialize(f::MyShapeFunction, ::Bcube.CellInfo) = f
 
-    # Nodes
-    nodes = [Node(Float32.([xmin + (i - 1) * Δx])) for i in 1:n]
+function Bcube.materialize(f::MyShapeFunction, cPoint::Bcube.CellPoint)
+    cInfo = Bcube.get_cellinfo(cPoint)
+    cType = Bcube.get_element_type(cInfo)
+    cShape = Bcube.shape(cType)
+    fs = Bcube.get_function_space(f.feSpace)
+    ξ = Bcube.get_coords(cPoint)
+    return Bcube._scalar_shape_functions(fs, cShape, ξ)[f.iloc]
+end
 
-    # Cell type is constant
-    celltypes = [Bcube.Bar2_t() for ielt in 1:nelts]
+@kernel function gpu_assemble_kernel!(
+    b,
+    @Const(f),
+    @Const(elts),
+    @Const(V),
+    @Const(quadrature),
+    @Const(rdhl)
+)
+    I = @index(Global)
 
-    # Cell -> nodes connectivity
-    cell2node = zeros(Int, 2 * nelts)
-    for ielt in 1:nelts
-        cell2node[2 * ielt - 1] = ielt
-        cell2node[2 * ielt]     = ielt + 1
+    offset = rdhl.offset[I]
+    for i in 1:rdhl.ncells[I]
+        icell = rdhl.icells[offset + i]
+        iloc = rdhl.iloc[offset + i]
+        eltInfo = elts[icell]
+
+        φ = MyShapeFunction(V, iloc)
+        fᵥ = Bcube.materialize(f(φ), eltInfo)
+        value = Bcube.integrate_on_ref_element(fᵥ, eltInfo, quadrature)
+        b[I] += value
     end
+end
 
-    # Number of nodes of each cell : always 2
-    cell2nnodes = 2 * ones(Int, nelts)
-
-    # Boundaries
-    bc_names, bc_nodes = Bcube.one_line_bnd(1, n, names)
-
-    # Mesh
-    return Bcube.Mesh(
-        nodes,
-        celltypes,
-        Bcube.Connectivity(cell2nnodes, cell2node);
-        bc_names,
-        bc_nodes,
+function gpu_assemble!(backend, y, f, elts, V, measure, rdhl)
+    quadrature = Bcube.get_quadrature(measure)
+    gpu_assemble_kernel!(backend, WORKGROUP_SIZE)(
+        y,
+        f,
+        elts,
+        V,
+        quadrature,
+        rdhl;
+        ndrange = size(y),
     )
 end
 
-@kernel function my_kernel(res, @Const(g), @Const(cells), @Const(quadrature))
-    icell = @index(Global)
-    eltInfo = cells[icell]
-    res[icell] = Bcube.integrate_on_ref_element(g, eltInfo, quadrature)
+@kernel function test_arg_kernel(x, @Const(arg))
+    I = @index(Global)
+    x[I] += 1
 end
 
-function cuda_kernel!(res, g, cells, quadrature)
-    index = threadIdx().x    # this example only requires linear indexing, so just use `x`
-    stride = blockDim().x
-    for icell in index:stride:length(res)
-        eltInfo = cells[icell]
-        res[icell] = Bcube.integrate_on_ref_element(g, eltInfo, quadrature)
-    end
-    return nothing
-end
-
-function run_my_kernel(backend, res, g, cells, quadrature)
-    my_kernel(backend, WORKGROUP_SIZE)(res, g, cells, quadrature; ndrange = length(cells))
-    KernelAbstractions.synchronize(backend)
-    return res
+function test_arg(backend, arg)
+    x = KernelAbstractions.zeros(backend, Float32, 10)
+    test_arg_kernel(backend, WORKGROUP_SIZE)(x, arg; ndrange = size(x))
 end
 
 function run(backend)
-    mesh = my_line_mesh(3)
+    mesh = line_mesh(3)
 
     Ω = CellDomain(mesh)
+    dΩ = Measure(Ω, 1)
 
     cells_cpu = map(Bcube.DomainIterator(Ω)) do cellInfo
         icell = Bcube.cellindex(cellInfo)
@@ -97,13 +146,16 @@ function run(backend)
     end
     cells = adapt(backend, cells_cpu)
 
-    quadrature = Quadrature(1)
-
-    res = KernelAbstractions.zeros(backend, Float32, ncells(mesh))
-
-    g = PhysicalFunction(x -> 1.0)
-    run_my_kernel(backend, res, g, cells, quadrature)
-    display(res)
+    U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+    V_cpu = TestFESpace(U)
+    rdhl_cpu = ReverseDofHandler(mesh, U)
+    rdhl = adapt(backend, rdhl_cpu)
+    f(φ) = PhysicalFunction(x -> 1.0) * φ
+    y = KernelAbstractions.zeros(backend, Float32, get_ndofs(U))
+    V = adapt(backend, V_cpu)
+    gpu_assemble!(backend, y, f, cells, V, dΩ, rdhl)
+    display(y)
+    # test_arg(backend, Bcube.get_quadrature(dΩ))
 
     # CUDA.@device_code_typed interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
     # @device_code_warntype interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)

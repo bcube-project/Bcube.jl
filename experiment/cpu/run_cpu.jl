@@ -7,4 +7,6 @@ function run()
     backend = CPU()
     BcubeGPU.run(backend)
 end
+
+run()
 end
