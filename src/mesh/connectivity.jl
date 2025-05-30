@@ -13,18 +13,18 @@ Base.size(::AbstractConnectivity) = error("Undefined")
 
 Type for connectivity with elements of type `T`.
 """
-struct Connectivity{T <: Integer} <: AbstractConnectivity{T}
+struct Connectivity{T <: Integer, O, I} <: AbstractConnectivity{T}
     minsize::T
     maxsize::T
-    offsets::Vector{T}
-    indices::Vector{T}
+    offsets::O
+    indices::I
 
     function Connectivity(
         minsize::T,
         maxsize::T,
-        offsets::Vector{T},
-        indices::Vector{T},
-    ) where {T <: Integer}
+        offsets::O,
+        indices::I,
+    ) where {T <: Integer, O <: AbstractVector{T}, I <: AbstractVector{T}}
         if offsets[end] - 1 ≠ length(indices)
             @show offsets[end] - 1, length(indices)
             error("Invalid offset range")
@@ -32,7 +32,7 @@ struct Connectivity{T <: Integer} <: AbstractConnectivity{T}
         for i in firstindex(offsets):(lastindex(offsets) - 1)
             offsets[i + 1] < offsets[i] ? error("Invalid offset ", i) : nothing
         end
-        new{T}(minsize, maxsize, offsets, indices)
+        new{T, O, I}(minsize, maxsize, offsets, indices)
     end
 end
 
