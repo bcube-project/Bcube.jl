@@ -107,11 +107,11 @@ A FESpace can be either scalar (to represent a Temperature for instance)
 or vector (to represent a Velocity). In case of a "vector" `SingleFESpace`,
 all the components necessarily share the same `FunctionSpace`.
 """
-struct SingleFESpace{S, FS <: AbstractFunctionSpace} <: AbstractSingleFESpace{S, FS}
+struct SingleFESpace{S, FS <: AbstractFunctionSpace, DHL, D} <: AbstractSingleFESpace{S, FS}
     fSpace::FS # function space
-    dhl::DofHandler # degrees of freedom of this FESpace
+    dhl::DHL # degrees of freedom of this FESpace
     isContinuous::Bool # finite-element or discontinuous-galerkin
-    dirichletBndTags::Vector{Int} # mesh boundary tags where Dirichlet condition applies
+    dirichletBndTags::D # mesh boundary tags where Dirichlet condition applies
 end
 
 Base.parent(feSpace::SingleFESpace) = feSpace
@@ -194,7 +194,12 @@ function SingleFESpace(
         push!(dirichletBndTags, boundary_tag(mesh, name))
     end
 
-    return SingleFESpace{size, typeof(fSpace)}(fSpace, dhl, isContinuous, dirichletBndTags)
+    return SingleFESpace{size, typeof(fSpace), typeof(dhl), typeof(dirichletBndTags)}(
+        fSpace,
+        dhl,
+        isContinuous,
+        dirichletBndTags,
+    )
 end
 
 @inline allocate_dofs(feSpace::SingleFESpace, T = Float64) = zeros(T, get_ndofs(feSpace))
