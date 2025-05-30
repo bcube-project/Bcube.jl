@@ -936,13 +936,22 @@ translate!(mesh::AbstractMesh, t::AbstractVector) = transform!(mesh, x -> x + t)
 Make an exact copy of the input mesh.
 """
 function _duplicate_mesh(mesh::AbstractMesh)
+    if isempty(boundary_names(mesh))
+        bc_names = Dict{Int, String}()
+        bc_nodes = Dict{Int, Vector{Int}}()
+        bc_faces = Dict{Int, Vector{Int}}()
+    else
+        bc_names = Dict(((i => string(a)) for (i, a) in pairs(boundary_names(mesh)))...)
+        bc_nodes = Dict(((i => boundary_nodes(mesh, i)) for (i, a) in pairs(bc_names))...)
+        bc_faces = Dict(((i => boundary_faces(mesh, i)) for (i, a) in pairs(bc_names))...)
+    end
     Mesh(
-        get_nodes(mesh),
-        cells(mesh),
-        connectivities(mesh, :c2n).indices;
-        bc_names = boundary_names(mesh),
-        bc_nodes = boundary_nodes(mesh),
-        bc_faces = boundary_faces(mesh),
+        deepcopy(get_nodes(mesh)),
+        deepcopy(cells(mesh)),
+        deepcopy(connectivities(mesh, :c2n).indices);
+        bc_names = deepcopy(bc_names),
+        bc_nodes = deepcopy(bc_nodes),
+        bc_faces = deepcopy(bc_faces),
     )
 end
 

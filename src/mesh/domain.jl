@@ -211,17 +211,8 @@ or several labels (=names).
 If no label is provided, all the `BoundaryFaceDomain` corresponds
 to all the boundary faces.
 """
-function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{String, Vararg{String}})
-    tags = map(label -> boundary_tag(mesh, label), labels)
-
-    # Check all tags have been found
-    for tag in tags
-        (tag isa Nothing) && error(
-            "Failed to build a `BoundaryFaceDomain` with labels '$(labels...)' -> double-check that your mesh contains these labels",
-        )
-    end
-
-    bndfaces = vcat(map(tag -> boundary_faces(mesh, tag), tags)...)
+function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol, Vararg{Symbol}})
+    bndfaces = vcat(map(label -> boundary_faces(mesh, label), labels)...)
     cache = bndfaces
     bc = nothing
     BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(labels), typeof(cache)}(
@@ -231,9 +222,12 @@ function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{String, Vararg{String}})
         cache,
     )
 end
+function BoundaryFaceDomain(mesh::AbstractMesh, labels::Tuple{String, Vararg{String}})
+    BoundaryFaceDomain(mesh, map(Symbol, labels))
+end
 BoundaryFaceDomain(mesh::AbstractMesh, label::String) = BoundaryFaceDomain(mesh, (label,))
 function BoundaryFaceDomain(mesh::AbstractMesh)
-    BoundaryFaceDomain(mesh, Tuple(values(boundary_names(mesh))))
+    BoundaryFaceDomain(mesh, values(boundary_names(mesh)))
 end
 function BoundaryFaceDomain(mesh::AbstractMesh, args...; kwargs...)
     BoundaryFaceDomain(parent(mesh), args...; kwargs...)
@@ -632,11 +626,17 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
     # Filter bc nodes
     # First, we filter to remove bnd conditions that does not exist in the new mesh
     # Second, we remove non-existing nodes from the boundary
-    d1 = filter(((tag, inodes),) -> any(view(hasNode, inodes)), boundary_nodes(mesh))
+    dict_bc_names = Dict(((i => string(a)) for (i, a) in pairs(boundary_names(mesh)))...)
+    dict_bc_nodes =
+        Dict(((i => boundary_nodes(mesh, i)) for (i, a) in pairs(dict_bc_names))...)
+    dict_bc_faces =
+        Dict(((i => boundary_faces(mesh, i)) for (i, a) in pairs(dict_bc_names))...)
+
+    d1 = filter(((tag, inodes),) -> any(view(hasNode, inodes)), dict_bc_nodes)
     bnd_nodes = Dict(
         tag => I_nodes_o2n[filter(inode -> hasNode[inode], inodes)] for (tag, inodes) in d1
     )
-    bnd_names = filter(((tag, name),) -> tag ∈ keys(bnd_nodes), boundary_names(mesh))
+    bnd_names = filter(((tag, name),) -> tag ∈ keys(bnd_nodes), dict_bc_names)
 
     # Assign boundary condition to nodes that were not boundary nodes in the old mesh
     # but are bnd nodes in the new mesh
