@@ -152,7 +152,7 @@ function DofHandler(
     # Create a cell number remapping to ensure a dense numbering
     densify!(iglob)
     ndofs_tot = length(unique(iglob))
-    return DofHandler(iglob, offset, _ndofs, ndofs_tot)
+    return DofHandler{typeof(iglob), typeof(offset)}(iglob, offset, _ndofs, ndofs_tot)
 end
 
 @inline get_offset(dhl::DofHandler) = dhl.offset

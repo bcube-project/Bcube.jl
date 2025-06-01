@@ -110,7 +110,10 @@ function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"
         Δx = l / (n - 1)
 
         # Nodes
-        nodes = [Node([xmin + (i - 1) * Δx]) for i in 1:n]
+        nodes = Vector{Node{1, Float64}}(undef, n)
+        for i in 1:n
+            nodes[i] = Node(SA[xmin + (i - 1) * Δx])
+        end
 
         # Cell type is constant
         celltypes = [Bar2_t() for ielt in 1:nelts]
