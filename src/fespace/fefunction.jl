@@ -85,6 +85,14 @@ function SingleFieldFEFunction(feSpace::AbstractFESpace, dofValues)
     return SingleFieldFEFunction{size, FE, V}(feSpace, dofValues)
 end
 
+"""
+    FEFunction(feSpace::AbstractFESpace, [T::Type{<:Number} = Float64])
+    FEFunction(feSpace::AbstractFESpace, dofValues)
+    FEFunction(feSpace::AbstractFESpace, constant::Number)
+    FEFunction(feSpace::AbstractFESpace, mesh::AbstractMesh, f::AbstractLazy)
+
+Build a FEFunction from an `AbstractFESpace` and, optionally, some init infos (constant, vector, or AbstractLazy).
+"""
 function FEFunction(feSpace::AbstractFESpace, dofValues)
     SingleFieldFEFunction(feSpace, dofValues)
 end
@@ -98,6 +106,56 @@ function FEFunction(feSpace::AbstractFESpace, constant::Number)
     feFunction = FEFunction(feSpace, typeof(constant))
     feFunction.dofValues .= constant
     return feFunction
+end
+
+# In the future, we shall dispatch first on the `basis_functions_style` rather than on the `FunctionSpace``
+function FEFunction(feSpace::AbstractFESpace, mesh::AbstractMesh, f::AbstractLazy)
+    FEFunction(get_type(get_function_space(feSpace)), feSpace, mesh, f)
+end
+
+function FEFunction(
+    ::Type{<:Lagrange},
+    feSpace::AbstractFESpace,
+    mesh::AbstractMesh,
+    f::AbstractLazy,
+)
+    # Allocate the vector of dofs
+    T, N = get_return_type_and_codim(f, mesh)
+    @assert length(N) == 1 "ndims(f) > 1 not supported for now, vectorize your input"
+    @assert get_size(feSpace) == first(N)
+    dofValues = allocate_dofs(feSpace, T)
+
+    # Alias
+    dhl = Bcube._get_dhl(feSpace)
+
+    for cinfo in DomainIterator(CellDomain(mesh))
+        # Cell infos
+        icell = cellindex(cinfo)
+        ctype = celltype(cinfo)
+
+        # Get Lagrange dofs/nodes coordinates in ref space
+        coords = get_coords(get_function_space(feSpace), shape(ctype))
+
+        # Materialize the LazyOp on this cell
+        op = Bcube.materialize(f, cinfo)
+
+        # Loop over these coords
+        for (iloc, ξ) in enumerate(coords)
+            # Create CellPoint (in reference domain)
+            cpoint = CellPoint(ξ, cinfo, ReferenceDomain())
+
+            # Evaluate the LazyOp on this point
+            val = Bcube.materialize(op, cpoint)
+
+            # Loop over the components
+            for icomp in 1:get_ncomponents(dhl)
+                iglob = get_dof(dhl, icell, icomp, iloc)
+                dofValues[iglob] = val[icomp]
+            end
+        end
+    end
+
+    return FEFunction(feSpace, dofValues)
 end
 
 get_fespace(f::SingleFieldFEFunction) = f.feSpace

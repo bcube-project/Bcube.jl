@@ -13,4 +13,5 @@ benchmark/Manifest.toml
 params.json
 .ipynb_checkpoints/
 /example/private/
+tmp
 
