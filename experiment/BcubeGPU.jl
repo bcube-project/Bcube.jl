@@ -38,6 +38,15 @@ end
 
 #>>>>>>>> Adapt some structures
 
+function Adapt.adapt_structure(
+    to,
+    conn::Bcube.MeshConnectivity{C, F, T, B},
+) where {C, F, T, B}
+    layers = adapt(to, Bcube.nlayers(conn))
+    ind = adapt(to, Bcube.indices(conn))
+    Bcube.MeshConnectivity{typeof(ind), F, T, B, typeof(layers)}(layers, ind)
+end
+
 function Adapt.adapt_structure(to, feSpace::Bcube.SingleFESpace{S, FS}) where {S, FS}
     dhl = adapt(to, Bcube._get_dhl(feSpace))
     tags = adapt(to, Bcube.get_dirichlet_boundary_tags(feSpace))
@@ -49,6 +58,7 @@ function Adapt.adapt_structure(to, feSpace::Bcube.SingleFESpace{S, FS}) where {S
     )
 end
 
+Adapt.@adapt_structure Bcube.Connectivity
 Adapt.@adapt_structure Bcube.TestFESpace
 Adapt.@adapt_structure Bcube.TrialFESpace
 Adapt.@adapt_structure Bcube.SingleFieldFEFunction
@@ -136,8 +146,23 @@ function test_arg(backend, arg)
     test_arg_kernel(backend, WORKGROUP_SIZE)(x, arg; ndrange = size(x))
 end
 
+struct Toto{S}
+    a::S
+end
+
 function run(backend)
     mesh = rectangle_mesh(2, 3)
+    mesh_gpu = adapt(backend, mesh)
+    test_arg(backend, adapt(backend, mesh_gpu.nodes)) # OK
+    test_arg(backend, adapt(backend, mesh_gpu.entities)) # OK
+    connectivities = mesh_gpu.connectivities
+    c2n = connectivities[:c2n]
+    @show typeof(c2n)
+    c2n_indices = c2n.indices
+    test_arg(backend, adapt(backend, c2n_indices)) # OK
+    @show typeof(c2n_indices)
+    test_arg(backend, adapt(backend, c2n))
+    error("dbg")
 
     Ω = CellDomain(mesh)
     dΩ = Measure(Ω, 1)
