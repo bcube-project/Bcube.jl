@@ -22,7 +22,7 @@ function topodim(::AbstractMesh{topoDim}, label::Symbol) where {topoDim}
     end
 end
 
-@inline boundary_tag(mesh::AbstractMesh, name::String) = boundary_tag(parent(mesh), name)
+@inline boundary_tag(mesh::AbstractMesh, name) = boundary_tag(parent(mesh), name)
 
 abstract type AbstractMeshConnectivity end
 
@@ -111,14 +111,13 @@ get_zone_element_indices(::DefaultMeshMetaData, mesh::AbstractMesh, name) = 1:nc
 `bc_nodes` : <boundary tag> => <boundary nodes tags>
 `bc_faces` : <boundary tag> => <boundary faces tags>
 """
-mutable struct Mesh{topoDim, spaceDim, C, E, T, M} <: AbstractMesh{topoDim, spaceDim}
-    nodes::Vector{Node{spaceDim, T}}
+struct Mesh{topoDim, spaceDim, N, E, C, BCn, BCf, M} <: AbstractMesh{topoDim, spaceDim}
+    nodes::N
     entities::E
     connectivities::C
 
-    bc_names::Dict{Int, String}
-    bc_nodes::Dict{Int, Vector{Int}}
-    bc_faces::Dict{Int, Vector{Int}}
+    bc_nodes::BCn #Vector{Vector{Int}}
+    bc_faces::BCf #Vector{Vector{Int}}
 
     absolute_indices::Dict{Symbol, Vector{Int}} # should disappear in favor of MeshMetaData
     local_indices::Dict{Symbol, Dict{Int, Int}}
@@ -128,14 +127,13 @@ end
 
 function Mesh(
     topoDim::Int,
-    nodes::Vector{Node{spaceDim, T}},
+    nodes::AbstractVector{<:Node{spaceDim, T}},
     celltypes::Vector{E},
     cell2node::C,
     buildfaces::Bool,
     buildboundaryfaces::Bool,
-    bc_names::Dict{Int, String},
-    bc_nodes::Dict{Int, Vector{Int}},
-    bc_faces::Dict{Int, Vector{Int}},
+    bc_nodes::NamedTuple,
+    bc_faces::NamedTuple,
     metadata::AbstractMeshMetaData,
 ) where {T <: Real, spaceDim, E <: AbstractEntityType, C <: AbstractConnectivity}
     @assert topoDim ≤ spaceDim
@@ -159,18 +157,26 @@ function Mesh(
     end
     if buildboundaryfaces
         @assert buildfaces "Faces must be built before boundary faces"
-        f2bc, _bc_faces = _build_boundary_faces!(f2n, f2c, bc_names, bc_nodes)
+        f2bc, _bc_faces = _build_boundary_faces!(f2n, f2c, bc_nodes)
         connectivities = (connectivities..., f2bc = f2bc)
     end
 
     absolute_indices = Dict{Symbol, Vector{Int}}()
     local_indices = Dict{Symbol, Dict{Int, Int}}()
 
-    Mesh{topoDim, spaceDim, typeof(connectivities), typeof(entities), T, typeof(metadata)}(
+    Mesh{
+        topoDim,
+        spaceDim,
+        typeof(nodes),
+        typeof(entities),
+        typeof(connectivities),
+        typeof(bc_nodes),
+        typeof(bc_faces),
+        typeof(metadata),
+    }(
         nodes,
         entities,
         connectivities,
-        bc_names,
         bc_nodes,
         _bc_faces,
         absolute_indices,
@@ -181,7 +187,7 @@ end
 
 function Mesh(
     nodes,
-    celltypes::Vector{E},
+    celltypes::E,
     cell2nodes::C;
     buildfaces::Bool = true,
     buildboundaryfaces::Bool = false,
@@ -189,7 +195,7 @@ function Mesh(
     bc_nodes::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
     bc_faces::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
     metadata::AbstractMeshMetaData = DefaultMeshMetaData(),
-) where {E <: AbstractEntityType, C <: AbstractConnectivity}
+) where {E <: AbstractVector{<:AbstractEntityType}, C <: AbstractConnectivity}
     topoDim = topodim(valtype(celltypes))
     if buildboundaryfaces
         @assert (!isempty(bc_names) && !isempty(bc_nodes)) "bc_names and bc_nodes must be provided to build boundary faces"
@@ -197,6 +203,11 @@ function Mesh(
     else
         (!isempty(bc_names) && !isempty(bc_nodes)) ? buildboundaryfaces = true : nothing
     end
+    _names = (Symbol(bc_names[i]) for i in keys(bc_names))
+    _nodes = (get(bc_nodes, i, Int[]) for i in keys(bc_names))
+    _faces = (get(bc_faces, i, Int[]) for i in keys(bc_names))
+    nt_bc_nodes = (; zip(_names, _nodes)...)
+    nt_bc_faces = (; zip(_names, _faces)...)
     Mesh(
         topoDim,
         nodes,
@@ -204,9 +215,8 @@ function Mesh(
         cell2nodes,
         buildfaces,
         buildboundaryfaces,
-        bc_names,
-        bc_nodes,
-        bc_faces,
+        nt_bc_nodes,
+        nt_bc_faces,
         metadata,
     )
 end
@@ -220,7 +230,7 @@ Base.parent(mesh::Mesh) = mesh
 @inline get_nodes(mesh::Mesh, i) = view(mesh.nodes, i)
 @inline get_nodes(mesh::Mesh, i::Int) = mesh.nodes[i]
 
-@inline set_nodes(mesh::Mesh, nodes) = mesh.nodes = nodes
+@inline set_nodes(mesh::Mesh, nodes) = mesh.nodes .= nodes
 
 @inline entities(mesh::Mesh) = mesh.entities
 @inline entities(mesh::Mesh, e::Symbol) = entities(mesh)[e]
@@ -251,18 +261,19 @@ end
 @inline connectivities(mesh::Mesh, c::Symbol) = connectivities(mesh)[c]
 @inline connectivities_indices(mesh::Mesh, c::Symbol) = indices(connectivities(mesh, c))
 
-@inline boundary_names(mesh::Mesh) = mesh.bc_names
-@inline boundary_names(mesh::Mesh, tag) = mesh.bc_names[tag]
+@inline boundary_names(mesh::Mesh) = keys(mesh.bc_nodes)
+@inline boundary_names(mesh::Mesh, tag) = keys(mesh.bc_nodes)[tag]
 @inline boundary_nodes(mesh::Mesh) = mesh.bc_nodes
 @inline boundary_nodes(mesh::Mesh, tag) = mesh.bc_nodes[tag]
 @inline boundary_faces(mesh::Mesh) = mesh.bc_faces
 @inline boundary_faces(mesh::Mesh, tag) = mesh.bc_faces[tag]
 @inline nboundaries(mesh::Mesh) = length(keys(boundary_names(mesh)))
-@inline function boundary_tag(mesh::Mesh, name::String)
-    findfirst(i -> i == name, boundary_names(mesh))
+@inline function boundary_tag(mesh::Mesh, name::Union{String, Symbol})
+    findfirst(i -> i == Symbol(name), boundary_names(mesh))
 end
-@inline boundary_faces(mesh::Mesh, name::String) = mesh.bc_faces[boundary_tag(mesh, name)]
-
+@inline function boundary_faces(mesh::Mesh, name::Union{String, Symbol})
+    mesh.bc_faces[Symbol(name)]
+end
 @inline absolute_indices(mesh::Mesh) = mesh.absolute_indices
 @inline absolute_indices(mesh::Mesh, e::Symbol) = mesh.absolute_indices[e]
 @inline local_indices(mesh::Mesh) = mesh.local_indices
@@ -322,14 +333,8 @@ function _build_faces!(c2n::MeshConnectivity, celltypes)
     return _face_types, c2f, f2c, f2n
 end
 
-function _build_boundary_faces!(
-    f2n::MeshConnectivity,
-    f2c::MeshConnectivity,
-    bc_names,
-    bc_nodes,
-)
-    @assert (bc_names ≠ nothing && bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
-    @assert (bc_names ≠ nothing && bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
+function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc_nodes)
+    @assert (bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
     @assert length(indices(f2n)) == length(indices(f2c)) "invalid f2n and/or f2c"
     @assert length(indices(f2n)) ≠ 0 "invalid f2n and/or f2c"
 
@@ -344,7 +349,7 @@ function _build_boundary_faces!(
         if length(f2c[iface]) == 1
             # Search for associated BC (if any)
             # Rq: there might not be any BC, for instance if the face if a ghost-cell face
-            for (tag, nodes) in bc_nodes
+            for (tag, nodes) in enumerate(bc_nodes)
                 if f2n ⊆ nodes
                     push!(f2bc_indices, tag)
                     f2bc_numindices[iface] = 1
@@ -358,17 +363,22 @@ function _build_boundary_faces!(
     f2bc = MeshConnectivity(:face, :face, Connectivity(f2bc_numindices, f2bc_indices))
 
     # create bc_faces
-    if length(bc_names) > 0
+    if length(bc_nodes) > 0
         f2bc_indices = indices(f2bc)
         #bc2f_indices = [[i for (i,bc) in enumerate(indices(f2bc)) if length(bc)>0 && bc[1]==bctag] for bctag in keys(bc_names)]
         #bc_faces = (;zip(Symbol.(keys(bc_names)), bc2f_indices)...)
         bc_faces = Dict{Int, Vector{Int}}()
-        for bctag in keys(bc_names)
-            bc_faces[bctag] = [
-                i for
-                (i, bc) in enumerate(indices(f2bc)) if length(bc) > 0 && bc[1] == bctag
-            ]
-        end
+        bc_faces = (;
+            zip(
+                keys(bc_nodes),
+                [
+                    [
+                        i for (i, bc) in enumerate(indices(f2bc)) if
+                        length(bc) > 0 && bc[1] == bctag
+                    ] for bctag in 1:length(bc_nodes)
+                ],
+            )...,
+        )
     end
 
     return f2bc, bc_faces

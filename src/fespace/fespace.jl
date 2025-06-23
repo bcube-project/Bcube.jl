@@ -190,7 +190,7 @@ function SingleFESpace(
     dirichletBndTags = Int[]
     bndNames = values(boundary_names(mesh))
     for name in dirichletBndNames
-        @assert name ∈ bndNames "Error with the Dirichlet condition on '$name' : this is not a boundary name. Boundary names are : $bndNames"
+        @assert Symbol(name) ∈ bndNames "Error with the Dirichlet condition on '$name' : this is not a boundary name. Boundary names are : $bndNames"
         push!(dirichletBndTags, boundary_tag(mesh, name))
     end
 

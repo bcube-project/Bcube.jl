@@ -4,5 +4,6 @@
     @test Bcube.is_continuous(U)
     @test !Bcube.is_discontinuous(U)
     @test Bcube.get_ncomponents(U) == 2
-    @test Bcube.get_dirichlet_values(U)[1](0.0, 0.0) == 3.0
+    bctag = first(Bcube.get_dirichlet_boundary_tags(U))
+    @test Bcube.get_dirichlet_values(U, bctag)(0.0, 0.0) == 3.0
 end
