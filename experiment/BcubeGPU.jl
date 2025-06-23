@@ -27,6 +27,7 @@ import Bcube:
     is_continuous,
     nlayers,
     _get_dhl,
+    _get_index,
     _scalar_shape_functions
 
 const WORKGROUP_SIZE = 32
@@ -95,6 +96,10 @@ function Adapt.adapt_structure(to, mesh::Mesh)
     )
 end
 
+Adapt.@adapt_structure CellDomain
+
+Adapt.@adapt_structure Measure
+
 Adapt.@adapt_structure DofHandler
 
 function Adapt.adapt_structure(to, feSpace::SingleFESpace{S, FS}) where {S, FS}
@@ -152,18 +157,19 @@ end
 @kernel function gpu_assemble_kernel!(
     b,
     @Const(f),
-    @Const(elts),
+    @Const(domain),
     @Const(V),
     @Const(quadrature),
     @Const(rdhl)
 )
+    # Here  `I` is a global index of a dof
     I = @index(Global)
 
     offset = rdhl.offset[I]
     for i in 1:rdhl.ncells[I]
         icell = rdhl.icells[offset + i]
         iloc = rdhl.iloc[offset + i]
-        eltInfo = elts[icell]
+        eltInfo = _get_index(domain, icell)
 
         φ = MyShapeFunction(V, iloc)
         fᵥ = Bcube.materialize(f(φ), eltInfo)
@@ -172,12 +178,13 @@ end
     end
 end
 
-function gpu_assemble!(backend, y, f, elts, V, measure, rdhl)
-    quadrature = get_quadrature(measure)
+function gpu_assemble!(backend, y, f, V, measure, rdhl)
+    quadrature = get_quadrature(measure) # not sure if it's needed here
+    domain = get_domain(measure)
     gpu_assemble_kernel!(backend, WORKGROUP_SIZE)(
         y,
         f,
-        elts,
+        domain,
         V,
         quadrature,
         rdhl;
@@ -195,63 +202,57 @@ function test_arg(backend, arg)
     test_arg_kernel(backend, WORKGROUP_SIZE)(x, arg; ndrange = size(x))
 end
 
-struct Toto{S}
-    a::S
-end
-
 function run(backend)
-    mesh = rectangle_mesh(2, 3)
-    test_arg(backend, adapt(backend, mesh.nodes)) # OK
-    test_arg(backend, adapt(backend, mesh.entities)) # OK
-    connectivities = mesh.connectivities
-    c2n = connectivities[:c2n]
-    c2n_indices = c2n.indices
-    test_arg(backend, adapt(backend, c2n_indices)) # OK
-    test_arg(backend, adapt(backend, c2n)) # OK
-    test_arg(backend, adapt(backend, mesh.connectivities)) # OK
-    test_arg(backend, adapt(backend, mesh.bc_nodes)) # OK
-    test_arg(backend, adapt(backend, mesh.bc_faces)) # OK
-    test_arg(backend, adapt(backend, mesh.metadata)) # OK
-    test_arg(backend, adapt(backend, mesh))
-    error("dbg")
+    # Mesh and domains
+    mesh_cpu = rectangle_mesh(2, 3)
+    mesh = adapt(backend, mesh_cpu)
+    test_arg(backend, mesh)
+    println("mesh on GPU!")
 
     Ω = CellDomain(mesh)
+    test_arg(backend, Ω)
+    println("Ω on GPU!")
+
     dΩ = Measure(Ω, 1)
+    test_arg(backend, dΩ)
+    println("dΩ on GPU!")
 
-    cells_cpu = map(Bcube.DomainIterator(Ω)) do cellInfo
-        icell = Bcube.cellindex(cellInfo)
-        ctype = Bcube.celltype(cellInfo)
-        nodes = SA[Bcube.nodes(cellInfo)...]
-        c2n = SA[Bcube.get_nodes_index(cellInfo)...]
-
-        Bcube.CellInfo(icell, ctype, nodes, c2n)
-    end
-    cells = adapt(backend, cells_cpu)
-
+    # Build TrialFESpace and TestFESpace
+    # The TrialFESpace must be first built on the CPU for now because the
+    # underlying DofHandler constructor uses scalar indexing
     g(x, t) = 3x[1]
     h(x, t) = 5x[1] + 2
 
     U_cpu = TrialFESpace(
         FunctionSpace(:Lagrange, 1),
-        mesh,
+        mesh_cpu,
         Dict("xmin" => 5.0, "xmax" => g, "ymin" => h),
     )
-    V_cpu = TestFESpace(U_cpu)
-    rdhl_cpu = ReverseDofHandler(mesh, U_cpu)
-
     U = adapt(backend, U_cpu)
-    V = adapt(backend, V_cpu)
-    rdhl = adapt(backend, rdhl_cpu)
+    test_arg(backend, U)
+    println("U on GPU!")
 
-    @show typeof(U)
-    @show typeof(V)
+    V = TestFESpace(U)
+    test_arg(backend, V)
+    println("V on GPU!")
+
+    # Build ReverseDofHandler : it could be part of the (direct)DofHandler
+    rdhl_cpu = ReverseDofHandler(mesh, U_cpu)
+    rdhl = adapt(backend, rdhl_cpu)
+    test_arg(backend, rdhl)
+    println("rdhl on GPU!")
+
+    # Build FEFunction
     u = FEFunction(U, KernelAbstractions.ones(backend, Float64, get_ndofs(U)))
+    test_arg(backend, u)
+    println("u on GPU!")
+
+    # Define linear form and assemble
     f(φ) = u * φ
     # f(φ) = PhysicalFunction(x -> 1.0) * φ
     y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
-    gpu_assemble!(backend, y, f, cells, V, dΩ, rdhl)
+    gpu_assemble!(backend, y, f, V, dΩ, rdhl)
     display(y)
-    # test_arg(backend, Bcube.get_quadrature(dΩ))
 
     # CUDA.@device_code_typed interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
     # @device_code_warntype interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)

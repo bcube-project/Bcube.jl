@@ -70,7 +70,7 @@ end
 @inline Base.getindex(c::Connectivity) = c.indices
 @propagate_inbounds Base.getindex(c::Connectivity, i) = view(c.indices, axes(c, i))
 @propagate_inbounds function Base.getindex(c::Connectivity, i, ::Val{N}) where {N}
-    length(c, i) == N || error("invalid length $N (length(c,i)=$(length(c,i)))")
+    #length(c, i) == N || error("invalid length $N (length(c,i)=$(length(c,i)))")
     SVector{N}(c[i])
 end
 
