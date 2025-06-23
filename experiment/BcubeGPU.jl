@@ -4,6 +4,7 @@ using Bcube
 using StaticArrays
 using KernelAbstractions
 using Adapt
+using SparseArrays
 
 const WORKGROUP_SIZE = 32
 
@@ -35,7 +36,8 @@ function ReverseDofHandler(mesh, U)
     return ReverseDofHandler(offset, ncells, icells, iloc)
 end
 
-Adapt.adapt_structure(to, V::TestFESpace) = TestFESpace(adapt(to, parent(V)))
+#>>>>>>>> Adapt some structures
+
 function Adapt.adapt_structure(to, feSpace::Bcube.SingleFESpace{S, FS}) where {S, FS}
     dhl = adapt(to, Bcube._get_dhl(feSpace))
     tags = adapt(to, Bcube.get_dirichlet_boundary_tags(feSpace))
@@ -47,8 +49,12 @@ function Adapt.adapt_structure(to, feSpace::Bcube.SingleFESpace{S, FS}) where {S
     )
 end
 
+Adapt.@adapt_structure Bcube.TestFESpace
+Adapt.@adapt_structure Bcube.TrialFESpace
+Adapt.@adapt_structure Bcube.SingleFieldFEFunction
 Adapt.@adapt_structure Bcube.DofHandler
 Adapt.@adapt_structure ReverseDofHandler
+#<<<<<<<< Adapt some structures
 
 """
 Build the connectivity <global dof index> -> <cells surrounding this dof, local index of this dof
@@ -131,7 +137,7 @@ function test_arg(backend, arg)
 end
 
 function run(backend)
-    mesh = line_mesh(3)
+    mesh = rectangle_mesh(2, 3)
 
     Ω = CellDomain(mesh)
     dΩ = Measure(Ω, 1)
@@ -146,13 +152,27 @@ function run(backend)
     end
     cells = adapt(backend, cells_cpu)
 
-    U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
-    V_cpu = TestFESpace(U)
-    rdhl_cpu = ReverseDofHandler(mesh, U)
-    rdhl = adapt(backend, rdhl_cpu)
-    f(φ) = PhysicalFunction(x -> 1.0) * φ
-    y = KernelAbstractions.zeros(backend, Float32, get_ndofs(U))
+    g(x, t) = 3x[1]
+    h(x, t) = 5x[1] + 2
+
+    U_cpu = TrialFESpace(
+        FunctionSpace(:Lagrange, 1),
+        mesh,
+        Dict("xmin" => 5.0, "xmax" => g, "ymin" => h),
+    )
+    V_cpu = TestFESpace(U_cpu)
+    rdhl_cpu = ReverseDofHandler(mesh, U_cpu)
+
+    U = adapt(backend, U_cpu)
     V = adapt(backend, V_cpu)
+    rdhl = adapt(backend, rdhl_cpu)
+
+    @show typeof(U)
+    @show typeof(V)
+    u = FEFunction(U, KernelAbstractions.ones(backend, Float64, get_ndofs(U)))
+    f(φ) = u * φ
+    # f(φ) = PhysicalFunction(x -> 1.0) * φ
+    y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
     gpu_assemble!(backend, y, f, cells, V, dΩ, rdhl)
     display(y)
     # test_arg(backend, Bcube.get_quadrature(dΩ))
