@@ -136,9 +136,6 @@ struct Mesh{topoDim, spaceDim, N, E, C, BCn, BCf, M} <: AbstractMesh{topoDim, sp
     bc_nodes::BCn #Vector{Vector{Int}}
     bc_faces::BCf #Vector{Vector{Int}}
 
-    absolute_indices::Dict{Symbol, Vector{Int}} # should disappear in favor of MeshMetaData
-    local_indices::Dict{Symbol, Dict{Int, Int}}
-
     metadata::M
 end
 
@@ -178,9 +175,6 @@ function Mesh(
         connectivities = (connectivities..., f2bc = f2bc)
     end
 
-    absolute_indices = Dict{Symbol, Vector{Int}}()
-    local_indices = Dict{Symbol, Dict{Int, Int}}()
-
     Mesh{
         topoDim,
         spaceDim,
@@ -196,8 +190,6 @@ function Mesh(
         connectivities,
         bc_nodes,
         _bc_faces,
-        absolute_indices,
-        local_indices,
         metadata,
     )
 end
@@ -290,16 +282,6 @@ end
 end
 @inline function boundary_faces(mesh::Mesh, name::Union{String, Symbol})
     mesh.bc_faces[Symbol(name)]
-end
-@inline absolute_indices(mesh::Mesh) = mesh.absolute_indices
-@inline absolute_indices(mesh::Mesh, e::Symbol) = mesh.absolute_indices[e]
-@inline local_indices(mesh::Mesh) = mesh.local_indices
-@inline local_indices(mesh::Mesh, e::Symbol) = mesh.local_indices[e]
-function add_absolute_indices!(mesh::Mesh, e::Symbol, indices::Vector{Int})
-    @assert n_entities(mesh, e) === length(indices) "invalid number of indices"
-    mesh.absolute_indices[e] = indices
-    mesh.local_indices[e] = Dict{Int, Int}(indices[i] => i for i in 1:length(indices))
-    return nothing
 end
 
 function _build_faces!(c2n::MeshConnectivity, celltypes)

@@ -5,6 +5,29 @@ using StaticArrays
 using KernelAbstractions
 using Adapt
 using SparseArrays
+import Bcube:
+    Connectivity,
+    DofHandler,
+    Mesh,
+    MeshConnectivity,
+    SingleFESpace,
+    SingleFieldFEFunction,
+    boundary_faces,
+    boundary_nodes,
+    connectivities,
+    entities,
+    get_coords,
+    get_dof,
+    get_dirichlet_boundary_tags,
+    get_function_space,
+    get_metadata,
+    get_quadrature,
+    indices,
+    integrate_on_ref_element,
+    is_continuous,
+    nlayers,
+    _get_dhl,
+    _scalar_shape_functions
 
 const WORKGROUP_SIZE = 32
 
@@ -37,32 +60,58 @@ function ReverseDofHandler(mesh, U)
 end
 
 #>>>>>>>> Adapt some structures
+Adapt.@adapt_structure Connectivity
 
-function Adapt.adapt_structure(
-    to,
-    conn::Bcube.MeshConnectivity{C, F, T, B},
-) where {C, F, T, B}
-    layers = adapt(to, Bcube.nlayers(conn))
-    ind = adapt(to, Bcube.indices(conn))
-    Bcube.MeshConnectivity{typeof(ind), F, T, B, typeof(layers)}(layers, ind)
+function Adapt.adapt_structure(to, conn::MeshConnectivity{C, F, T, B}) where {C, F, T, B}
+    layers = adapt(to, nlayers(conn))
+    ind = adapt(to, indices(conn))
+    MeshConnectivity{typeof(ind), F, T, B, typeof(layers)}(layers, ind)
 end
 
-function Adapt.adapt_structure(to, feSpace::Bcube.SingleFESpace{S, FS}) where {S, FS}
-    dhl = adapt(to, Bcube._get_dhl(feSpace))
-    tags = adapt(to, Bcube.get_dirichlet_boundary_tags(feSpace))
-    Bcube.SingleFESpace{S, FS, typeof(dhl), typeof(tags)}(
-        Bcube.get_function_space(feSpace),
+function Adapt.adapt_structure(to, mesh::Mesh)
+    nodes_gpu = adapt(to, get_nodes(mesh))
+    entities_gpu = adapt(to, entities(mesh))
+    connectivities_gpu = adapt(to, connectivities(mesh))
+    bc_nodes_gpu = adapt(to, boundary_nodes(mesh))
+    bc_faces_gpu = adapt(to, boundary_faces(mesh))
+    metadata_gpu = adapt(to, get_metadata(mesh))
+
+    Mesh{
+        topodim(mesh),
+        spacedim(mesh),
+        typeof(nodes_gpu),
+        typeof(entities_gpu),
+        typeof(connectivities_gpu),
+        typeof(bc_nodes_gpu),
+        typeof(bc_faces_gpu),
+        typeof(metadata_gpu),
+    }(
+        nodes_gpu,
+        entities_gpu,
+        connectivities_gpu,
+        bc_nodes_gpu,
+        bc_faces_gpu,
+        metadata_gpu,
+    )
+end
+
+Adapt.@adapt_structure DofHandler
+
+function Adapt.adapt_structure(to, feSpace::SingleFESpace{S, FS}) where {S, FS}
+    dhl = adapt(to, _get_dhl(feSpace))
+    tags = adapt(to, get_dirichlet_boundary_tags(feSpace))
+    SingleFESpace{S, FS, typeof(dhl), typeof(tags)}(
+        get_function_space(feSpace),
         dhl,
-        Bcube.is_continuous(feSpace),
+        is_continuous(feSpace),
         tags,
     )
 end
 
-Adapt.@adapt_structure Bcube.Connectivity
-Adapt.@adapt_structure Bcube.TestFESpace
-Adapt.@adapt_structure Bcube.TrialFESpace
-Adapt.@adapt_structure Bcube.SingleFieldFEFunction
-Adapt.@adapt_structure Bcube.DofHandler
+Adapt.@adapt_structure TestFESpace
+Adapt.@adapt_structure TrialFESpace
+Adapt.@adapt_structure SingleFieldFEFunction
+
 Adapt.@adapt_structure ReverseDofHandler
 #<<<<<<<< Adapt some structures
 
@@ -72,12 +121,12 @@ in the cells>
 """
 function build_dof_to_cells(mesh, U)
     dof_to_cells = [Tuple{Int, Int}[] for _ in 1:get_ndofs(U)]
-    dhl = Bcube._get_dhl(U)
+    dhl = _get_dhl(U)
     # dof_to_cells = [Int[] for _ in 1:get_ndofs(U)]
     for icell in 1:ncells(mesh)
         # foreach(idof -> push!(dof_to_cells[idof], icell), Bcube.get_dofs(U, icell))
         for iloc in 1:get_ndofs(dhl, icell)
-            idof = Bcube.get_dof(dhl, icell, 1, iloc) # comp = 1
+            idof = get_dof(dhl, icell, 1, iloc) # comp = 1
             push!(dof_to_cells[idof], (icell, iloc))
         end
     end
@@ -95,9 +144,9 @@ function Bcube.materialize(f::MyShapeFunction, cPoint::Bcube.CellPoint)
     cInfo = Bcube.get_cellinfo(cPoint)
     cType = Bcube.get_element_type(cInfo)
     cShape = Bcube.shape(cType)
-    fs = Bcube.get_function_space(f.feSpace)
-    ξ = Bcube.get_coords(cPoint)
-    return Bcube._scalar_shape_functions(fs, cShape, ξ)[f.iloc]
+    fs = get_function_space(f.feSpace)
+    ξ = get_coords(cPoint)
+    return _scalar_shape_functions(fs, cShape, ξ)[f.iloc]
 end
 
 @kernel function gpu_assemble_kernel!(
@@ -118,13 +167,13 @@ end
 
         φ = MyShapeFunction(V, iloc)
         fᵥ = Bcube.materialize(f(φ), eltInfo)
-        value = Bcube.integrate_on_ref_element(fᵥ, eltInfo, quadrature)
+        value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
         b[I] += value
     end
 end
 
 function gpu_assemble!(backend, y, f, elts, V, measure, rdhl)
-    quadrature = Bcube.get_quadrature(measure)
+    quadrature = get_quadrature(measure)
     gpu_assemble_kernel!(backend, WORKGROUP_SIZE)(
         y,
         f,
@@ -152,16 +201,18 @@ end
 
 function run(backend)
     mesh = rectangle_mesh(2, 3)
-    mesh_gpu = adapt(backend, mesh)
-    test_arg(backend, adapt(backend, mesh_gpu.nodes)) # OK
-    test_arg(backend, adapt(backend, mesh_gpu.entities)) # OK
-    connectivities = mesh_gpu.connectivities
+    test_arg(backend, adapt(backend, mesh.nodes)) # OK
+    test_arg(backend, adapt(backend, mesh.entities)) # OK
+    connectivities = mesh.connectivities
     c2n = connectivities[:c2n]
-    @show typeof(c2n)
     c2n_indices = c2n.indices
     test_arg(backend, adapt(backend, c2n_indices)) # OK
-    @show typeof(c2n_indices)
-    test_arg(backend, adapt(backend, c2n))
+    test_arg(backend, adapt(backend, c2n)) # OK
+    test_arg(backend, adapt(backend, mesh.connectivities)) # OK
+    test_arg(backend, adapt(backend, mesh.bc_nodes)) # OK
+    test_arg(backend, adapt(backend, mesh.bc_faces)) # OK
+    test_arg(backend, adapt(backend, mesh.metadata)) # OK
+    test_arg(backend, adapt(backend, mesh))
     error("dbg")
 
     Ω = CellDomain(mesh)
