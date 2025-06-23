@@ -210,9 +210,9 @@ A TrialFESpace is basically a SingleFESpace plus other attributes (related to bo
 # Dev notes
 * we cannot directly store Dirichlet values on dofs because the Dirichlet values needs "time" to apply
 """
-struct TrialFESpace{S, FE <: AbstractSingleFESpace} <: AbstractFESpace{S}
+struct TrialFESpace{S, FE <: AbstractSingleFESpace, D} <: AbstractFESpace{S}
     feSpace::FE
-    dirichletValues::Dict{Int, Function} # <boundary tag> => <dirichlet value (function of x, t)>
+    dirichletValues::D # <boundary tag> => <dirichlet value (function of x, t)>
 end
 
 """
@@ -271,15 +271,21 @@ function TrialFESpace(
     feSpace = SingleFESpace(fSpace, mesh, keys(dirichlet); size, isContinuous, kwargs...)
 
     # Transform any constant value into a function of (x,t)
-    dirichletValues = Dict(
+    d = Dict(
         boundary_tag(mesh, k) => (v isa Function ? v : (x, t) -> v) for (k, v) in dirichlet
     )
+
+    # Transform the dict into a NamedTuple (for GPU compatibility)
+    dirichletValues = (; zip(Symbol.(keys(d)), values(d))...)
 
     return TrialFESpace(feSpace, dirichletValues)
 end
 
 function TrialFESpace(feSpace, dirichletValues)
-    TrialFESpace{get_size(feSpace), typeof(feSpace)}(feSpace, dirichletValues)
+    TrialFESpace{get_size(feSpace), typeof(feSpace), typeof(dirichletValues)}(
+        feSpace,
+        dirichletValues,
+    )
 end
 
 function TrialFESpace(
