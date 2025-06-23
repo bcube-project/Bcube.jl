@@ -18,22 +18,6 @@ struct Connectivity{T <: Integer, O, I} <: AbstractConnectivity{T}
     maxsize::T
     offsets::O
     indices::I
-
-    function Connectivity(
-        minsize::T,
-        maxsize::T,
-        offsets::O,
-        indices::I,
-    ) where {T <: Integer, O <: AbstractVector{T}, I <: AbstractVector{T}}
-        if offsets[end] - 1 ≠ length(indices)
-            @show offsets[end] - 1, length(indices)
-            error("Invalid offset range")
-        end
-        for i in firstindex(offsets):(lastindex(offsets) - 1)
-            offsets[i + 1] < offsets[i] ? error("Invalid offset ", i) : nothing
-        end
-        new{T, O, I}(minsize, maxsize, offsets, indices)
-    end
 end
 
 function Connectivity(
@@ -48,7 +32,23 @@ function Connectivity(
     for (i, size) in enumerate(numIndices)
         offsets[i + 1] = offsets[i] + size
     end
-    return Connectivity(minsize, maxsize, offsets, indices)
+    _check_connectivity(minsize, maxsize, offsets, indices)
+    return Connectivity{T, typeof(offsets), typeof(indices)}(
+        minsize,
+        maxsize,
+        offsets,
+        indices,
+    )
+end
+
+function _check_connectivity(minsize, maxsize, offsets, indices)
+    if offsets[end] - 1 ≠ length(indices)
+        @show offsets[end] - 1, length(indices)
+        error("Invalid offset range")
+    end
+    for i in firstindex(offsets):(lastindex(offsets) - 1)
+        offsets[i + 1] < offsets[i] ? error("Invalid offset ", i) : nothing
+    end
 end
 
 Base.length(c::Connectivity) = length(c.offsets) - 1

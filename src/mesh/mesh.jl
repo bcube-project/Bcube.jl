@@ -26,22 +26,39 @@ end
 
 abstract type AbstractMeshConnectivity end
 
-struct MeshConnectivity{C} <: AbstractMeshConnectivity
-    from::Symbol
-    to::Symbol
-    by::Union{Symbol, Nothing}
-    nLayers::Union{Int, Nothing}
+"""
+Type parameters details:
+* `C` is the indices type
+* `F` is a symbol standing for "from"
+* `T` is a symbol standing for "to"
+* `B::Union{Symbol,Nothing}` is a symbol (or Nothing) standing for "by"
+* `L::Union{Int,Nothing}` is nLayers type
+
+Dev notes: `from`, `to`, `by` were previously structure properties (of type Symbol) but
+were moved to type parameter for GPU compatibility
+"""
+struct MeshConnectivity{C, F, T, B, L} <: AbstractMeshConnectivity
+    nLayers::L
     indices::C
 end
 
 function MeshConnectivity(
     from::Symbol,
     to::Symbol,
-    by::Symbol,
+    by::Union{Symbol, Nothing},
     nLayers::Union{Int, Nothing},
     connectivity::AbstractConnectivity,
 )
-    MeshConnectivity{typeof(connectivity)}(from, to, by, nLayers, connectivity)
+    MeshConnectivity{
+        typeof(connectivity),
+        typeof(from),
+        typeof(to),
+        typeof(by),
+        typeof(nLayers),
+    }(
+        nLayers,
+        connectivity,
+    )
 end
 function MeshConnectivity(from::Symbol, to::Symbol, by::Symbol, c::AbstractConnectivity)
     MeshConnectivity(from, to, by, nothing, c)
@@ -50,9 +67,9 @@ function MeshConnectivity(from::Symbol, to::Symbol, c::AbstractConnectivity)
     MeshConnectivity(from, to, nothing, nothing, c)
 end
 
-@inline from(c::MeshConnectivity) = c.from
-@inline to(c::MeshConnectivity) = c.to
-@inline by(c::MeshConnectivity) = c.by
+@inline from(::MeshConnectivity{C, F}) where {C, F} = F
+@inline to(::MeshConnectivity{C, F, T}) where {C, F, T} = T
+@inline by(::MeshConnectivity{C, F, T, B}) where {C, F, T, B} = B
 @inline nlayers(c::MeshConnectivity) = c.nLayers
 @inline indices(c::MeshConnectivity) = c.indices
 
