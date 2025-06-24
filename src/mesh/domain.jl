@@ -45,7 +45,6 @@ abstract type AbstractFaceDomain{M} <: AbstractDomain{M} end
 struct InteriorFaceDomain{M, I} <: AbstractFaceDomain{M}
     mesh::M
     indices::I
-    InteriorFaceDomain(mesh, indices) = new{typeof(mesh), typeof(indices)}(mesh, indices)
 end
 @inline topodim(d::InteriorFaceDomain) = topodim(get_mesh(d)) - 1
 InteriorFaceDomain(mesh::AbstractMesh) = InteriorFaceDomain(parent(mesh))
@@ -314,12 +313,17 @@ are duplicate from the negative ones.
 - For performance reason (type stability), nodes and type of the face
 is stored explicitely in `FaceInfo` even if it could have been
 computed by collecting info from the side of the negative or positive cells.
+- For GPU compatibility, it has been necessary to introduce two additional type
+parameters, namely `CSN` and `CSP` whereas in practice `CSN == CSP == Int`
+(bmxam : I've done multiple tests and this is the only solution I have for now.
+But I don't understand this solution and this might not be necessary)
 """
-struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N, I} <: AbstractFaceInfo
+struct FaceInfo{CN <: CellInfo, CP <: CellInfo, CSN, CSP, FT, FN, F2N, I} <:
+       AbstractFaceInfo
     cellinfo_n::CN
     cellinfo_p::CP
-    cellside_n::Int
-    cellside_p::Int
+    cellside_n::CSN
+    cellside_p::CSP
     faceType::FT
     faceNodes::FN
     f2n::F2N
@@ -341,19 +345,20 @@ function FaceInfo(
 )
     cellside_n = cell_side(celltype(cellinfo_n), get_nodes_index(cellinfo_n), f2n)
     cellside_p = cell_side(celltype(cellinfo_p), get_nodes_index(cellinfo_p), f2n)
-    if cellside_n === nothing || cellside_p === nothing
-        printstyled("\n=== ERROR in FaceInfo ===\n"; color = :red)
-        @show cellside_n
-        @show cellside_p
-        @show celltype(cellinfo_n)
-        @show get_nodes_index(cellinfo_n)
-        @show celltype(cellinfo_p)
-        @show get_nodes_index(cellinfo_p)
-        @show faceType
-        @show faceNodes
-        @show f2n
-        error("Invalid cellside in `FaceInfo`")
-    end
+    # Rq bmxam : I have to comment this block for GPU compatibility
+    #    if cellside_n === nothing || cellside_p === nothing
+    #        printstyled("\n=== ERROR in FaceInfo ===\n"; color = :red)
+    #        @show cellside_n
+    #        @show cellside_p
+    #        @show celltype(cellinfo_n)
+    #        @show get_nodes_index(cellinfo_n)
+    #        @show celltype(cellinfo_p)
+    #        @show get_nodes_index(cellinfo_p)
+    #        @show faceType
+    #        @show faceNodes
+    #        @show f2n
+    #        error("Invalid cellside in `FaceInfo`")
+    #    end
     FaceInfo(
         cellinfo_n,
         cellinfo_p,

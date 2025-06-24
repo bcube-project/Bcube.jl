@@ -1,8 +1,10 @@
 module BcubeGPU
-# using Cthulhu
+#using Cthulhu
+#using CUDA # just for debug, to be commented once solved
 using Bcube
 using StaticArrays
 using KernelAbstractions
+using GPUArrays # just to access the type AbstractGPUArray for dispatch of `inner_faces`
 using Adapt
 using SparseArrays
 import Bcube:
@@ -25,6 +27,7 @@ import Bcube:
     indices,
     integrate_on_ref_element,
     is_continuous,
+    nfaces,
     nlayers,
     _get_dhl,
     _get_index,
@@ -97,6 +100,7 @@ function Adapt.adapt_structure(to, mesh::Mesh)
 end
 
 Adapt.@adapt_structure CellDomain
+Adapt.@adapt_structure InteriorFaceDomain
 
 Adapt.@adapt_structure Measure
 
@@ -138,6 +142,23 @@ function build_dof_to_cells(mesh, U)
     return dof_to_cells
 end
 
+@kernel function inner_faces_kernel!(n_neighbors, @Const(f2c))
+    iface = @index(Global)
+    n_neighbors[iface] = length(f2c[iface])
+end
+
+function Bcube.inner_faces(mesh::Mesh{T, S, N}) where {T, S, N <: AbstractGPUArray}
+    f2c = indices(connectivities(mesh, :f2c))
+    backend = get_backend(get_nodes(mesh))
+    n_neighbors = KernelAbstractions.zeros(backend, Int, nfaces(mesh))
+    inner_faces_kernel!(backend, WORKGROUP_SIZE)(
+        n_neighbors,
+        f2c;
+        ndrange = size(n_neighbors),
+    )
+    return findall(n_neighbors .> 1)
+end
+
 struct MyShapeFunction{FE, I} <: Bcube.AbstractLazy where {FE, I}
     feSpace::FE
     iloc::I
@@ -152,6 +173,19 @@ function Bcube.materialize(f::MyShapeFunction, cPoint::Bcube.CellPoint)
     fs = get_function_space(f.feSpace)
     ξ = get_coords(cPoint)
     return _scalar_shape_functions(fs, cShape, ξ)[f.iloc]
+end
+
+struct MyFaceInfo{A, B, C, D} <: Bcube.AbstractFaceInfo
+    cellinfo_n::A
+    cellinfo_p::B
+    cellside_n::C
+    cellside_p::D
+    #faceType::FT
+    #faceNodes::FN
+    #f2n::F2N
+    #iface::I
+
+    # MyFaceInfo(a, b, c, d) = new{typeof(a), typeof(b), typeof(c)}(a, b, c, d)
 end
 
 @kernel function gpu_assemble_kernel!(
@@ -169,12 +203,12 @@ end
     for i in 1:rdhl.ncells[I]
         icell = rdhl.icells[offset + i]
         iloc = rdhl.iloc[offset + i]
-        eltInfo = _get_index(domain, icell)
+        # eltInfo = _get_index(domain, icell)
 
-        φ = MyShapeFunction(V, iloc)
-        fᵥ = Bcube.materialize(f(φ), eltInfo)
-        value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
-        b[I] += value
+        #φ = MyShapeFunction(V, iloc)
+        #fᵥ = Bcube.materialize(f(φ), eltInfo)
+        #value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
+        #b[I] += value
     end
 end
 
@@ -202,7 +236,7 @@ function test_arg(backend, arg)
     test_arg_kernel(backend, WORKGROUP_SIZE)(x, arg; ndrange = size(x))
 end
 
-function run(backend)
+function run_linear_cell_continuous(backend)
     # Mesh and domains
     mesh_cpu = rectangle_mesh(2, 3)
     mesh = adapt(backend, mesh_cpu)
@@ -253,6 +287,85 @@ function run(backend)
     y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
     gpu_assemble!(backend, y, f, V, dΩ, rdhl)
     display(y)
+
+    # Compare with CPU result
+    u_cpu = FEFunction(U_cpu, ones(get_ndofs(U)))
+    f_cpu(φ) = ∫(u_cpu * φ)Measure(CellDomain(mesh_cpu), 1)
+    println("Result on CPU:")
+    display(assemble_linear(f_cpu, TestFESpace(U_cpu)))
+
+    # CUDA.@device_code_typed interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
+    # @device_code_warntype interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
+    # @cuda cuda_kernel!(res, g, cells, quadrature)
+end
+
+function run(backend)
+    # Mesh and domains
+    mesh_cpu = rectangle_mesh(2, 3)
+    mesh = adapt(backend, mesh_cpu)
+    test_arg(backend, mesh)
+    println("mesh on GPU!")
+
+    Ω = CellDomain(mesh)
+    test_arg(backend, Ω)
+    println("Ω on GPU!")
+
+    dΩ = Measure(Ω, 1)
+    test_arg(backend, dΩ)
+    println("dΩ on GPU!")
+
+    Γ = InteriorFaceDomain(mesh)
+    test_arg(backend, Γ)
+    println("Γ on GPU!")
+
+    dΓ = Measure(Γ, 1)
+    test_arg(backend, dΓ)
+    println("dΓ on GPU!")
+
+    # Build TrialFESpace and TestFESpace
+    # The TrialFESpace must be first built on the CPU for now because the
+    # underlying DofHandler constructor uses scalar indexing
+    g(x, t) = 3x[1]
+    h(x, t) = 5x[1] + 2
+
+    U_cpu = TrialFESpace(
+        FunctionSpace(:Lagrange, 1),
+        mesh_cpu,
+        :discontinuous,
+        Dict("xmin" => 5.0, "xmax" => g, "ymin" => h),
+    )
+    U = adapt(backend, U_cpu)
+    test_arg(backend, U)
+    println("U on GPU!")
+
+    V = TestFESpace(U)
+    test_arg(backend, V)
+    println("V on GPU!")
+
+    # Build ReverseDofHandler : it could be part of the (direct)DofHandler
+    rdhl_cpu = ReverseDofHandler(mesh, U_cpu)
+    rdhl = adapt(backend, rdhl_cpu)
+    test_arg(backend, rdhl)
+    println("rdhl on GPU!")
+
+    # Build FEFunction
+    u = FEFunction(U, KernelAbstractions.ones(backend, Float64, get_ndofs(U)))
+    test_arg(backend, u)
+    println("u on GPU!")
+
+    # Define linear form and assemble
+    f(φ) = side_n(u) * jump(φ)
+    y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
+    gpu_assemble!(backend, y, f, V, dΓ, rdhl)
+    #@device_code_warntype interactive = true gpu_assemble!(backend, y, f, V, dΓ, rdhl)
+    display(y)
+    error("dbg")
+
+    # Compare with CPU result
+    u_cpu = FEFunction(U_cpu, ones(get_ndofs(U)))
+    f_cpu(φ) = ∫(side_n(u_cpu) * jump(φ))Measure(InteriorFaceDomain(mesh_cpu), 1)
+    println("Result on CPU:")
+    display(assemble_linear(f_cpu, TestFESpace(U_cpu)))
 
     # CUDA.@device_code_typed interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
     # @device_code_warntype interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
