@@ -7,28 +7,55 @@ using KernelAbstractions
 using GPUArrays # just to access the type AbstractGPUArray for dispatch of `inner_faces`
 using Adapt
 using SparseArrays
+# using BcubeGmsh # TMP
+include(joinpath(@__DIR__, "misc.jl"))
 import Bcube:
+    AbstractCellDomain,
+    AbstractFaceDomain,
+    AllFaceDomain,
+    CellInfo,
+    CellPoint,
     Connectivity,
     DofHandler,
+    DomainIterator,
+    FaceInfo,
+    FacePoint,
+    FaceSidePair,
+    LazyMapOver,
     Mesh,
     MeshConnectivity,
+    NullOperator,
+    PhysicalDomain,
+    ReferenceDomain,
+    Side⁻,
+    Side⁺,
     SingleFESpace,
     SingleFieldFEFunction,
     boundary_faces,
     boundary_nodes,
     connectivities,
     entities,
+    get_args,
+    get_cellinfo_n,
+    get_cellinfo_p,
+    get_cell_shape_functions,
+    get_cell_side_n,
+    get_cell_side_p,
     get_coords,
     get_dof,
     get_dirichlet_boundary_tags,
+    get_element_index,
+    get_element_type,
     get_function_space,
     get_metadata,
     get_quadrature,
+    idof_by_face_with_bounds,
     indices,
     integrate_on_ref_element,
     is_continuous,
     nfaces,
     nlayers,
+    shape,
     _get_dhl,
     _get_index,
     _scalar_shape_functions
@@ -37,30 +64,99 @@ const WORKGROUP_SIZE = 32
 
 struct ReverseDofHandler{A, B, C, D}
     offset::A # 1:ndofs
-    ncells::B # 1:ndofs number of cells owning each dof
-    icells::C # icells[offset[idof]:offset[idof]+ncells[idof]] are cells surrounding idof
-    iloc::D # iloc[offset[idof]:offset[idof]+ncells[idof]] are local indices of the dof in the corresponding cell
+    nelts::B # 1:ndofs number of elts owning each dof
+    ielts::C # ielts[offset[idof]:offset[idof]+nelts[idof]] are elements surrounding idof
+    iloc::D # iloc[offset[idof]:offset[idof]+nelts[idof]] are local indices of the dof in the corresponding element
 end
 
-function ReverseDofHandler(mesh, U)
-    dof_to_cells = build_dof_to_cells(mesh, U)
-    ndofs = get_ndofs(U)
+function ReverseDofHandler(dof_to_elts)
+    ndofs = length(dof_to_elts)
     offset = zeros(Int, ndofs)
-    ncells = zeros(Int, ndofs)
-    n = sum(length.(dof_to_cells))
-    icells = zeros(Int, n)
+    nelts = zeros(Int, ndofs)
+    n = sum(length.(dof_to_elts))
+    ielts = zeros(Int, n)
     iloc = zeros(Int, n)
     curr = 1
-    for (idof, x) in enumerate(dof_to_cells)
-        ncells[idof] = length(x)
-        for (icell, _iloc) in x
-            icells[curr] = icell
+    for (idof, x) in enumerate(dof_to_elts)
+        nelts[idof] = length(x)
+        for (ielt, _iloc) in x
+            ielts[curr] = ielt
             iloc[curr] = _iloc
             curr += 1
         end
-        (idof > 1) && (offset[idof] = offset[idof - 1] + ncells[idof - 1])
+        (idof > 1) && (offset[idof] = offset[idof - 1] + nelts[idof - 1])
     end
-    return ReverseDofHandler(offset, ncells, icells, iloc)
+    return ReverseDofHandler(offset, nelts, ielts, iloc)
+end
+
+"""
+Build the dof -> cell ReverseDofHandler
+
+Build the connectivity <global dof index> -> <cells surrounding this dof, local index of this dof
+in the cells>
+"""
+function ReverseDofHandler(domain::AbstractCellDomain, U)
+    dof_to_cells = [Tuple{Int, Int}[] for _ in 1:get_ndofs(U)]
+    dhl = _get_dhl(U)
+    for cInfo in DomainIterator(domain)
+        icell = get_element_index(cInfo)
+        for iloc in 1:get_ndofs(dhl, icell)
+            idof = get_dof(dhl, icell, 1, iloc) # comp = 1
+            push!(dof_to_cells[idof], (icell, iloc))
+        end
+    end
+    return ReverseDofHandler(dof_to_cells)
+end
+
+"""
+Build the dof -> face ReverseDofHandler
+
+Build the connectivity <global dof index> -> <faces (side) surrounding this dof, local index of this dof in the attached faces>
+
+Note that for interior faces, a dof may belong (in FEM) to two "face side", i.e two cells.
+For a given face number, dofs lying on the negative side will have a minus sign.
+"""
+function ReverseDofHandler(domain::AbstractFaceDomain, U)
+    dof_to_faces = [Tuple{Int, Int}[] for _ in 1:get_ndofs(U)]
+    dhl = _get_dhl(U)
+    fs = get_function_space(U)
+
+    for (iface_l, fInfo) in enumerate(DomainIterator(domain))
+        iface_g = get_element_index(fInfo)
+
+        # Negative side
+        cInfo_n = get_cellinfo_n(fInfo)
+        cshape_n = shape(get_element_type(cInfo_n))
+        icell_n = get_element_index(cInfo_n)
+        cside_n = get_cell_side_n(fInfo)
+        for iloc in 1:get_ndofs(dhl, icell_n)
+            idof = get_dof(dhl, icell_n, 1, iloc) # comp = 1
+            push!(dof_to_faces[idof], (iface_l, -iloc)) # -iloc because negative side
+        end
+        # for iloc in idof_by_face_with_bounds(fs, cshape_n)[cside_n]
+        #     idof = get_dof(dhl, icell_n, 1, iloc) # comp = 1
+        #     push!(dof_to_faces[idof], (iface, -iloc)) # -iloc because negative side
+        # end
+
+        # Positive side
+        cInfo_p = get_cellinfo_p(fInfo)
+        icell_p = get_element_index(cInfo_p)
+        (icell_n == icell_p) && continue # no positive side (boundary face)
+        cshape_p = shape(get_element_type(cInfo_p))
+        cside_p = get_cell_side_p(fInfo)
+        for iloc in 1:get_ndofs(dhl, icell_p)
+            idof = get_dof(dhl, icell_p, 1, iloc) # comp = 1
+            push!(dof_to_faces[idof], (iface_l, iloc)) # +iloc because positive side
+        end
+        # for iloc in idof_by_face_with_bounds(fs, cshape_p)[cside_p]
+        #     idof = get_dof(dhl, icell_p, 1, iloc) # comp = 1
+        #     push!(dof_to_faces[idof], (iface, iloc)) # +iloc because positive side
+        # end
+    end
+
+    display.(dof_to_faces)
+
+    return ReverseDofHandler(dof_to_faces)
 end
 
 #>>>>>>>> Adapt some structures
@@ -124,30 +220,14 @@ Adapt.@adapt_structure SingleFieldFEFunction
 Adapt.@adapt_structure ReverseDofHandler
 #<<<<<<<< Adapt some structures
 
-"""
-Build the connectivity <global dof index> -> <cells surrounding this dof, local index of this dof
-in the cells>
-"""
-function build_dof_to_cells(mesh, U)
-    dof_to_cells = [Tuple{Int, Int}[] for _ in 1:get_ndofs(U)]
-    dhl = _get_dhl(U)
-    # dof_to_cells = [Int[] for _ in 1:get_ndofs(U)]
-    for icell in 1:ncells(mesh)
-        # foreach(idof -> push!(dof_to_cells[idof], icell), Bcube.get_dofs(U, icell))
-        for iloc in 1:get_ndofs(dhl, icell)
-            idof = get_dof(dhl, icell, 1, iloc) # comp = 1
-            push!(dof_to_cells[idof], (icell, iloc))
-        end
-    end
-    return dof_to_cells
-end
-
 @kernel function inner_faces_kernel!(n_neighbors, @Const(f2c))
     iface = @index(Global)
     n_neighbors[iface] = length(f2c[iface])
 end
 
 function Bcube.inner_faces(mesh::Mesh{T, S, N}) where {T, S, N <: AbstractGPUArray}
+    # TODO : recall why we can't just use `n_neighbors = AK.map(length, f2c)` ?
+    # (maybe I haven't tried)
     f2c = indices(connectivities(mesh, :f2c))
     backend = get_backend(get_nodes(mesh))
     n_neighbors = KernelAbstractions.zeros(backend, Int, nfaces(mesh))
@@ -175,17 +255,51 @@ function Bcube.materialize(f::MyShapeFunction, cPoint::Bcube.CellPoint)
     return _scalar_shape_functions(fs, cShape, ξ)[f.iloc]
 end
 
-struct MyFaceInfo{A, B, C, D} <: Bcube.AbstractFaceInfo
-    cellinfo_n::A
-    cellinfo_p::B
-    cellside_n::C
-    cellside_p::D
-    #faceType::FT
-    #faceNodes::FN
-    #f2n::F2N
-    #iface::I
+function Bcube.materialize(f::MyShapeFunction, side::Side⁻{Nothing, <:Tuple{FaceInfo}})
+    # error("passage materialize side_n(MyShapeFunction, finfo)")
+    return f
+end
+function Bcube.materialize(f::MyShapeFunction, side::Side⁺{Nothing, <:Tuple{FaceInfo}})
+    # error("passage materialize side_p(MyShapeFunction, finfo)")
+    return f
+end
+function Bcube.materialize(f::MyShapeFunction, side::Side⁻{Nothing, <:Tuple{FacePoint}})
+    (f.iloc > 0) && return 0.0
+    cPoint = side_n(first(get_args(side)))
+    Bcube.materialize(MyShapeFunction(f.feSpace, -f.iloc), cPoint)
+    # error("passage materialize side_n(MyShapeFunction, fpoint)")
+end
+function Bcube.materialize(f::MyShapeFunction, side::Side⁺{Nothing, <:Tuple{FacePoint}})
+    (f.iloc < 0) && return 0.0
+    cPoint = side_p(first(get_args(side)))
+    # @show side_p(side)
+    # error("dbg")
+    Bcube.materialize(f, cPoint)
+    # error("passage materialize side_p(MyShapeFunction, fpoint)")
+end
 
-    # MyFaceInfo(a, b, c, d) = new{typeof(a), typeof(b), typeof(c)}(a, b, c, d)
+custom_get_shape_function(::CellInfo, V, iloc) = MyShapeFunction(V, iloc)
+function custom_get_shape_function(fInfo::FaceInfo, V, iloc)
+    φ = MyShapeFunction(V, iloc)
+    return φ
+
+    # cInfo = (iloc < 0) ? get_cellinfo_n(fInfo) : get_cellinfo_p(fInfo)
+    # cshape = shape(get_element_type(cInfo))
+    # φ = get_cell_shape_functions(V, cshape)[abs(iloc)]
+
+    # fsp = if (iloc > 0)
+    #     FaceSidePair(NullOperator(), LazyMapOver(φ))
+    # else
+    #     FaceSidePair(LazyMapOver(φ), NullOperator())
+    # end
+    # fsp = if (iloc > 0)
+    #     FaceSidePair(LazyMapOver(NullOperator()), LazyMapOver(φ))
+    # else
+    #     FaceSidePair(LazyMapOver(φ), LazyMapOver(NullOperator()))
+    # end
+    # fsp = (iloc > 0) ? FaceSidePair(NullOperator(), φ) : FaceSidePair(φ, NullOperator())
+    # return fsp
+    # return LazyMapOver((fsp,))
 end
 
 @kernel function gpu_assemble_kernel!(
@@ -200,15 +314,16 @@ end
     I = @index(Global)
 
     offset = rdhl.offset[I]
-    for i in 1:rdhl.ncells[I]
-        icell = rdhl.icells[offset + i]
+    for i in 1:rdhl.nelts[I]
+        ielt = rdhl.ielts[offset + i]
         iloc = rdhl.iloc[offset + i]
-        # eltInfo = _get_index(domain, icell)
+        eltInfo = _get_index(domain, ielt)
+        # println("integrating on iface=$ielt with iloc=$iloc")
 
-        #φ = MyShapeFunction(V, iloc)
-        #fᵥ = Bcube.materialize(f(φ), eltInfo)
-        #value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
-        #b[I] += value
+        φ = custom_get_shape_function(eltInfo, V, iloc)
+        fᵥ = Bcube.materialize(f(φ), eltInfo)
+        value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
+        b[I] += value
     end
 end
 
@@ -224,16 +339,6 @@ function gpu_assemble!(backend, y, f, V, measure, rdhl)
         rdhl;
         ndrange = size(y),
     )
-end
-
-@kernel function test_arg_kernel(x, @Const(arg))
-    I = @index(Global)
-    x[I] += 1
-end
-
-function test_arg(backend, arg)
-    x = KernelAbstractions.zeros(backend, Float32, 10)
-    test_arg_kernel(backend, WORKGROUP_SIZE)(x, arg; ndrange = size(x))
 end
 
 function run_linear_cell_continuous(backend)
@@ -270,8 +375,8 @@ function run_linear_cell_continuous(backend)
     test_arg(backend, V)
     println("V on GPU!")
 
-    # Build ReverseDofHandler : it could be part of the (direct)DofHandler
-    rdhl_cpu = ReverseDofHandler(mesh, U_cpu)
+    # Build ReverseDofHandler
+    rdhl_cpu = ReverseDofHandler(Ω, U_cpu)
     rdhl = adapt(backend, rdhl_cpu)
     test_arg(backend, rdhl)
     println("rdhl on GPU!")
@@ -301,19 +406,12 @@ end
 
 function run(backend)
     # Mesh and domains
-    mesh_cpu = rectangle_mesh(2, 3)
+    mesh_cpu = rectangle_mesh(3, 2)
     mesh = adapt(backend, mesh_cpu)
     test_arg(backend, mesh)
     println("mesh on GPU!")
 
-    Ω = CellDomain(mesh)
-    test_arg(backend, Ω)
-    println("Ω on GPU!")
-
-    dΩ = Measure(Ω, 1)
-    test_arg(backend, dΩ)
-    println("dΩ on GPU!")
-
+    Γ_cpu = InteriorFaceDomain(mesh_cpu)
     Γ = InteriorFaceDomain(mesh)
     test_arg(backend, Γ)
     println("Γ on GPU!")
@@ -342,8 +440,8 @@ function run(backend)
     test_arg(backend, V)
     println("V on GPU!")
 
-    # Build ReverseDofHandler : it could be part of the (direct)DofHandler
-    rdhl_cpu = ReverseDofHandler(mesh, U_cpu)
+    # Build ReverseDofHandler
+    rdhl_cpu = ReverseDofHandler(Γ_cpu, U_cpu)
     rdhl = adapt(backend, rdhl_cpu)
     test_arg(backend, rdhl)
     println("rdhl on GPU!")
@@ -357,9 +455,7 @@ function run(backend)
     f(φ) = side_n(u) * jump(φ)
     y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
     gpu_assemble!(backend, y, f, V, dΓ, rdhl)
-    #@device_code_warntype interactive = true gpu_assemble!(backend, y, f, V, dΓ, rdhl)
     display(y)
-    error("dbg")
 
     # Compare with CPU result
     u_cpu = FEFunction(U_cpu, ones(get_ndofs(U)))
