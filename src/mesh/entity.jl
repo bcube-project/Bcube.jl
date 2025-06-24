@@ -505,7 +505,6 @@ A `Node` is a point in space of dimension `dim`.
 struct Node{spaceDim, T}
     x::SVector{spaceDim, T}
 end
-Node(x::SVector{S, T}) where {S, T} = Node{S, T}(x)
 Node(x::Vector{T}) where {T} = Node{length(x), T}(SVector{length(x), T}(x))
 @inline get_coords(n::Node) = n.x
 get_coords(n::Node, i) = get_coords(n)[i]
