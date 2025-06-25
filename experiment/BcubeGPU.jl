@@ -67,6 +67,8 @@ const WORKGROUP_SIZE = 32
 Structure representing a sparse Matrix with non-empty rows, meaning that each
 row contains at least on element.
 
+Rq : we can actually remove this non-empty constraint easily
+
 `offset` starts at 0 : `offset[1] = 0`
 """
 struct DenseRowsSparseCols{O, D}
@@ -75,23 +77,26 @@ struct DenseRowsSparseCols{O, D}
 end
 
 function get_n_elts(x::DenseRowsSparseCols, i)
+    l = length(x.offset)
     n = x.offset[i]
-    m = (i < l) ? offset[i + 1] : l
-    return m - n + 1
+    m = (i < l) ? x.offset[i + 1] : length(x.values)
+    return m - n
 end
 
-get_elt(x::DenseRowsSparseCols, i, j) = x.values[offset[i] + j]
+get_elt(x::DenseRowsSparseCols, i, j) = x.values[x.offset[i] + j]
 
 """
 This structure actually represents two "sparse" matrices. The first sparse matrix is (idof, ielt), the
-second is (idof, iloc).
+second is (idof, iloc of idof in ielt).
 """
-struct ReverseDofHandler{A, B, C, D}
-    offset::A # 1:ndofs
-    nelts::B # 1:ndofs number of elts owning each dof
-    ielts::C # ielts[offset[idof]:offset[idof]+nelts[idof]] are elements surrounding idof
-    iloc::D # iloc[offset[idof]:offset[idof]+nelts[idof]] are local indices of the dof in the corresponding element
+struct ReverseDofHandler{A}
+    dof2elt::A
+    dof2iloc::A
 end
+
+get_n_elts(rdhl::ReverseDofHandler, idof) = get_n_elts(rdhl.dof2elt, idof)
+get_ielt(rdhl::ReverseDofHandler, idof, j) = get_elt(rdhl.dof2elt, idof, j)
+get_iloc(rdhl::ReverseDofHandler, idof, j) = get_elt(rdhl.dof2iloc, idof, j)
 
 function ReverseDofHandler(dof_to_elts)
     ndofs = length(dof_to_elts)
@@ -110,7 +115,9 @@ function ReverseDofHandler(dof_to_elts)
         end
         (idof > 1) && (offset[idof] = offset[idof - 1] + nelts[idof - 1])
     end
-    return ReverseDofHandler(offset, nelts, ielts, iloc)
+    dof2elt = DenseRowsSparseCols(offset, ielts)
+    dof2iloc = DenseRowsSparseCols(offset, iloc)
+    return ReverseDofHandler{typeof(dof2elt)}(dof2elt, dof2iloc)
 end
 
 """
@@ -129,6 +136,7 @@ function ReverseDofHandler(domain::AbstractCellDomain, U)
             push!(dof_to_cells[idof], (icell, iloc))
         end
     end
+    @show dof_to_cells
     return ReverseDofHandler(dof_to_cells)
 end
 
@@ -239,6 +247,7 @@ Adapt.@adapt_structure TestFESpace
 Adapt.@adapt_structure TrialFESpace
 Adapt.@adapt_structure SingleFieldFEFunction
 
+Adapt.@adapt_structure DenseRowsSparseCols
 Adapt.@adapt_structure ReverseDofHandler
 #<<<<<<<< Adapt some structures
 
@@ -322,11 +331,13 @@ function custom_get_shape_function(fInfo::FaceInfo, V, iloc)
     # return LazyMapOver((fsp,))
 end
 
+"""
+Assemble the idof-th element of a linear form
+"""
 function assemble_linear_elemental!(idof, b, f, domain, V, quadrature, rdhl)
-    offset = rdhl.offset[idof]
-    for i in 1:rdhl.nelts[idof]
-        ielt = rdhl.ielts[offset + i]
-        iloc = rdhl.iloc[offset + i]
+    for i in 1:get_n_elts(rdhl, idof)
+        ielt = get_ielt(rdhl, idof, i)
+        iloc = get_iloc(rdhl, idof, i)
         eltInfo = _get_index(domain, ielt)
 
         φ = MyShapeFunction(V, iloc)
@@ -350,7 +361,6 @@ function assemble_bilinear_elemental_v2!(
     U,
     V,
     quadrature,
-    rdhl_U,
     rhdl_V,
 )
     offset_V = rdhl_V.offset[idof]
@@ -496,7 +506,7 @@ function run_linear_cell_continuous(backend)
     # @cuda cuda_kernel!(res, g, cells, quadrature)
 end
 
-function run(backend)
+function run_linear_face_discontinuous(backend)
     # Mesh and domains
     mesh_cpu = rectangle_mesh(3, 2)
     mesh = adapt(backend, mesh_cpu)
