@@ -49,13 +49,7 @@ function MeshConnectivity(
     nLayers::Union{Int, Nothing},
     connectivity::AbstractConnectivity,
 )
-    MeshConnectivity{
-        typeof(connectivity),
-        typeof(from),
-        typeof(to),
-        typeof(by),
-        typeof(nLayers),
-    }(
+    MeshConnectivity{typeof(connectivity), from, to, by, typeof(nLayers)}(
         nLayers,
         connectivity,
     )

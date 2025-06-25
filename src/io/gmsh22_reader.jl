@@ -140,8 +140,11 @@ function _msh_to_bcube_mesh(
         Dict(tag => map(i -> glo2loc_node_indices[i], nodes) for (tag, nodes) in bc_nodes)
 
     mesh = Mesh(nodes, celltypes, c2n; bc_nodes, bc_names)
-    add_absolute_indices!(mesh, :node, absolute_node_indices)
-    add_absolute_indices!(mesh, :cell, absolute_cell_indices)
+    # TODO : need to decide if we want to store this in a MeshMetaData structure
+    # My opinion is that we shouldn't do it for this raw gmsh22_reader.jl, but do it
+    # for BcubeGmsh.jl
+    # add_absolute_indices!(mesh, :node, absolute_node_indices)
+    # add_absolute_indices!(mesh, :cell, absolute_cell_indices)
 
     return mesh
 end
