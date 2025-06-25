@@ -3,6 +3,7 @@ module BcubeGPU
 # using CUDA # just for debug, to be commented once solved
 using Bcube
 using StaticArrays
+using LinearAlgebra
 using KernelAbstractions
 using GPUArrays # just to access the type AbstractGPUArray for dispatch of `inner_faces`
 using Adapt
@@ -10,6 +11,8 @@ using SparseArrays
 using InteractiveUtils
 # using BcubeGmsh # TMP
 include(joinpath(@__DIR__, "misc.jl"))
+include(joinpath(@__DIR__, "assemble_linear.jl"))
+include(joinpath(@__DIR__, "assemble_bilinear.jl"))
 import Bcube:
     AbstractCellDomain,
     AbstractFaceDomain,
@@ -331,120 +334,9 @@ function custom_get_shape_function(fInfo::FaceInfo, V, iloc)
     # return LazyMapOver((fsp,))
 end
 
-"""
-Assemble the idof-th element of a linear form
-"""
-function assemble_linear_elemental!(idof, b, f, domain, V, quadrature, rdhl)
-    for i in 1:get_n_elts(rdhl, idof)
-        ielt = get_ielt(rdhl, idof, i)
-        iloc = get_iloc(rdhl, idof, i)
-        eltInfo = _get_index(domain, ielt)
-
-        φ = MyShapeFunction(V, iloc)
-        fᵥ = Bcube.materialize(f(φ), eltInfo)
-        value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
-        b[idof] += value
-    end
-end
-
-"""
-In this version, the parallelization is only performed on the rows of the matrix (A[i,:]) not
-the elements (A[i,j])
-"""
-function assemble_bilinear_elemental_v2!(
-    idof,
-    _I,
-    _J,
-    _V,
-    f,
-    domain,
-    U,
-    V,
-    quadrature,
-    rhdl_V,
-)
-    offset_V = rdhl_V.offset[idof]
-    dhl_U = _get_dhl(U)
-
-    # Loop on elements "surrounding" idof
-    for i in 1:rdhl.nelts[idof]
-        ielt = rdhl_V.ielts[offset_V + i]
-        iloc = rdhl.iloc[offset + i]
-        eltInfo = _get_index(domain, ielt)
-        φi = MyShapeFunction(V, iloc)
-
-        # Loop on dofs of U in this cell
-        # Warning : this is only valid for CellDomain assembly!
-        for (jloc, jdof) in enumerate(get_dof(dhl_U, get_element_index(eltInfo), 1)) # Warning icomp=1
-            φj = MyShapeFunction(U, jloc)
-            fᵤᵥ = Bcube.materialize(f(φj, φi), eltInfo)
-            value = integrate_on_ref_element(fᵤᵥ, eltInfo, quadrature)
-            # TODO : store in _I, _J, _V
-        end
-    end
-end
-
-"""
-In this version, the parallelization is performed on the elements (A[i,j]).
-This function must not be called for all idof ∈ V, jdof ∈ U, but only for
-(idof,jdof) sharing at least on element
-"""
-function assemble_bilinear_elemental_v1!(
-    idof,
-    jdof,
-    _I,
-    _J,
-    _V,
-    f,
-    domain,
-    U,
-    V,
-    quadrature,
-    rdhl_U,
-    rhdl_V,
-)
-    offset_V = rdhl_V.offset[idof]
-    # Loop on elements "surrounding" idof
-    for i in 1:rdhl.nelts[idof]
-        ielt = rdhl_V.ielts[offset_V + i]
-    end
-end
-
-@kernel function assemble_linear_kernel!(
-    b,
-    @Const(f),
-    @Const(domain),
-    @Const(V),
-    @Const(quadrature),
-    @Const(rdhl)
-)
-    # Here  `I` is a global index of a dof
-    I = @index(Global)
-
-    assemble_linear_elemental!(I, b, f, domain, V, quadrature, rdhl)
-end
-
-function kernabs_assemble_linear!(backend, y, f, V, measure, rdhl)
-    quadrature = get_quadrature(measure) # not sure if it's needed here
-    domain = get_domain(measure)
-
-    # @code_warntype test_gpu_assemble_kernel!(1, y, f, domain, V, quadrature, rdhl)
-    # error("dbg")
-
-    assemble_linear_kernel!(backend, WORKGROUP_SIZE)(
-        y,
-        f,
-        domain,
-        V,
-        quadrature,
-        rdhl;
-        ndrange = size(y),
-    )
-end
-
-function run_linear_cell_continuous(backend)
+function run(backend)
     # Mesh and domains
-    mesh_cpu = rectangle_mesh(2, 3)
+    mesh_cpu = rectangle_mesh(2, 4)
     mesh = adapt(backend, mesh_cpu)
     test_arg(backend, mesh)
     println("mesh on GPU!")
@@ -461,109 +353,36 @@ function run_linear_cell_continuous(backend)
     # Build TrialFESpace and TestFESpace
     # The TrialFESpace must be first built on the CPU for now because the
     # underlying DofHandler constructor uses scalar indexing
-    g(x, t) = 3x[1]
-    h(x, t) = 5x[1] + 2
-
-    U_cpu = TrialFESpace(
-        FunctionSpace(:Lagrange, 1),
-        mesh_cpu,
-        Dict("xmin" => 5.0, "xmax" => g, "ymin" => h),
-    )
+    U_cpu = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh_cpu)
     U = adapt(backend, U_cpu)
     test_arg(backend, U)
     println("U on GPU!")
 
+    V_cpu = TestFESpace(U_cpu)
     V = TestFESpace(U)
     test_arg(backend, V)
     println("V on GPU!")
 
     # Build ReverseDofHandler
-    rdhl_cpu = ReverseDofHandler(Ω_cpu, U_cpu)
+    rdhl_cpu = ReverseDofHandler(Ω_cpu, V_cpu)
     rdhl = adapt(backend, rdhl_cpu)
     test_arg(backend, rdhl)
     println("rdhl on GPU!")
 
-    # Build FEFunction
-    u = FEFunction(U, KernelAbstractions.ones(backend, Float64, get_ndofs(U)))
-    test_arg(backend, u)
-    println("u on GPU!")
+    # Build "storage" indirection for bilinear assembly
+    ind_cpu = build_bilinear_storage_ind(U_cpu, V_cpu, rdhl_cpu)
+    ind = adapt(backend, ind_cpu)
 
-    # Define linear form and assemble
-    f(φ) = u * φ
-    # f(φ) = PhysicalFunction(x -> 1.0) * φ
-    y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
-    kernabs_assemble_linear!(backend, y, f, V, dΩ, rdhl)
-    display(y)
+    # Define bilinear form and assemble
+    f(u, v) = u ⋅ v
+    A = kernabs_assemble_bilinear(backend, f, U, V, dΩ, rdhl, ind)
+    _I, _J, _V = findnz(A)
+    display(sparse(Array(_I), Array(_J), Array(_V)))
 
     # Compare with CPU result
-    u_cpu = FEFunction(U_cpu, ones(get_ndofs(U)))
-    f_cpu(φ) = ∫(u_cpu * φ)Measure(CellDomain(mesh_cpu), 1)
+    a(u, v) = ∫(f(u, v))Measure(CellDomain(mesh_cpu), 1)
     println("Result on CPU:")
-    display(assemble_linear(f_cpu, TestFESpace(U_cpu)))
-
-    # CUDA.@device_code_typed interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
-    # @device_code_warntype interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
-    # @cuda cuda_kernel!(res, g, cells, quadrature)
-end
-
-function run_linear_face_discontinuous(backend)
-    # Mesh and domains
-    mesh_cpu = rectangle_mesh(3, 2)
-    mesh = adapt(backend, mesh_cpu)
-    test_arg(backend, mesh)
-    println("mesh on GPU!")
-
-    Γ_cpu = InteriorFaceDomain(mesh_cpu)
-    Γ = InteriorFaceDomain(mesh)
-    test_arg(backend, Γ)
-    println("Γ on GPU!")
-
-    dΓ = Measure(Γ, 1)
-    test_arg(backend, dΓ)
-    println("dΓ on GPU!")
-
-    # Build TrialFESpace and TestFESpace
-    # The TrialFESpace must be first built on the CPU for now because the
-    # underlying DofHandler constructor uses scalar indexing
-    g(x, t) = 3x[1]
-    h(x, t) = 5x[1] + 2
-
-    U_cpu = TrialFESpace(
-        FunctionSpace(:Lagrange, 1),
-        mesh_cpu,
-        :discontinuous,
-        Dict("xmin" => 5.0, "xmax" => g, "ymin" => h),
-    )
-    U = adapt(backend, U_cpu)
-    test_arg(backend, U)
-    println("U on GPU!")
-
-    V = TestFESpace(U)
-    test_arg(backend, V)
-    println("V on GPU!")
-
-    # Build ReverseDofHandler
-    rdhl_cpu = ReverseDofHandler(Γ_cpu, U_cpu)
-    rdhl = adapt(backend, rdhl_cpu)
-    test_arg(backend, rdhl)
-    println("rdhl on GPU!")
-
-    # Build FEFunction
-    u = FEFunction(U, KernelAbstractions.ones(backend, Float64, get_ndofs(U)))
-    test_arg(backend, u)
-    println("u on GPU!")
-
-    # Define linear form and assemble
-    f(φ) = side_n(u) * jump(φ)
-    y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
-    kernabs_assemble_linear!(backend, y, f, V, dΓ, rdhl)
-    display(y)
-
-    # Compare with CPU result
-    u_cpu = FEFunction(U_cpu, ones(get_ndofs(U)))
-    f_cpu(φ) = ∫(side_n(u_cpu) * jump(φ))Measure(InteriorFaceDomain(mesh_cpu), 1)
-    println("Result on CPU:")
-    display(assemble_linear(f_cpu, TestFESpace(U_cpu)))
+    display(assemble_bilinear(a, U_cpu, V_cpu))
 
     # CUDA.@device_code_typed interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
     # @device_code_warntype interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
