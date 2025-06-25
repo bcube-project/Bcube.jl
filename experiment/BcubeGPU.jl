@@ -1,12 +1,13 @@
 module BcubeGPU
-#using Cthulhu
-#using CUDA # just for debug, to be commented once solved
+# using Cthulhu
+# using CUDA # just for debug, to be commented once solved
 using Bcube
 using StaticArrays
 using KernelAbstractions
 using GPUArrays # just to access the type AbstractGPUArray for dispatch of `inner_faces`
 using Adapt
 using SparseArrays
+using InteractiveUtils
 # using BcubeGmsh # TMP
 include(joinpath(@__DIR__, "misc.jl"))
 import Bcube:
@@ -62,6 +63,29 @@ import Bcube:
 
 const WORKGROUP_SIZE = 32
 
+"""
+Structure representing a sparse Matrix with non-empty rows, meaning that each
+row contains at least on element.
+
+`offset` starts at 0 : `offset[1] = 0`
+"""
+struct DenseRowsSparseCols{O, D}
+    offset::O # 1:n
+    values::D # values[offset[i]+1:offset[i]+offset[i+1]]
+end
+
+function get_n_elts(x::DenseRowsSparseCols, i)
+    n = x.offset[i]
+    m = (i < l) ? offset[i + 1] : l
+    return m - n + 1
+end
+
+get_elt(x::DenseRowsSparseCols, i, j) = x.values[offset[i] + j]
+
+"""
+This structure actually represents two "sparse" matrices. The first sparse matrix is (idof, ielt), the
+second is (idof, iloc).
+"""
 struct ReverseDofHandler{A, B, C, D}
     offset::A # 1:ndofs
     nelts::B # 1:ndofs number of elts owning each dof
@@ -153,8 +177,6 @@ function ReverseDofHandler(domain::AbstractFaceDomain, U)
         #     push!(dof_to_faces[idof], (iface, iloc)) # +iloc because positive side
         # end
     end
-
-    display.(dof_to_faces)
 
     return ReverseDofHandler(dof_to_faces)
 end
@@ -264,18 +286,16 @@ function Bcube.materialize(f::MyShapeFunction, side::Side⁺{Nothing, <:Tuple{Fa
     return f
 end
 function Bcube.materialize(f::MyShapeFunction, side::Side⁻{Nothing, <:Tuple{FacePoint}})
+    # return NullOperator()
     (f.iloc > 0) && return 0.0
     cPoint = side_n(first(get_args(side)))
     Bcube.materialize(MyShapeFunction(f.feSpace, -f.iloc), cPoint)
-    # error("passage materialize side_n(MyShapeFunction, fpoint)")
 end
 function Bcube.materialize(f::MyShapeFunction, side::Side⁺{Nothing, <:Tuple{FacePoint}})
+    # return NullOperator()
     (f.iloc < 0) && return 0.0
     cPoint = side_p(first(get_args(side)))
-    # @show side_p(side)
-    # error("dbg")
     Bcube.materialize(f, cPoint)
-    # error("passage materialize side_p(MyShapeFunction, fpoint)")
 end
 
 custom_get_shape_function(::CellInfo, V, iloc) = MyShapeFunction(V, iloc)
@@ -302,7 +322,85 @@ function custom_get_shape_function(fInfo::FaceInfo, V, iloc)
     # return LazyMapOver((fsp,))
 end
 
-@kernel function gpu_assemble_kernel!(
+function assemble_linear_elemental!(idof, b, f, domain, V, quadrature, rdhl)
+    offset = rdhl.offset[idof]
+    for i in 1:rdhl.nelts[idof]
+        ielt = rdhl.ielts[offset + i]
+        iloc = rdhl.iloc[offset + i]
+        eltInfo = _get_index(domain, ielt)
+
+        φ = MyShapeFunction(V, iloc)
+        fᵥ = Bcube.materialize(f(φ), eltInfo)
+        value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
+        b[idof] += value
+    end
+end
+
+"""
+In this version, the parallelization is only performed on the rows of the matrix (A[i,:]) not
+the elements (A[i,j])
+"""
+function assemble_bilinear_elemental_v2!(
+    idof,
+    _I,
+    _J,
+    _V,
+    f,
+    domain,
+    U,
+    V,
+    quadrature,
+    rdhl_U,
+    rhdl_V,
+)
+    offset_V = rdhl_V.offset[idof]
+    dhl_U = _get_dhl(U)
+
+    # Loop on elements "surrounding" idof
+    for i in 1:rdhl.nelts[idof]
+        ielt = rdhl_V.ielts[offset_V + i]
+        iloc = rdhl.iloc[offset + i]
+        eltInfo = _get_index(domain, ielt)
+        φi = MyShapeFunction(V, iloc)
+
+        # Loop on dofs of U in this cell
+        # Warning : this is only valid for CellDomain assembly!
+        for (jloc, jdof) in enumerate(get_dof(dhl_U, get_element_index(eltInfo), 1)) # Warning icomp=1
+            φj = MyShapeFunction(U, jloc)
+            fᵤᵥ = Bcube.materialize(f(φj, φi), eltInfo)
+            value = integrate_on_ref_element(fᵤᵥ, eltInfo, quadrature)
+            # TODO : store in _I, _J, _V
+        end
+    end
+end
+
+"""
+In this version, the parallelization is performed on the elements (A[i,j]).
+This function must not be called for all idof ∈ V, jdof ∈ U, but only for
+(idof,jdof) sharing at least on element
+"""
+function assemble_bilinear_elemental_v1!(
+    idof,
+    jdof,
+    _I,
+    _J,
+    _V,
+    f,
+    domain,
+    U,
+    V,
+    quadrature,
+    rdhl_U,
+    rhdl_V,
+)
+    offset_V = rdhl_V.offset[idof]
+    # Loop on elements "surrounding" idof
+    for i in 1:rdhl.nelts[idof]
+        ielt = rdhl_V.ielts[offset_V + i]
+    end
+end
+
+@kernel function assemble_linear_kernel!(
     b,
     @Const(f),
     @Const(domain),
@@ -313,24 +411,17 @@ end
     # Here  `I` is a global index of a dof
     I = @index(Global)
 
-    offset = rdhl.offset[I]
-    for i in 1:rdhl.nelts[I]
-        ielt = rdhl.ielts[offset + i]
-        iloc = rdhl.iloc[offset + i]
-        eltInfo = _get_index(domain, ielt)
-        # println("integrating on iface=$ielt with iloc=$iloc")
-
-        φ = custom_get_shape_function(eltInfo, V, iloc)
-        fᵥ = Bcube.materialize(f(φ), eltInfo)
-        value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
-        b[I] += value
-    end
+    assemble_linear_elemental!(I, b, f, domain, V, quadrature, rdhl)
 end
 
-function gpu_assemble!(backend, y, f, V, measure, rdhl)
+function kernabs_assemble_linear!(backend, y, f, V, measure, rdhl)
     quadrature = get_quadrature(measure) # not sure if it's needed here
     domain = get_domain(measure)
-    gpu_assemble_kernel!(backend, WORKGROUP_SIZE)(
+
+    # @code_warntype test_gpu_assemble_kernel!(1, y, f, domain, V, quadrature, rdhl)
+    # error("dbg")
+
+    assemble_linear_kernel!(backend, WORKGROUP_SIZE)(
         y,
         f,
         domain,
@@ -348,6 +439,7 @@ function run_linear_cell_continuous(backend)
     test_arg(backend, mesh)
     println("mesh on GPU!")
 
+    Ω_cpu = CellDomain(mesh_cpu)
     Ω = CellDomain(mesh)
     test_arg(backend, Ω)
     println("Ω on GPU!")
@@ -376,7 +468,7 @@ function run_linear_cell_continuous(backend)
     println("V on GPU!")
 
     # Build ReverseDofHandler
-    rdhl_cpu = ReverseDofHandler(Ω, U_cpu)
+    rdhl_cpu = ReverseDofHandler(Ω_cpu, U_cpu)
     rdhl = adapt(backend, rdhl_cpu)
     test_arg(backend, rdhl)
     println("rdhl on GPU!")
@@ -390,7 +482,7 @@ function run_linear_cell_continuous(backend)
     f(φ) = u * φ
     # f(φ) = PhysicalFunction(x -> 1.0) * φ
     y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
-    gpu_assemble!(backend, y, f, V, dΩ, rdhl)
+    kernabs_assemble_linear!(backend, y, f, V, dΩ, rdhl)
     display(y)
 
     # Compare with CPU result
@@ -454,7 +546,7 @@ function run(backend)
     # Define linear form and assemble
     f(φ) = side_n(u) * jump(φ)
     y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
-    gpu_assemble!(backend, y, f, V, dΓ, rdhl)
+    kernabs_assemble_linear!(backend, y, f, V, dΓ, rdhl)
     display(y)
 
     # Compare with CPU result
