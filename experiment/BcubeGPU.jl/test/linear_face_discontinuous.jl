@@ -55,9 +55,9 @@ function run_linear_face_discontinuous(backend)
     # Compare with CPU result
     u_cpu = FEFunction(U_cpu, ones(get_ndofs(U)))
     f_cpu(φ) = ∫(side_n(u_cpu) * jump(φ))Measure(InteriorFaceDomain(mesh_cpu), 1)
-    y_cpu = assemble_linear(f_cpu, TestFESpace(U_cpu))
+    res_cpu = assemble_linear(f_cpu, TestFESpace(U_cpu))
     println("Result on CPU:")
-    display(y_cpu)
+    display(res_cpu)
 
     return (; res_cpu, res_from_gpu)
 

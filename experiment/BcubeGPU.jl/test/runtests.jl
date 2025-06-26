@@ -8,22 +8,17 @@ using Bcube
 using Adapt
 using SparseArrays
 
-const excluded_files = ("runtests.jl", "helper.jl")
+include(joinpath(@__DIR__, "utils.jl"))
+
 const backend = CPU()
 const dir = @__DIR__
 
+const filepaths = list_examples_files(dir)
+
 @testset "BcubeGPU.jl" begin
-    for file in readdir(dir)
-        full_path = joinpath(dir, file)
-
-        # Skip if not a .jl file
-        endswith(file, ".jl") || continue
-
-        # Skip excluded files
-        file in excluded_files && continue
-
+    for file in filepaths
         # Include the file
-        include(full_path)
+        include(joinpath(dir, file))
 
         # Extract base name (e.g., file.jl -> file)
         base_name = first(splitext(file))
