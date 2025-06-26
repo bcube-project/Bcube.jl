@@ -2,9 +2,12 @@ function kernabs_assemble_linear!(backend, y, f, V, measure, rdhl)
     quadrature = get_quadrature(measure) # not sure if it's needed here
     domain = get_domain(measure)
 
-    # @code_warntype test_gpu_assemble_kernel!(1, y, f, domain, V, quadrature, rdhl)
+    # idof = 2
+    # @code_warntype assemble_linear_elemental!(idof, y, f, domain, V, quadrature, rdhl)
+    # @btime assemble_linear_elemental!($idof, $y, $f, $domain, $V, $quadrature, $rdhl)
     # error("dbg")
-
+    #
+    #@device_code_warntype interactive = true  
     assemble_linear_kernel!(backend, WORKGROUP_SIZE)(
         y,
         f,
@@ -33,17 +36,32 @@ end
 """
 Assemble the idof-th element of a linear form
 """
-function assemble_linear_elemental!(idof, b, f, domain, V, quadrature, rdhl)
+function assemble_linear_elemental!(
+    idof::I,
+    b::B,
+    f::F,
+    domain::D,
+    V::TV,
+    quadrature,
+    rdhl::R,
+) where {I, B, F, D, TV, R}
     for i in 1:get_n_elts(rdhl, idof)
         ielt = get_ielt(rdhl, idof, i)
         iloc = get_iloc(rdhl, idof, i)
         eltInfo = _get_index(domain, ielt)
 
         φ = MyShapeFunction(V, iloc)
-        fᵥ = Bcube.materialize(f(φ), eltInfo)
-        value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
-        b[idof] += value
+        _f = f(φ)
+        # fᵥ = Bcube.materialize(_f, eltInfo)
+        # value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
+        # b[idof] += value
+        b[idof] += _compute_value(_f, eltInfo, quadrature)
     end
+end
+function _compute_value(f::F, eltInfo::E, quadrature::Q) where {F, E, Q}
+    fᵥ = Bcube.materialize(f, eltInfo)
+    value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
+    return value
 end
 
 function run_linear_cell_continuous(backend)
