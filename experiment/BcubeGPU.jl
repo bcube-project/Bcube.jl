@@ -1,6 +1,12 @@
 module BcubeGPU
+# temporary / dev imports
 # using Cthulhu
 # using CUDA # just for debug, to be commented once solved
+using InteractiveUtils
+using BenchmarkTools
+using DelimitedFiles
+
+# standard imports
 using Bcube
 using StaticArrays
 using LinearAlgebra
@@ -8,10 +14,6 @@ using KernelAbstractions
 using GPUArrays # just to access the type AbstractGPUArray for dispatch of `inner_faces`
 using Adapt
 using SparseArrays
-using InteractiveUtils
-using BenchmarkTools
-using Cthulhu
-using CUDA
 # using BcubeGmsh # TMP
 include(joinpath(@__DIR__, "misc.jl"))
 include(joinpath(@__DIR__, "assemble_linear.jl"))
@@ -55,7 +57,9 @@ import Bcube:
     get_element_type,
     get_function_space,
     get_metadata,
+    get_ncomponents,
     get_quadrature,
+    get_shape_functions,
     idof_by_face_with_bounds,
     indices,
     integrate_on_ref_element,
@@ -63,6 +67,7 @@ import Bcube:
     nfaces,
     nlayers,
     shape,
+    shape_functions,
     _get_dhl,
     _get_index,
     _scalar_shape_functions
@@ -130,16 +135,21 @@ end
 Build the dof -> cell ReverseDofHandler
 
 Build the connectivity <global dof index> -> <cells surrounding this dof, local index of this dof
-in the cells>
+in the cells (all components merged)>
 """
 function ReverseDofHandler(domain::AbstractCellDomain, U)
     dof_to_cells = [Tuple{Int, Int}[] for _ in 1:get_ndofs(U)]
     dhl = _get_dhl(U)
+    ncomps = get_ncomponents(U)
     for cInfo in DomainIterator(domain)
         icell = get_element_index(cInfo)
-        for iloc in 1:get_ndofs(dhl, icell)
-            idof = get_dof(dhl, icell, 1, iloc) # comp = 1
-            push!(dof_to_cells[idof], (icell, iloc))
+        kloc = 1
+        for icomp in 1:ncomps
+            for iloc in 1:get_ndofs(dhl, icell, icomp)
+                idof = get_dof(dhl, icell, icomp, iloc)
+                push!(dof_to_cells[idof], (icell, kloc))
+                kloc += 1
+            end
         end
     end
     @show dof_to_cells
@@ -289,7 +299,16 @@ function Bcube.materialize(f::MyShapeFunction, cPoint::Bcube.CellPoint)
     cShape = Bcube.shape(cType)
     fs = get_function_space(f.feSpace)
     ξ = get_coords(cPoint)
-    return _scalar_shape_functions(fs, cShape, ξ)[f.iloc]
+    nc = Val(get_ncomponents(f.feSpace))
+
+    # return _scalar_shape_functions(fs, cShape, ξ)[f.iloc]
+
+    # display(shape_functions(fs, nc, cShape, ξ))
+    return shape_functions(fs, nc, cShape, ξ)[f.iloc, :]
+
+    # φ = get_shape_functions(f.feSpace, cShape)[f.iloc]
+    # _φ = Bcube.materialize(φ, cInfo)
+    # return Bcube.materialize(_φ, ξ)
 end
 
 function Bcube.materialize(f::MyShapeFunction, side::Side⁻{Nothing, <:Tuple{FaceInfo}})
@@ -338,60 +357,13 @@ function custom_get_shape_function(fInfo::FaceInfo, V, iloc)
 end
 
 function run(backend)
-    run_linear_face_discontinuous(backend)
-    return
-    # Mesh and domains
-    mesh_cpu = rectangle_mesh(2, 4)
-    mesh = adapt(backend, mesh_cpu)
-    test_arg(backend, mesh)
-    println("mesh on GPU!")
+    # Linear examples
+    run_linear_cell_continuous(backend)
+    run_linear_cell_continuous_vector(backend)
 
-    Ω_cpu = CellDomain(mesh_cpu)
-    Ω = CellDomain(mesh)
-    test_arg(backend, Ω)
-    println("Ω on GPU!")
-
-    dΩ = Measure(Ω, 1)
-    test_arg(backend, dΩ)
-    println("dΩ on GPU!")
-
-    # Build TrialFESpace and TestFESpace
-    # The TrialFESpace must be first built on the CPU for now because the
-    # underlying DofHandler constructor uses scalar indexing
-    U_cpu = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh_cpu)
-    U = adapt(backend, U_cpu)
-    test_arg(backend, U)
-    println("U on GPU!")
-
-    V_cpu = TestFESpace(U_cpu)
-    V = TestFESpace(U)
-    test_arg(backend, V)
-    println("V on GPU!")
-
-    # Build ReverseDofHandler
-    rdhl_cpu = ReverseDofHandler(Ω_cpu, V_cpu)
-    rdhl = adapt(backend, rdhl_cpu)
-    test_arg(backend, rdhl)
-    println("rdhl on GPU!")
-
-    # Build "storage" indirection for bilinear assembly
-    ind_cpu = build_bilinear_storage_ind(U_cpu, V_cpu, rdhl_cpu)
-    ind = adapt(backend, ind_cpu)
-
-    # Define bilinear form and assemble
-    f(u, v) = u ⋅ v
-    A = kernabs_assemble_bilinear(backend, f, U, V, dΩ, rdhl, ind)
-    _I, _J, _V = findnz(A)
-    display(sparse(Array(_I), Array(_J), Array(_V)))
-
-    # Compare with CPU result
-    a(u, v) = ∫(f(u, v))Measure(CellDomain(mesh_cpu), 1)
-    println("Result on CPU:")
-    display(assemble_bilinear(a, U_cpu, V_cpu))
-
-    # CUDA.@device_code_typed interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
-    # @device_code_warntype interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
-    # @cuda cuda_kernel!(res, g, cells, quadrature)
+    # Bilinear examples
+    run_bilinear_cell_continuous(backend)
+    run_bilinear_cell_continuous_vector(backend)
 end
 
 end
