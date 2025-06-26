@@ -4,20 +4,14 @@ module BcubeGPU
 # using CUDA # just for debug, to be commented once solved
 using InteractiveUtils
 using BenchmarkTools
-using DelimitedFiles
 
 # standard imports
 using Bcube
 using StaticArrays
-using LinearAlgebra
 using KernelAbstractions
 using GPUArrays # just to access the type AbstractGPUArray for dispatch of `inner_faces`
 using Adapt
 using SparseArrays
-# using BcubeGmsh # TMP
-include(joinpath(@__DIR__, "misc.jl"))
-include(joinpath(@__DIR__, "assemble_linear.jl"))
-include(joinpath(@__DIR__, "assemble_bilinear.jl"))
 import Bcube:
     AbstractCellDomain,
     AbstractFaceDomain,
@@ -73,6 +67,10 @@ import Bcube:
     _scalar_shape_functions
 
 const WORKGROUP_SIZE = 32
+
+include(joinpath(@__DIR__, "temp.jl"))
+include(joinpath(@__DIR__, "assemble_linear.jl"))
+include(joinpath(@__DIR__, "assemble_bilinear.jl"))
 
 """
 Structure representing a sparse Matrix with non-empty rows, meaning that each
@@ -300,23 +298,13 @@ function Bcube.materialize(f::MyShapeFunction, cPoint::Bcube.CellPoint)
     fs = get_function_space(f.feSpace)
     ξ = get_coords(cPoint)
     nc = Val(get_ncomponents(f.feSpace))
-
-    # return _scalar_shape_functions(fs, cShape, ξ)[f.iloc]
-
-    # display(shape_functions(fs, nc, cShape, ξ))
     return shape_functions(fs, nc, cShape, ξ)[f.iloc, :]
-
-    # φ = get_shape_functions(f.feSpace, cShape)[f.iloc]
-    # _φ = Bcube.materialize(φ, cInfo)
-    # return Bcube.materialize(_φ, ξ)
 end
 
-function Bcube.materialize(f::MyShapeFunction, side::Side⁻{Nothing, <:Tuple{FaceInfo}})
-    # error("passage materialize side_n(MyShapeFunction, finfo)")
+function Bcube.materialize(f::MyShapeFunction, ::Side⁻{Nothing, <:Tuple{FaceInfo}})
     return f
 end
-function Bcube.materialize(f::MyShapeFunction, side::Side⁺{Nothing, <:Tuple{FaceInfo}})
-    # error("passage materialize side_p(MyShapeFunction, finfo)")
+function Bcube.materialize(f::MyShapeFunction, ::Side⁺{Nothing, <:Tuple{FaceInfo}})
     return f
 end
 function Bcube.materialize(f::MyShapeFunction, side::Side⁻{Nothing, <:Tuple{FacePoint}})
@@ -332,38 +320,7 @@ function Bcube.materialize(f::MyShapeFunction, side::Side⁺{Nothing, <:Tuple{Fa
     Bcube.materialize(f, cPoint)
 end
 
-custom_get_shape_function(::CellInfo, V, iloc) = MyShapeFunction(V, iloc)
-function custom_get_shape_function(fInfo::FaceInfo, V, iloc)
-    φ = MyShapeFunction(V, iloc)
-    return φ
-
-    # cInfo = (iloc < 0) ? get_cellinfo_n(fInfo) : get_cellinfo_p(fInfo)
-    # cshape = shape(get_element_type(cInfo))
-    # φ = get_cell_shape_functions(V, cshape)[abs(iloc)]
-
-    # fsp = if (iloc > 0)
-    #     FaceSidePair(NullOperator(), LazyMapOver(φ))
-    # else
-    #     FaceSidePair(LazyMapOver(φ), NullOperator())
-    # end
-    # fsp = if (iloc > 0)
-    #     FaceSidePair(LazyMapOver(NullOperator()), LazyMapOver(φ))
-    # else
-    #     FaceSidePair(LazyMapOver(φ), LazyMapOver(NullOperator()))
-    # end
-    # fsp = (iloc > 0) ? FaceSidePair(NullOperator(), φ) : FaceSidePair(φ, NullOperator())
-    # return fsp
-    # return LazyMapOver((fsp,))
-end
-
-function run(backend)
-    # Linear examples
-    run_linear_cell_continuous(backend)
-    run_linear_cell_continuous_vector(backend)
-
-    # Bilinear examples
-    run_bilinear_cell_continuous(backend)
-    run_bilinear_cell_continuous_vector(backend)
-end
+export ReverseDofHandler
+export test_arg # to be deleted
 
 end
