@@ -9,6 +9,9 @@ using GPUArrays # just to access the type AbstractGPUArray for dispatch of `inne
 using Adapt
 using SparseArrays
 using InteractiveUtils
+using BenchmarkTools
+using Cthulhu
+using CUDA
 # using BcubeGmsh # TMP
 include(joinpath(@__DIR__, "misc.jl"))
 include(joinpath(@__DIR__, "assemble_linear.jl"))
@@ -335,6 +338,8 @@ function custom_get_shape_function(fInfo::FaceInfo, V, iloc)
 end
 
 function run(backend)
+    run_linear_face_discontinuous(backend)
+    return
     # Mesh and domains
     mesh_cpu = rectangle_mesh(2, 4)
     mesh = adapt(backend, mesh_cpu)

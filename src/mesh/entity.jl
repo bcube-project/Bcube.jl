@@ -480,6 +480,8 @@ end
 function cell_side(t::AbstractEntityType, c2n::AbstractVector, f2n::AbstractVector)
     all_f2n = f2n_from_c2n(t, c2n)
     side = myfindfirst(x -> x ⊆ f2n, all_f2n)
+    @assert isa(side, Integer) "invalid cell side"
+    return side
 end
 
 function oriented_cell_side(t::AbstractEntityType, c2n::AbstractVector, f2n::AbstractVector)
