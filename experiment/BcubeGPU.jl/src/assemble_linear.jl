@@ -52,14 +52,12 @@ function assemble_linear_elemental!(
 
         φ = MyShapeFunction(V, iloc)
         _f = f(φ)
-        # fᵥ = Bcube.materialize(_f, eltInfo)
-        # value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)
-        # b[idof] += value
         x = _compute_value(_f, eltInfo, quadrature)
         @assert length(x) == 1 "Result is not scalar"
         b[idof] += first(x)
     end
 end
+
 function _compute_value(f::F, eltInfo::E, quadrature::Q) where {F, E, Q}
     fᵥ = Bcube.materialize(f, eltInfo)
     value = integrate_on_ref_element(fᵥ, eltInfo, quadrature)

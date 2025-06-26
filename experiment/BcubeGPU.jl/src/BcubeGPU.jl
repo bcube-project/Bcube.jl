@@ -309,13 +309,13 @@ function Bcube.materialize(f::MyShapeFunction, ::Side⁺{Nothing, <:Tuple{FaceIn
 end
 function Bcube.materialize(f::MyShapeFunction, side::Side⁻{Nothing, <:Tuple{FacePoint}})
     # return NullOperator()
-    (f.iloc > 0) && return 0.0
+    (f.iloc > 0) && return NullOperator()
     cPoint = side_n(first(get_args(side)))
     Bcube.materialize(MyShapeFunction(f.feSpace, -f.iloc), cPoint)
 end
 function Bcube.materialize(f::MyShapeFunction, side::Side⁺{Nothing, <:Tuple{FacePoint}})
     # return NullOperator()
-    (f.iloc < 0) && return 0.0
+    (f.iloc < 0) && return NullOperator()
     cPoint = side_p(first(get_args(side)))
     Bcube.materialize(f, cPoint)
 end
