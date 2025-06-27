@@ -31,8 +31,7 @@ const filepaths = list_examples_files(dir)
             println("Running function: ", func_name)
             f = getfield(Main, func_name)
             @testset "$base_name" begin
-                x = f(backend)
-                @test x.res_cpu == x.res_from_gpu
+                @test f(backend)
             end
         else
             @warn "Function $(func_name) not found or not callable"

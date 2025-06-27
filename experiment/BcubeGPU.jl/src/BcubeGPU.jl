@@ -50,6 +50,7 @@ import Bcube:
     get_element_index,
     get_element_type,
     get_function_space,
+    get_mapping,
     get_metadata,
     get_ncomponents,
     get_quadrature,
@@ -150,7 +151,6 @@ function ReverseDofHandler(domain::AbstractCellDomain, U)
             end
         end
     end
-    @show dof_to_cells
     return ReverseDofHandler(dof_to_cells)
 end
 
@@ -284,14 +284,30 @@ function Bcube.inner_faces(mesh::Mesh{T, S, N}) where {T, S, N <: AbstractGPUArr
     return findall(n_neighbors .> 1)
 end
 
-struct MyShapeFunction{FE, I} <: Bcube.AbstractLazy where {FE, I}
+struct MyShapeFunction{S, FE, I} <: Bcube.AbstractLazy where {S, FE, I}
     feSpace::FE
     iloc::I
 end
 
+function MyShapeFunction(feSpace, iloc)
+    MyShapeFunction{get_ncomponents(feSpace), typeof(feSpace), typeof(iloc)}(feSpace, iloc)
+end
+
+# This is in Bcube but only for an AbstractLazyOperator and for simplicity I chose to descend from AbstractLazy
+(lOp::MyShapeFunction)(x::Vararg{Any, N}) where {N} = Bcube.materialize(lOp, x...)
+
 Bcube.materialize(f::MyShapeFunction, ::Bcube.CellInfo) = f
 
-function Bcube.materialize(f::MyShapeFunction, cPoint::Bcube.CellPoint)
+function Bcube.materialize(f::MyShapeFunction{1}, cPoint::Bcube.CellPoint)
+    cInfo = Bcube.get_cellinfo(cPoint)
+    cType = Bcube.get_element_type(cInfo)
+    cShape = Bcube.shape(cType)
+    fs = get_function_space(f.feSpace)
+    ξ = get_coords(cPoint)
+    return _scalar_shape_functions(fs, cShape, ξ)[f.iloc]
+end
+
+function Bcube.materialize(f::MyShapeFunction{N}, cPoint::Bcube.CellPoint) where {N}
     cInfo = Bcube.get_cellinfo(cPoint)
     cType = Bcube.get_element_type(cInfo)
     cShape = Bcube.shape(cType)
