@@ -53,8 +53,9 @@ function assemble_linear_elemental!(
         φ = MyShapeFunction(V, iloc)
         _f = f(φ)
         x = _compute_value(_f, eltInfo, quadrature)
-        @assert length(x) == 1 "Result is not scalar"
-        b[idof] += first(x)
+        # @assert length(x) == 1 "Result is not scalar" # KO on CUDA
+        # b[idof] += first(x) # KO on CUDA
+        b[idof] += x[1] # quite bad because first element of `x` could be something else than "1"
     end
 end
 
