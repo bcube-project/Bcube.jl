@@ -16,19 +16,8 @@ include(joinpath(@__DIR__, "utils.jl"))
 const filepaths = list_examples_files(@__DIR__)
 for file in filepaths
     full_path = joinpath(@__DIR__, file)
-    println("Including file $(full_path)")
+    # println("Including file $(full_path)")
     include(full_path)
-end
-
-function run_helper(backend)
-    # Linear examples
-    # run_linear_cell_continuous(backend)
-    # run_linear_cell_continuous_vector(backend)
-    run_linear_face_discontinuous(backend)
-
-    # Bilinear examples
-    # run_bilinear_cell_continuous(backend)
-    # run_bilinear_cell_continuous_vector(backend)
 end
 
 function run_tests(backend)
@@ -50,4 +39,20 @@ function run_tests(backend)
         end
     end
 end
+
+function run_helper(backend)
+    # Linear examples
+    run_linear_cell_continuous(backend)
+    # run_linear_cell_continuous_multi(backend)
+    # run_linear_cell_continuous_vector(backend)
+    # run_linear_face_discontinuous(backend)
+
+    # Bilinear examples
+    # run_bilinear_cell_continuous(backend)
+    # run_bilinear_cell_continuous_vector(backend)
+
+    # Full problem
+    # run_helmholtz(backend)
+end
+
 end

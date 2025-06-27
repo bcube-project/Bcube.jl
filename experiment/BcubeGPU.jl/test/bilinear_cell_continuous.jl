@@ -50,7 +50,7 @@ function run_bilinear_cell_continuous(backend)
     println("Result on CPU:")
     display(res_cpu)
 
-    return (; res_cpu, res_from_gpu)
+    return res_cpu == res_from_gpu
 
     # CUDA.@device_code_typed interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)
     # @device_code_warntype interactive = true @cuda cuda_kernel!(res, g, cells, quadrature)

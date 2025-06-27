@@ -1,13 +1,8 @@
+""" Single FESpace version """
 function kernabs_assemble_linear!(backend, y, f, V, measure, rdhl)
     quadrature = get_quadrature(measure) # not sure if it's needed here
     domain = get_domain(measure)
 
-    # idof = 2
-    # @code_warntype assemble_linear_elemental!(idof, y, f, domain, V, quadrature, rdhl)
-    # @btime assemble_linear_elemental!($idof, $y, $f, $domain, $V, $quadrature, $rdhl)
-    # error("dbg")
-    #
-    #@device_code_warntype interactive = true
     assemble_linear_kernel!(backend, WORKGROUP_SIZE)(
         y,
         f,
@@ -17,6 +12,30 @@ function kernabs_assemble_linear!(backend, y, f, V, measure, rdhl)
         rdhl;
         ndrange = size(y),
     )
+    synchronize(backend)
+end
+
+""" Multi FESpace version """
+function kernabs_assemble_linear!(backend, y, f, V::MultiFESpace, measure, rdhl::Tuple)
+    quadrature = get_quadrature(measure) # not sure if it's needed here
+    domain = get_domain(measure)
+    mappings = get_mapping(V)
+
+    error("wip")
+
+    for (_V, m, _rdhl) in zip(V, mappings, rdhl)
+        _y = view(y, m)
+        assemble_linear_kernel!(backend, WORKGROUP_SIZE)(
+            y,
+            f,
+            domain,
+            _V,
+            quadrature,
+            _rdhl;
+            ndrange = size(_y),
+        )
+    end
+    synchronize(backend)
 end
 
 @kernel function assemble_linear_kernel!(

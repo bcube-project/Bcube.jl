@@ -20,6 +20,7 @@ function kernabs_assemble_bilinear(backend, f, U, V, measure, rdhl_V, ind)
         ind;
         ndrange = get_ndofs(V),
     )
+    synchronize(backend)
 
     return sparse(_I, _J, _V)
 end
@@ -139,8 +140,5 @@ function build_bilinear_storage_ind(U, V, rdhl_V)
         end
     end
     values = collect(1:sum(ndofs_by_dof))
-    @show ndofs_by_dof
-    @show offset
-    @show values
     return DenseRowsSparseCols(offset, values)
 end
