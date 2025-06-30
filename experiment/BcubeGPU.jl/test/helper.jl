@@ -3,10 +3,10 @@ using BcubeGPU
 using KernelAbstractions
 using DelimitedFiles
 using LinearAlgebra
-using BcubeGmsh
-using Bcube
+using Bcube, BcubeGmsh, BcubeVTK
 using Adapt
 using SparseArrays
+using StaticArrays
 
 # this file is a helper to select the example(s) we want to run by
 # exposing a single "run" function. It avoids modifying the
@@ -42,7 +42,7 @@ end
 
 function run_helper(backend)
     # Linear examples
-    run_linear_cell_continuous(backend)
+    # run_linear_cell_continuous(backend)
     # run_linear_cell_continuous_multi(backend)
     # run_linear_cell_continuous_vector(backend)
     # run_linear_face_discontinuous(backend)
@@ -52,7 +52,8 @@ function run_helper(backend)
     # run_bilinear_cell_continuous_vector(backend)
 
     # Full problem
-    # run_helmholtz(backend)
+    # @show run_helmholtz(backend)
+    @show run_linear_transport(backend)
 end
 
 end
