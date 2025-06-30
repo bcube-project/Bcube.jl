@@ -34,11 +34,14 @@ import Bcube:
     Side⁺,
     SingleFESpace,
     SingleFieldFEFunction,
+    bctype,
     boundary_faces,
     boundary_nodes,
     connectivities,
     entities,
     get_args,
+    get_bc,
+    get_cache,
     get_cellinfo_n,
     get_cellinfo_p,
     get_cell_shape_functions,
@@ -51,6 +54,7 @@ import Bcube:
     get_element_type,
     get_function_space,
     get_mapping,
+    get_mesh,
     get_metadata,
     get_ncomponents,
     get_quadrature,
@@ -241,6 +245,28 @@ end
 
 Adapt.@adapt_structure CellDomain
 Adapt.@adapt_structure InteriorFaceDomain
+
+function Adapt.adapt_structure(to, b::BoundaryFaceDomain)
+    println("Running adapt on BoundaryFaceDomain")
+    mesh = adapt(to, get_mesh(b))
+    bc = adapt(to, get_bc(b))
+    labels = adapt(to, [b.labels...])
+    cache = adapt(to, get_cache(b))
+
+    BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(labels), typeof(cache)}(
+        mesh,
+        bc,
+        labels,
+        cache,
+    )
+end
+
+function Adapt.adapt_structure(
+    to,
+    b::BoundaryFaceDomain{M, BC},
+) where {M, BC <: Bcube.PeriodicBCType}
+    error("not implemented yet")
+end
 
 Adapt.@adapt_structure Measure
 

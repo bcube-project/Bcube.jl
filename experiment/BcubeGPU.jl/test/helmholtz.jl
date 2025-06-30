@@ -29,6 +29,8 @@ function run_helmholtz(backend)
     A = BcubeGPU.kernabs_assemble_bilinear(backend, a, U, V, dΩ, rdhl, ind)
     B = BcubeGPU.kernabs_assemble_bilinear(backend, b, U, V, dΩ, rdhl, ind)
 
+    # we could maybe compute the eigenvalues using KrylovKit or something like this
+
     # Ref solution on CPU
     dΩ_cpu = Measure(Ω_cpu, 2 * degree + 1)
     _a(u, v) = ∫(a(u, v))dΩ_cpu
@@ -36,8 +38,5 @@ function run_helmholtz(backend)
     A = assemble_bilinear(_a, U_cpu, V_cpu)
     B = assemble_bilinear(_b, U_cpu, V_cpu)
 
-    return (A == sparse(Array.(findnz(A)))) && (B == sparse(Array.(findnz(B))))
-
-    # vp, vecp = eigen(Matrix(A), Matrix(B))
-    # @show sqrt.(abs.(vp[3:8]))
+    return (A == sparse(Array.(findnz(A))...)) && (B == sparse(Array.(findnz(B))...))
 end
