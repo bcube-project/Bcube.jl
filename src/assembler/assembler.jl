@@ -842,6 +842,45 @@ end
 _domain_to_mesh_nelts(domain::AbstractCellDomain) = ncells(get_mesh(domain))
 _domain_to_mesh_nelts(domain::AbstractFaceDomain) = nfaces(get_mesh(domain))
 
+
+"""
+    compute(multi::MultiIntegration)
+
+Evaluates a sum of integrals stored in a `MultiIntegration` object.
+
+Each sub-integral is of the form `∫(f)dΩ`, computed over a specific domain
+with a given quadrature. The result of `compute(multi)` is the sum of the
+results of `compute` applied to each individual `Integration`.
+
+Returns a `SparseVector` whose indices correspond to the mesh entities
+(cells, faces, etc.) of the integration domains. The values represent the
+total integral contribution over those entities.
+
+# Example
+```julia
+mesh = line_mesh(4)
+Ω    = CellDomain(mesh)
+dΩ   = Measure(Ω, 2)
+f    = PhysicalFunction(x -> 1.0)
+int1 = ∫(f)dΩ
+int2 = 2.0 * int1
+multi = int1 + int2
+res = compute(multi)  # should be equal to 3 * compute(int1)
+"""
+
+function compute(multi::MultiIntegration{N}) where {N}
+    ∑ = compute(multi[Val(1)]) 
+    N == 1 && return ∑
+    for i in 2:N
+        tmp = compute(multi[Val(i)])
+        @assert length(tmp) == length(∑) "Measures don't fit."
+        ∑ .+= tmp
+    end
+    return ∑
+end
+
+
+
 """
     AbstractFaceSidePair{A} <: AbstractLazyWrap{A}
 

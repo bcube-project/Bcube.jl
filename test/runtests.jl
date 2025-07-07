@@ -166,5 +166,6 @@ tempdir = mktempdir()
     @testset "Issues" begin
         custom_include("./issues/issue_112.jl")
         custom_include("./issues/issue_130.jl")
+        custom_include("./issues/issue_101.jl")
     end
 end
