@@ -20,12 +20,12 @@ function integrate_on_ref_element(g, eltInfo, quadrature::AbstractQuadrature)
 end
 
 function integrate_on_ref_element(
-    g,
+    g::G,
     elementInfo::Union{CellInfo, FaceInfo},
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
-)
-    _g(ξ) = g(ElementPoint(ξ, elementInfo, ReferenceDomain()))
+) where {G}
+    _g(ξ::T) where {T} = g(ElementPoint(ξ, elementInfo, ReferenceDomain()))
     integrate_on_ref_element(
         _g,
         get_element_type(elementInfo),
@@ -36,12 +36,12 @@ function integrate_on_ref_element(
 end
 
 function integrate_on_ref_element(
-    g,
-    ctype,
-    cnodes,
+    g::G,
+    ctype::CT,
+    cnodes::CN,
     quadrature::AbstractQuadrature,
     mapstyle::MapComputeQuadratureStyle,
-)
+) where {G, CT, CN}
     f = Base.Fix1(_apply_metric, (g, ctype, cnodes))
     int = apply_quadrature(f, ctype, cnodes, quadrature, mapstyle)
     return int
@@ -146,11 +146,11 @@ end
 
 function apply_quadrature(
     ::isVolumic,
-    g,
+    g::G,
     shape::AbstractShape,
     quadrature::AbstractQuadrature,
     qStyle::MapComputeQuadratureStyle,
-)
+) where {G}
     apply_quadrature(g, shape, quadrature, qStyle)
 end
 
