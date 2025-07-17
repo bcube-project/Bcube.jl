@@ -214,10 +214,11 @@ function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol, Vararg{Symbol}})
     bndfaces = vcat(map(label -> boundary_faces(mesh, label), labels)...)
     cache = bndfaces
     bc = nothing
-    BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(labels), typeof(cache)}(
+    _labels = (; zip(labels, ntuple(i -> i, length(labels)))...) # store labels as keys of a namedtuple for make it isbits
+    BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(_labels), typeof(cache)}(
         mesh,
         bc,
-        labels,
+        _labels,
         cache,
     )
 end
