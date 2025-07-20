@@ -194,9 +194,9 @@ function Mesh(
     cell2nodes::C;
     buildfaces::Bool = true,
     buildboundaryfaces::Bool = false,
-    bc_names::Dict{Int, String} = Dict{Int, String}(),
-    bc_nodes::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
-    bc_faces::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
+    bc_names = Dict{Int, String}(),
+    bc_nodes = Dict{Int, Vector{Int}}(),
+    bc_faces = Dict{Int, Vector{Int}}(),
     metadata::AbstractMeshMetaData = DefaultMeshMetaData(),
 ) where {E <: AbstractVector{<:AbstractEntityType}, C <: AbstractConnectivity}
     topoDim = topodim(valtype(celltypes))
@@ -206,9 +206,14 @@ function Mesh(
     else
         (!isempty(bc_names) && !isempty(bc_nodes)) ? buildboundaryfaces = true : nothing
     end
+
+    # Warning : there is a flaw here, because the valtype of bc_nodes and bc_faces could differ.
+    # Especially if one of them was set by default (hence giving Int64). But up to now we've just used
+    # bc_nodes...
+    T_int = eltype(valtype(bc_nodes))
     _names = (Symbol(bc_names[i]) for i in keys(bc_names))
-    _nodes = (get(bc_nodes, i, Int[]) for i in keys(bc_names))
-    _faces = (get(bc_faces, i, Int[]) for i in keys(bc_names))
+    _nodes = (get(bc_nodes, i, T_int[]) for i in keys(bc_names))
+    _faces = (get(bc_faces, i, T_int[]) for i in keys(bc_names))
     nt_bc_nodes = (; zip(_names, _nodes)...)
     nt_bc_faces = (; zip(_names, _faces)...)
     Mesh(
@@ -293,7 +298,7 @@ function _build_faces!(c2n::MeshConnectivity, celltypes)
         for (j, _f2n) in enumerate(f2n_from_c2n(_c, _c2n))
             if !haskey(dict_faces, Set(_f2n))
                 #create a new face
-                push!(f2c_indices, SVector{2, T}(i::T, zero(T)))
+                push!(f2c_indices, SVector{2, T}(T(i)::T, zero(T)))
                 push!(face_types, facetypes(_c)[j])
                 push!(f2n_indices, _f2n)
                 nface += 1
@@ -309,15 +314,15 @@ function _build_faces!(c2n::MeshConnectivity, celltypes)
     c2f = MeshConnectivity(
         :cell,
         :face,
-        Connectivity([length(a) for a in c2f_indices], reduce(vcat, c2f_indices)),
+        Connectivity(T[length(a) for a in c2f_indices], reduce(vcat, c2f_indices)),
     )
-    numIndices = [sum(i -> i > zero(eltype(a)) ? 1 : 0, a) for a in f2c_indices]
+    numIndices = T[sum(i -> i > zero(eltype(a)) ? 1 : 0, a) for a in f2c_indices]
     _indices = [f2c_indices[i][j] for i in eachindex(f2c_indices) for j in 1:numIndices[i]]
     f2c = MeshConnectivity(:face, :cell, Connectivity(numIndices, _indices))
     f2n = MeshConnectivity(
         :face,
         :node,
-        Connectivity([length(a) for a in f2n_indices], reduce(vcat, f2n_indices)),
+        Connectivity(T[length(a) for a in f2n_indices], reduce(vcat, f2n_indices)),
     )
 
     # try to convert `face_types` to a vector of concrete type when it is possible
