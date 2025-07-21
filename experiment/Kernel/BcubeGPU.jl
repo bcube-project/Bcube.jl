@@ -116,28 +116,6 @@ function Bcube._update_b!(b::AbstractVector, dofs::D, vals::V) where {D, V}#, wi
     nothing
 end
 
-# @kernel function AK_assemble_bilinear_kernel!(
-#     imat,
-#     jmat,
-#     vmat,
-#     f::F,
-#     elts::E,
-#     U::TU,
-#     V::TV,
-#     quadrature,
-#     domain,
-# ) where {Y, F, E, TU, TV}
-#     I = @index(Global)
-#     elementInfo = elts[I]
-#     vₑ = Bcube.blockmap_shape_functions(V, elementInfo)
-#     fᵥ = Bcube.materialize(f(vₑ), elementInfo) #895.260 μs (159 allocations: 5.64 KiB)
-#     values = Bcube.integrate_on_ref_element(fᵥ, elementInfo, quadrature) #12.638 ms (159 allocations: 5.64 KiB)
-
-#     # values = zero(eltype(y))
-#     Bcube._update_b!(y, V, values, elementInfo, domain)# 10.892 ms (159 allocations: 5.64 KiB)
-#     nothing
-# end
-
 function Bcube.__assemble_linear!(b::AbstractGPUArray, f, V, measure::Measure)
     AK_assemble!(b, f, nothing, V, measure)
 end
@@ -159,23 +137,110 @@ function AK_assemble!(y, f, elts, V, measure)
     return nothing
 end
 
-# function AK_assemble_bilinear!(y, f, elts::E, U, V, measure) where {E}
-#     quadrature = Bcube.get_quadrature(measure)
-#     domain = get_domain(measure)
-#     backend = get_backend(y)
-#     AK_assemble_bilinear_kernel!(backend, WORKGROUP_SIZE)(
-#         y,
-#         f,
-#         elts,
-#         U,
-#         V,
-#         quadrature,
-#         domain;
-#         ndrange = size(elts),
-#     )
-#     KA.synchronize(backend)
-#     return nothing
-# end
+@kernel function AK_assemble_bilinear_kernel!(
+    imat,
+    jmat,
+    vmat,
+    offsets,
+    f::F,
+    elts::E,
+    U::TU,
+    V::TV,
+    quadrature,
+    domain,
+) where {F, E, TU, TV}
+    I = @index(Global)
+    elementInfo = Bcube._get_index(domain, I)
+    λu, λv = Bcube.blockmap_bilinear_shape_functions(U, V, elementInfo)
+    g1 = Bcube.materialize(f(λu, λv), elementInfo)
+    values = Bcube.integrate_on_ref_element(g1, elementInfo, quadrature)
+    Bcube._append_contribution!(
+        (offsets[I], vmat),
+        imat,
+        jmat,
+        U,
+        V,
+        values,
+        elementInfo,
+        domain,
+    )
+    nothing
+end
+
+function Bcube._append_bilinear!(I, J, _X::Tuple, row, col, vals)
+    offset, X = _X
+    _rows, _cols = Bcube._cartesian_product(row, col)
+    for k in eachindex(_rows)
+        I[offset + k] = _rows[k]
+        J[offset + k] = _cols[k]
+        X[offset + k] = vals[k]
+    end
+end
+
+@kernel function _ndofs_element_bilinear_kernel!(ndofs, U, V, domain::D) where {D}
+    I = @index(Global)
+    elementInfo = @inline Bcube._get_index(domain, I)
+    nU = Val(Bcube.get_ndofs(U, shape(Bcube.celltype(elementInfo))))
+    nV = Val(Bcube.get_ndofs(V, shape(Bcube.celltype(elementInfo))))
+    Udofs = Bcube.get_dofs(U, I, nU) # columns correspond to the TrialFunction
+    Vdofs = Bcube.get_dofs(V, I, nV) # lines correspond to the TestFunction
+    rows, = Bcube._cartesian_product(Vdofs, Udofs)
+    ndofs[I] = length(rows)
+end
+
+function Bcube.assemble_bilinear!(I, J, X::AbstractGPUArray, f, measure::Measure, U, V)
+    AK_assemble_bilinear(I, J, X, f, nothing, U, V, measure)
+end
+
+function Bcube.allocate_bilinear(backend::CUDABackend, a, U, V, T)
+    integration = a(Bcube._null_operator(U), Bcube._null_operator(V))
+    domain = Bcube.get_domain(Bcube.get_measure(integration))
+    ndofs = KernelAbstractions.zeros(backend, Int, length(Bcube.indices(domain)))
+    _ndofs_element_bilinear_kernel!(backend, WORKGROUP_SIZE)(
+        ndofs,
+        U,
+        V,
+        domain;
+        ndrange = size(ndofs),
+    )
+    buffersize = AK.reduce(+, ndofs; init = zero(eltype(ndofs)))
+    I = KernelAbstractions.zeros(backend, Int, buffersize)
+    J = KernelAbstractions.zeros(backend, Int, buffersize)
+    X = KernelAbstractions.zeros(backend, Float64, buffersize)
+    return I, J, X
+end
+
+function AK_assemble_bilinear(I, J, X, f, elts::E, U, V, measure) where {E}
+    quadrature = Bcube.get_quadrature(measure)
+    domain = get_domain(measure)
+    backend = get_backend(X)
+
+    ndofs = KernelAbstractions.zeros(backend, Int, length(Bcube.indices(domain)))
+    _ndofs_element_bilinear_kernel!(backend, WORKGROUP_SIZE)(
+        ndofs,
+        U,
+        V,
+        domain;
+        ndrange = size(ndofs),
+    )
+    offsets = AK.accumulate(+, ndofs; init = zero(eltype(ndofs)), inclusive = false)
+    ndrange = length(DomainIterator(domain))
+    AK_assemble_bilinear_kernel!(backend, WORKGROUP_SIZE)(
+        I,
+        J,
+        X,
+        offsets,
+        f,
+        elts,
+        U,
+        V,
+        quadrature,
+        domain;
+        ndrange = ndrange,
+    )
+    KA.synchronize(backend)
+    return nothing
+end
 
 f(λ) = PhysicalFunction(x -> 1.0) * λ #
 
