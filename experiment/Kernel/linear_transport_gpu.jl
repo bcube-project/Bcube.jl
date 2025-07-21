@@ -89,18 +89,8 @@ function main(nx, ny, nite, degree, backend)
 
     println("Building mass matrix")
 
-    ## TODO : assembling on GPU and factorize the sparse result without relying on dense matrix
-    M = assemble_bilinear(
-        (u, v) -> begin
-            dΩ_cpu = Measure(CellDomain(mesh_cpu), 2 * degree + 1)
-            ∫(u ⋅ v)dΩ_cpu
-        end,
-        U_cpu,
-        TestFESpace(U_cpu),
-    )
-    #factoM = adapt(backend, factorize(M))
-    M_gpu = adapt(backend, Array(M))
-    factoM = cholesky(M_gpu)
+    M = assemble_bilinear(m, U, V; T = Float64, backend = backend)
+    factoM = cholesky(adapt(backend, Array(M))) # TODO : avoid dense matrix
 
     ## Allocate buffers for linear assembling
     b_vol = KernelAbstractions.ones(backend, Float64, get_ndofs(U))
@@ -148,7 +138,7 @@ function main(nx, ny, nite, degree, backend)
     end
 end
 
-#main(nx, ny, nite, degree, get_backend(ones(2)))       ## CPU 
+#main(nx, ny, nite, degree, get_backend(ones(2)))       ## CPU
 main(nx, ny, nite, degree, get_backend(CUDA.ones(2)))   ## GPU
 
 end
