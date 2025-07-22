@@ -177,7 +177,12 @@ function Bcube._append_bilinear!(I, J, _X::Tuple, row, col, vals)
     end
 end
 
-@kernel function _ndofs_element_bilinear_kernel!(ndofs, U, V, domain::D) where {D}
+@kernel function _ndofs_element_bilinear_kernel!(
+    ndofs,
+    U,
+    V,
+    domain::D,
+) where {D <: CellDomain}
     I = @index(Global)
     elementInfo = @inline Bcube._get_index(domain, I)
     nU = Val(Bcube.get_ndofs(U, shape(Bcube.celltype(elementInfo))))

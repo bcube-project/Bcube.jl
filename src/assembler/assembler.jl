@@ -1,3 +1,15 @@
+function allocate_bilinear(backend::Nothing, a, U, V, T)
+    # Prepare sparse matrix allocation
+    I = Int[]
+    J = Int[]
+    X = T[]
+
+    # Pre-allocate I, J, X
+    n = _count_n_elts(U, V, a)
+    foreach(Base.Fix2(sizehint!, n), (I, J, X))
+    return I, J, X
+end
+
 """
     assemble_bilinear(a::Function, U, V)
 
@@ -31,16 +43,9 @@ function assemble_bilinear(
     U::Union{TrialFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}}},
     V::Union{TestFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}}};
     T = Float64,
+    backend = nothing,
 ) where {N}
-
-    # Prepare sparse matrix allocation
-    I = Int[]
-    J = Int[]
-    X = T[] # TODO : could be ComplexF64 or Dual
-
-    # Pre-allocate I, J, X
-    n = _count_n_elts(U, V, a)
-    foreach(Base.Fix2(sizehint!, n), (I, J, X))
+    I, J, X = allocate_bilinear(backend, a, U, V, T)
 
     # Compute
     assemble_bilinear!(I, J, X, a, U, V)
@@ -56,9 +61,9 @@ function assemble_bilinear!(I, J, X, a, U, V)
 end
 
 function _assemble_bilinear!(
-    I::Vector{Int},
-    J::Vector{Int},
-    X::Vector,
+    I::AbstractVector,
+    J::AbstractVector,
+    X::AbstractVector,
     a::Function,
     U,
     V,
@@ -71,9 +76,9 @@ function _assemble_bilinear!(
 end
 
 function _assemble_bilinear!(
-    I::Vector{Int},
-    J::Vector{Int},
-    X::Vector,
+    I::AbstractVector,
+    J::AbstractVector,
+    X::AbstractVector,
     a::Function,
     U,
     V,
