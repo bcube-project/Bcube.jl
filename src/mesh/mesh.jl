@@ -194,9 +194,9 @@ function Mesh(
     cell2nodes::C;
     buildfaces::Bool = true,
     buildboundaryfaces::Bool = false,
-    bc_names = Dict{Int, String}(),
-    bc_nodes = Dict{Int, Vector{Int}}(),
-    bc_faces = Dict{Int, Vector{Int}}(),
+    bc_names::AbstractDict = Dict{Int, String}(),
+    bc_nodes::AbstractDict = Dict{Int, Vector{Int}}(),
+    bc_faces::AbstractDict = Dict{Int, Vector{Int}}(),
     metadata::AbstractMeshMetaData = DefaultMeshMetaData(),
 ) where {E <: AbstractVector{<:AbstractEntityType}, C <: AbstractConnectivity}
     topoDim = topodim(valtype(celltypes))
@@ -207,15 +207,17 @@ function Mesh(
         (!isempty(bc_names) && !isempty(bc_nodes)) ? buildboundaryfaces = true : nothing
     end
 
-    # Warning : there is a flaw here, because the valtype of bc_nodes and bc_faces could differ.
-    # Especially if one of them was set by default (hence giving Int64). But up to now we've just used
-    # bc_nodes...
-    T_int = eltype(valtype(bc_nodes))
+    # Determine integer type. Warning : in the case where both `bc_nodes` and `bc_faces`
+    # are empty and are set by default (think of a closed surface for instance), we cannot
+    # properly determiner T_int : the user has to input empty dicts of the correct type
+    T_int = length(bc_nodes) > 0 ? eltype(valtype(bc_nodes)) : eltype(valtype(bc_faces))
+
     _names = (Symbol(bc_names[i]) for i in keys(bc_names))
     _nodes = (get(bc_nodes, i, T_int[]) for i in keys(bc_names))
     _faces = (get(bc_faces, i, T_int[]) for i in keys(bc_names))
     nt_bc_nodes = (; zip(_names, _nodes)...)
     nt_bc_faces = (; zip(_names, _faces)...)
+
     Mesh(
         topoDim,
         nodes,
@@ -337,9 +339,9 @@ function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc
     @assert length(indices(f2n)) ≠ 0 "invalid f2n and/or f2c"
 
     # find boundary faces (all faces with only 1 adjacent cell)
-
-    f2bc_numindices = zeros(Int, length(indices(f2n)))
-    f2bc_indices = Vector{Int}()
+    T_int = eltype(valtype(bc_nodes))
+    f2bc_numindices = zeros(T_int, length(indices(f2n)))
+    f2bc_indices = Vector{T_int}()
     sizehint!(f2bc_indices, length(f2bc_numindices))
 
     f2c = indices(f2c)
