@@ -36,7 +36,11 @@ end
 @inline topodim(d::CellDomain) = topodim(get_mesh(d))
 
 CellDomain(mesh::AbstractMesh) = CellDomain(parent(mesh))
-CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
+function CellDomain(mesh::Mesh)
+    c2n = connectivities_indices(mesh, :c2n)
+    T_int = eltype(c2n)
+    CellDomain(mesh, T_int(1):T_int(ncells(mesh)))
+end
 
 LazyOperators.pretty_name(domain::CellDomain) = "CellDomain"
 

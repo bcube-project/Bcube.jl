@@ -420,6 +420,51 @@
         @test sum(Bcube.compute(∫(f)dΩ2)) == 0.5
     end
 
+    @testset "Arbitrary precision" begin
+        # to be moved elsewhere? This is a bit "transverse". We could split it in
+        # multiple places but we would duplicate a lot of code
+        T_int = Int32
+        T_float = Float32
+        mesh = one_cell_mesh(:line; xmin = T_float(0.0), xmax = T_float(1.0), T_int)
+
+        # Check mesh
+        @test eltype(get_coords(first(get_nodes(mesh)))) == T_float
+        @test all(Bcube.indices.(values(Bcube.connectivities(mesh)))) do conn
+            return eltype(conn) == eltype(conn.offsets) == eltype(conn.indices) == T_int
+        end
+
+        # Check domain and measure
+        Ω = CellDomain(mesh)
+        @test eltype(Ω.indices) == T_int
+        dΩ = Measure(Ω, T_int(1))
+
+        # Check FESpace
+        fs = FunctionSpace(:Lagrange, Int32(1))
+        U = TrialFESpace(fs, mesh, Dict("xmin" => T_float(0.0)))
+        V = TestFESpace(U)
+        dhl = Bcube._get_dhl(U)
+        @test eltype(dhl.iglob) == eltype(dhl.offset) == typeof(dhl.ndofs_tot) == T_int
+
+        # Check FEFunction
+        u = FEFunction(U, T_float)
+        @test eltype(get_dof_values(u)) == T_float
+
+        # Check bilinear assembly
+        a(u, v) = ∫(u * v)dΩ
+        M = assemble_bilinear(a, U, V; T = T_float)
+        @test eltype(M) == T_float
+
+        # Check linear assembly (without FEFunction)
+        b(v) = ∫(v)dΩ
+        B = assemble_linear(b, V; T = T_float)
+        @test eltype(B)
+
+        # Check linear assembly (with FEFunction)
+        c(v) = ∫(u * v)dΩ
+        C = assemble_linear(c, V; T = T_float)
+        @test eltype(C) == T_float # FAILING FOR NOW
+    end
+
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials

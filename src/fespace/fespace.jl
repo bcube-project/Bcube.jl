@@ -63,16 +63,19 @@ function get_ndofs(feSpace::AbstractFESpace, shape::AbstractShape)
     get_ndofs(get_function_space(feSpace), shape) * get_ncomponents(feSpace)
 end
 
-function get_dofs(feSpace::AbstractFESpace, icell::Int, n::Val{N}) where {N}
+function get_dofs(feSpace::AbstractFESpace, icell::I, n::Val{N}) where {I <: Integer, N}
     get_dofs(parent(feSpace), icell, n)
 end
 
 """
+    get_dofs(feSpace::AbstractFESpace, icell::I) where {I <: Integer}
+
 Return the dofs indices for the cell `icell`
 
 Result is an array of integers.
 """
-get_dofs(feSpace::AbstractFESpace, icell::Int) = get_dofs(parent(feSpace), icell)
+get_dofs(feSpace::AbstractFESpace, icell::I) where {I <: Integer} =
+    get_dofs(parent(feSpace), icell)
 
 is_continuous(feSpace::AbstractFESpace) = is_continuous(parent(feSpace))
 is_discontinuous(feSpace::AbstractFESpace) = !is_continuous(feSpace)
@@ -145,8 +148,10 @@ is_continuous(feSpace::SingleFESpace) = feSpace.isContinuous
 
 _get_dof_handler(feSpace::SingleFESpace) = feSpace.dhl
 
-get_dofs(feSpace::SingleFESpace, icell::Int) = get_dof(feSpace.dhl, icell)
-function get_dofs(feSpace::SingleFESpace, icell::Int, n::Val{N}) where {N}
+function get_dofs(feSpace::SingleFESpace, icell::I) where {I <: Integer}
+    get_dof(feSpace.dhl, icell)
+end
+function get_dofs(feSpace::SingleFESpace, icell::I, n::Val{N}) where {I <: Integer, N}
     get_dof(feSpace.dhl, icell, n)
 end
 get_ndofs(feSpace::SingleFESpace) = get_ndofs(_get_dhl(feSpace))

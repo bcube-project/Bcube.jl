@@ -38,7 +38,11 @@ function Base.getindex(f::AbstractFEFunction{S}, i::CellInfo) where {S}
     λ = shape_functions(fSpace, cshape) # shape functions for one scalar component
     ndofs = get_ndofs(feSpace, cshape) # total number of dofs for this shape (all components included)
     ncomps = get_ncomponents(feSpace)
+    @show f, cellindex(i), Val(ndofs)
+    @show typeof(get_dof_values(f))
     q₀ = get_dof_values(f, cellindex(i), Val(ndofs))
+    @show typeof(q₀)
+    error("dbg")
     fcell = _interpolate(Val(ncomps), q₀, λ)
     CellFunction(fcell, domainStyle, Val(S))
 end
@@ -170,6 +174,7 @@ end
 function get_dof_values(f::SingleFieldFEFunction, icell, n::Val{N}) where {N}
     feSpace = get_fespace(f)
     idofs = get_dofs(feSpace, icell, n)
+    @show typeof(idofs)
     return f.dofValues[idofs]
 end
 
