@@ -89,7 +89,7 @@ function main(nx, ny, nite, degree, backend)
 
     println("Building mass matrix")
 
-    M = assemble_bilinear(m, U, V; T = Float64, backend = backend)
+    M = assemble_bilinear(m, U, V; backend = backend)
     factoM = cholesky(adapt(backend, Array(M))) # TODO : avoid dense matrix
 
     ## Allocate buffers for linear assembling

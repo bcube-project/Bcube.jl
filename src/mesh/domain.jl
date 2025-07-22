@@ -467,12 +467,12 @@ end
 
 Base.getindex(iter::DomainIterator, i) = _get_index(get_domain(iter), i)
 
-function _get_index(domain::AbstractCellDomain, i::Integer)
+function _get_index(domain::D, i::Integer) where {D <: AbstractCellDomain}
     icell = indices(domain)[i]
     mesh = get_mesh(domain)
     _get_cellinfo(mesh, icell)
 end
-function _get_cellinfo(mesh, icell)
+function _get_cellinfo(mesh::M, icell) where {M <: AbstractMesh}
     c2n = connectivities_indices(mesh, :c2n)
     celltypes = cells(mesh)
     ctype = celltypes[icell]
@@ -482,7 +482,7 @@ function _get_cellinfo(mesh, icell)
     CellInfo(icell, ctype, cnodes, _c2n)
 end
 
-function _get_index(domain::AbstractFaceDomain, i::Integer)
+function _get_index(domain::D, i::Integer) where {D <: AbstractFaceDomain}
     iface = indices(domain)[i]
     mesh = get_mesh(domain)
     f2n = connectivities_indices(mesh, :f2n)
