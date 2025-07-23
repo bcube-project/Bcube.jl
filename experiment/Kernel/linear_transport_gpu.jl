@@ -5,14 +5,17 @@ using BcubeVTK
 using KernelAbstractions
 using CUDA, CUDA.CUSPARSE, CUDA.CUSOLVER
 using SparseArrays, LinearAlgebra
+using TimerOutputs
+
+const to = TimerOutput()
 
 include("./adapt.jl")
 include(joinpath(@__DIR__, "BcubeGPU.jl"))
 using .BcubeGPU
 
-const nx = 50
-const ny = 50
-const nite = 400
+const nx = 500
+const ny = 500
+const nite = 10
 const degree = 0
 const c = SA[1.0, 0.0] # Convection velocity (must be a vector)
 const CFL = 0.2
@@ -42,7 +45,7 @@ function append_vtk(vtk, u::Bcube.AbstractFEFunction, t)
     vtk.ite += 1
 end
 
-bc_in(t) = PhysicalFunction(x -> c .* cos(3 * x[2])) * sin(4 * t)
+bc_in(t) = PhysicalFunction(x -> c .* cos(3 * x[2])) * sin(4 * reduce(+, t))
 
 function upwind(ui, uj, nij)
     cij = c ⋅ nij
@@ -82,10 +85,13 @@ function main(nx, ny, nite, degree, backend)
     println("Building weak forms")
 
     m(u, v) = ∫(u ⋅ v)dΩ # Mass matrix
-    l_Ω(v) = ∫((c * u) ⋅ ∇(v))dΩ
+    f_Ω(v) = (c * u) ⋅ ∇(v)
+    l_Ω(v) = ∫(f_Ω(v))dΩ
 
     l_Γ(v) = ∫((upwind ∘ (side⁻(u), side⁺(u), side⁻(nΓ))) * jump(v))dΓ
     l_Γ_in(v, t) = ∫((side⁻(bc_in(t)) ⋅ side⁻(nΓ_in)) * side⁻(v))dΓ_in
+    current_time = KernelAbstractions.zeros(backend, Float64, 1)
+    l_Γ_in_t(v) = l_Γ_in(v, current_time)
     l_Γ_out(v) = ∫((upwind ∘ (side⁻(u), 0.0, side⁻(nΓ_out))) * side⁻(v))dΓ_out
 
     ## Allocate buffers for linear assembling
@@ -95,9 +101,17 @@ function main(nx, ny, nite, degree, backend)
 
     println("Building mass matrix")
 
-    M = assemble_bilinear(m, U, V; backend = backend)
-    F = CUSOLVER.SparseCholesky(M)
-    CUSOLVER.spcholesky_factorise(F, M, 1.e-12)
+    @timeit to "assemble mass matrix" begin
+        M = assemble_bilinear(m, U, V; backend = backend)
+    end
+    @timeit to "factorize mass matrix" begin
+        if isa(backend, CUDA.CUDABackend)
+            F = CUSOLVER.SparseCholesky(M)
+            CUSOLVER.spcholesky_factorise(F, M, 1.e-12)
+        else
+            factoM = factorize(M)
+        end
+    end
 
     # factoM = cholesky(M2; check = true)
     #linsolve = LS.init(LS.LinearProblem(CuSparseMatrixCSR(M), b_vol))
@@ -114,41 +128,67 @@ function main(nx, ny, nite, degree, backend)
     u_cpu = adapt(get_backend(zeros(1)), u)
     append_vtk(vtk, u_cpu, t)
 
-    for i in 1:nite
-        (i % nout == 0) && println("$i / $nite")
+    @timeit to "timeloop" begin
+        for i in 1:nite
+            (i % nout == 0) && println("$i / $nite")
 
-        ## Reset pre-allocated vectors
-        b_vol .= 0.0
-        b_fac .= 0.0
+            ## Reset pre-allocated vectors
+            @timeit to "reset buffers" begin
+                b_vol .= 0.0
+                b_fac .= 0.0
+            end
 
-        # Assembling linear form
-        assemble_linear!(b_vol, l_Ω, V)
-        assemble_linear!(b_fac, l_Γ, V)
-        assemble_linear!(b_fac, l_Γ_out, V)
-        tᵢ = copy(t)
-        assemble_linear!(b_fac, v -> l_Γ_in(v, tᵢ), V)
+            # Assembling linear form
+            @timeit to "assemble linear" begin
+                @timeit to "l_Ω" assemble_linear!(b_vol, l_Ω, V)
+                @timeit to "l_Γ" assemble_linear!(b_fac, l_Γ, V)
+                @timeit to "l_Γ_out" assemble_linear!(b_fac, l_Γ_out, V)
+                tᵢ = copy(t)
+                current_time .= tᵢ
+                @timeit to "l_Γ_in" assemble_linear!(b_fac, l_Γ_in_t, V)
+            end
 
-        ## Compute rhs
-        #LS.set_b(linsolve, b_vol - b_fac)
-        #sol = LS.solve!(linsolve)
-        #rhs .= Δt .* sol.u
-        CUSOLVER.spcholesky_solve(F, b_vol - b_fac, rhs)
-        rhs .*= Δt
+            ## Compute rhs
+            #LS.set_b(linsolve, b_vol - b_fac)
+            #sol = LS.solve!(linsolve)
+            #rhs .= Δt .* sol.u
+            @timeit to "compute rhs (solve)" begin
+                if isa(backend, CUDA.CUDABackend)
+                    CUSOLVER.spcholesky_solve(F, b_vol - b_fac, rhs)
+                else
+                    rhs = factoM \ (b_vol - b_fac)
+                end
+                rhs .*= Δt
+            end
 
-        ## Update solution
-        u.dofValues .+= rhs
+            ## Update solution
+            @timeit to "update solution" begin
+                u.dofValues .+= rhs
+            end
 
-        ## Update time
-        t += Δt
+            ## Update time
+            t += Δt
 
-        if (i % nout) == 0
-            u_cpu = adapt(get_backend(zeros(1)), u)
-            append_vtk(vtk, u_cpu, t)
+            if (i % nout) == 0
+                @timeit to "append_vtk" begin
+                    u_cpu = adapt(get_backend(zeros(1)), u)
+                    append_vtk(vtk, u_cpu, t)
+                end
+            end
         end
     end
 end
 
-#main(nx, ny, nite, degree, get_backend(ones(2)))       ## CPU
-main(nx, ny, nite, degree, get_backend(CUDA.ones(2)))   ## GPU
+#const backend = get_backend(ones(2))  ## CPU
+const backend = get_backend(CUDA.ones(2)) ## GPU
 
+#warmup :
+disable_timer!(to)
+main(nx, ny, 1, degree, backend)
+
+#timing :
+enable_timer!(to)
+main(nx, ny, nite, degree, backend)
+
+show(to)
 end

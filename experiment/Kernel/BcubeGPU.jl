@@ -12,6 +12,7 @@ using InteractiveUtils
 using CUDA
 using Atomix
 using GPUArrays
+using LinearAlgebra
 import Bcube:
     AbstractCellDomain,
     AbstractFaceDomain,
@@ -306,7 +307,8 @@ function _solve(backend, nx = 300, ny = 300)
     faces = adapt(backend, faces_cpu)
 
     # Define linear form and assemble
-    f(φ) = u * φ
+    #f(φ) = u * φ
+    f(φ) = (∇(u) ⋅ SA[1.0, 0.0]) * φ
     f_face(φ) = side_n(u) * jump(φ)
     y = KernelAbstractions.zeros(backend, Float64, get_ndofs(U))
     AK_assemble!(y, f, cells, V, dΩ)
@@ -334,6 +336,11 @@ function _solve(backend, nx = 300, ny = 300)
             y .= 0
             @btime CUDA.@sync begin
                 AK_assemble!($y, $f, $cells, $V, $dΩ)
+            end
+            l_Ω(v) = ∫(f(v))dΩ
+            assemble_linear!(y, l_Ω, V)
+            @btime CUDA.@sync begin
+                assemble_linear!($y, $l_Ω, $V)
             end
             y .= 0
             AK_assemble!(y, f, cells, V, dΩ)
