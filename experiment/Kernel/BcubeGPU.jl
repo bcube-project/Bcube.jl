@@ -351,6 +351,11 @@ function _solve(backend, nx = 300, ny = 300)
             @btime CUDA.@sync begin
                 AK_assemble!($y_face, $f_face, $faces, $V, $dΓ)
             end
+            l_Γ(v) = ∫(f_face(v))dΓ
+            assemble_linear!(y_face, l_Γ, V)
+            @btime CUDA.@sync begin
+                assemble_linear!($y_face, $l_Γ, $V)
+            end
         end
         CUDA.@profile AK_assemble!(y_face, f_face, faces, V, dΓ)
     end
@@ -359,7 +364,7 @@ function _solve(backend, nx = 300, ny = 300)
     u_cpu = FEFunction(U_cpu, ones(get_ndofs(U)))
     dΩ_cpu = Measure(CellDomain(mesh_cpu), degquad)
     dΓ_cpu = Measure(InteriorFaceDomain(mesh_cpu), degquad)
-    f_cpu(φ) = ∫(u_cpu * φ) * dΩ_cpu
+    f_cpu(φ) = ∫((∇(u_cpu) ⋅ SA[1.0, 0.0]) * φ) * dΩ_cpu
     f_face_cpu(φ) = ∫(side_n(u_cpu) * jump(φ)) * dΓ_cpu
     y_ref = assemble_linear(f_cpu, TestFESpace(U_cpu))
     y_ref .= 0.0
