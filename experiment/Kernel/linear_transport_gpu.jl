@@ -1,13 +1,14 @@
 module LinearTransportGpu
 
 using Bcube
-using LinearAlgebra
+using BcubeVTK
 using KernelAbstractions
+using CUDA, CUDA.CUSPARSE, CUDA.CUSOLVER
+using SparseArrays, LinearAlgebra
+
 include("./adapt.jl")
 include(joinpath(@__DIR__, "BcubeGPU.jl"))
 using .BcubeGPU
-using CUDA
-using BcubeVTK
 
 const nx = 50
 const ny = 50
@@ -87,15 +88,20 @@ function main(nx, ny, nite, degree, backend)
     l_Γ_in(v, t) = ∫((side⁻(bc_in(t)) ⋅ side⁻(nΓ_in)) * side⁻(v))dΓ_in
     l_Γ_out(v) = ∫((upwind ∘ (side⁻(u), 0.0, side⁻(nΓ_out))) * side⁻(v))dΓ_out
 
-    println("Building mass matrix")
-
-    M = assemble_bilinear(m, U, V; backend = backend)
-    factoM = cholesky(adapt(backend, Array(M))) # TODO : avoid dense matrix
-
     ## Allocate buffers for linear assembling
     b_vol = KernelAbstractions.ones(backend, Float64, get_ndofs(U))
     b_fac = similar(b_vol)
     rhs = similar(b_vol)
+
+    println("Building mass matrix")
+
+    M = assemble_bilinear(m, U, V; backend = backend)
+    F = CUSOLVER.SparseCholesky(M)
+    CUSOLVER.spcholesky_factorise(F, M, 1.e-12)
+
+    # factoM = cholesky(M2; check = true)
+    #linsolve = LS.init(LS.LinearProblem(CuSparseMatrixCSR(M), b_vol))
+    #factoM = cholesky(adapt(backend, Array(M))) # TODO : avoid dense matrix
 
     println("Starting time loop")
 
@@ -123,7 +129,11 @@ function main(nx, ny, nite, degree, backend)
         assemble_linear!(b_fac, v -> l_Γ_in(v, tᵢ), V)
 
         ## Compute rhs
-        rhs .= Δt .* (factoM \ (b_vol - b_fac))
+        #LS.set_b(linsolve, b_vol - b_fac)
+        #sol = LS.solve!(linsolve)
+        #rhs .= Δt .* sol.u
+        CUSOLVER.spcholesky_solve(F, b_vol - b_fac, rhs)
+        rhs .*= Δt
 
         ## Update solution
         u.dofValues .+= rhs
