@@ -1,4 +1,4 @@
-function allocate_bilinear(backend::Nothing, a, U, V, T)
+function allocate_bilinear(backend, a, U, V, T)
     # Prepare sparse matrix allocation
     I = Int[]
     J = Int[]
