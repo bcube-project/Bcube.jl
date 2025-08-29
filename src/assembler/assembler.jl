@@ -1,4 +1,6 @@
-function allocate_bilinear(backend, a, U, V, T)
+allocate_linear(backend::BcubeBackendCPUSerial, V, T) = allocate_dofs(V, T)
+
+function allocate_bilinear(backend::BcubeBackendCPUSerial, a, U, V, T)
     # Prepare sparse matrix allocation
     I = Int[]
     J = Int[]
@@ -43,7 +45,7 @@ function assemble_bilinear(
     U::Union{TrialFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}}},
     V::Union{TestFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}}};
     T = Float64,
-    backend = get_bcube_backend(),
+    backend::AbstractBcubeBackend = get_bcube_backend(),
 ) where {N}
     @show backend
     I, J, X = allocate_bilinear(backend, a, U, V, T)
@@ -55,7 +57,7 @@ function assemble_bilinear(
     return sparse(I, J, X, nrows, ncols)
 end
 
-function assemble_bilinear!(I, J, X, a, U, V, backend)
+function assemble_bilinear!(I, J, X, a, U, V, backend::AbstractBcubeBackend)
     return_type_a = a(_null_operator(U), _null_operator(V))
     _assemble_bilinear!(I, J, X, a, U, V, return_type_a, backend)
     return nothing
@@ -69,7 +71,7 @@ function _assemble_bilinear!(
     U,
     V,
     integration::Integration,
-    backend,
+    backend::AbstractBcubeBackend,
 )
     f(u, v) = get_function(get_integrand(a(u, v)))
     measure = get_measure(integration)
@@ -85,7 +87,7 @@ function _assemble_bilinear!(
     U,
     V,
     multiIntegration::MultiIntegration{N},
-    backend,
+    backend::AbstractBcubeBackend,
 ) where {N}
     for i in 1:N
         ival = Val(i)
@@ -100,7 +102,16 @@ end
 
 In-place version of [`assemble_bilinear`](@ref).
 """
-function assemble_bilinear!(I, J, X, f, measure::Measure, U, V, backend)
+function assemble_bilinear!(
+    I,
+    J,
+    X,
+    f,
+    measure::Measure,
+    U,
+    V,
+    backend::BcubeBackendCPUSerial,
+)
     # Alias
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
@@ -124,7 +135,7 @@ function assemble_bilinear!(
     measure::Measure,
     U::AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}},
     V::AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}},
-    backend,
+    backend::AbstractBcubeBackend,
 ) where {N}
 
     # Loop over all combinations
@@ -186,9 +197,10 @@ function assemble_linear(
     l::Function,
     V::Union{TestFESpace, AbstractMultiTestFESpace};
     T = Float64,
+    backend::AbstractBcubeBackend = get_bcube_backend(),
 )
-    b = allocate_dofs(V, T)
-    assemble_linear!(b, l, V)
+    b = allocate_linear(backend, V, T)
+    assemble_linear!(b, l, V, backend)
     return b
 end
 
@@ -201,7 +213,7 @@ function assemble_linear!(
     b::AbstractVector,
     l::Function,
     V::Union{TestFESpace, AbstractMultiTestFESpace};
-    backend = nothing,
+    backend::AbstractBcubeBackend = get_bcube_backend(),
 )
     # apply `l` on `NullOperator` to get the type
     # of the result of `l` and use it for dispatch
@@ -224,7 +236,7 @@ These functions act as a function barrier in order to:
 The case `integration::MultiIntegration{N}` is treated by looping over
 each `Integration` contained in the `MultiIntegration`
 """
-function _assemble_linear!(b, l, V, integration::Integration, backend)
+function _assemble_linear!(b, l, V, integration::Integration, backend::AbstractBcubeBackend)
     f(v) = get_function(get_integrand(l(v)))
     measure = get_measure(integration)
     __assemble_linear!(_may_reshape_b(b, V), f, V, measure, backend)
@@ -246,7 +258,7 @@ end
 Two levels of "LazyMapOver" because first we LazyMapOver the Tuple of argument of the linear form,
 and the for each item of this Tuple we LazyMapOver the shape functions.
 """
-function __assemble_linear!(b, f, V, measure::Measure, backend)
+function __assemble_linear!(b, f, V, measure::Measure, backend::BcubeBackendCPUSerial)
     # Alias
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
@@ -285,7 +297,7 @@ function _append_contribution!(
     values,
     elementInfo::CellInfo,
     domain,
-    backend,
+    backend::AbstractBcubeBackend,
 )
     icell = cellindex(elementInfo)
     nU = Val(get_ndofs(U, shape(celltype(elementInfo))))
@@ -307,7 +319,7 @@ function _append_contribution!(
     values,
     elementInfo::FaceInfo,
     domain,
-    backend,
+    backend::AbstractBcubeBackend,
 )
     cellinfo_n = get_cellinfo_n(elementInfo)
     cellinfo_p = get_cellinfo_p(elementInfo)
@@ -342,14 +354,24 @@ function _append_contribution!(
     return nothing
 end
 
-function _append_bilinear!(I, J, X, row, col, vals, backend)
+function _append_bilinear!(I, J, X, row, col, vals, backend::BcubeBackendCPUSerial)
     _rows, _cols = _cartesian_product(row, col)
     @assert length(_rows) == length(_cols) == length(vals)
     append!(I, _rows)
     append!(J, _cols)
     append!(X, vec(vals))
 end
-_append_bilinear!(I, J, X, row, col, vals::NullOperator, backend) = nothing
+function _append_bilinear!(
+    I,
+    J,
+    X,
+    row,
+    col,
+    vals::NullOperator,
+    backend::AbstractBcubeBackend,
+)
+    nothing
+end
 function _append_bilinear!(
     I,
     J,
@@ -357,7 +379,7 @@ function _append_bilinear!(
     row,
     col,
     vals::Union{T, SMatrix{M, N, T}},
-    backend,
+    backend::AbstractBcubeBackend,
 ) where {M, N, T <: NullOperator}
     nothing
 end
@@ -396,7 +418,14 @@ end
 _recursive_unwrap(a::LazyOperators.AbstractMapOver) = map(_recursive_unwrap, unwrap(a))
 _recursive_unwrap(a) = unwrap(a)
 
-function _update_b!(b, V, values, elementInfo::CellInfo, domain, backend::B) where {B}
+function _update_b!(
+    b,
+    V,
+    values,
+    elementInfo::CellInfo,
+    domain,
+    backend::AbstractBcubeBackend,
+)
     idofs = get_dofs(V, cellindex(elementInfo))
     unwrapValues = _unwrap_cell_integrate(V, values)
     __update_b!(b, idofs, unwrapValues, backend)
@@ -410,8 +439,8 @@ function _update_b!(
     values::Tval,
     elementInfo::FaceInfo,
     domain,
-    backend::Ba,
-) where {B, TV, Tval, Ba}
+    backend::AbstractBcubeBackend,
+) where {B, TV, Tval}
     # First, we get the values from the integration on the positive/negative side
     # Then, if the face has two side, we seek the values from the opposite side
     unwrapValues = _unwrap_face_integrate(V, values)
@@ -433,8 +462,8 @@ function __update_b!(
     b::Tuple{Vararg{Any, N}},
     idofs::Tuple{Vararg{Any, N}},
     intvals::Tuple{Vararg{Any, N}},
-    backend::B,
-) where {N, B}
+    backend::AbstractBcubeBackend,
+) where {N}
     f(x1, x2, x3) = __update_b!(x1, x2, x3, backend)
     map(f, b, idofs, intvals)
     nothing
@@ -443,20 +472,37 @@ function __update_b!(
     b::AbstractVector,
     idofs,
     intvals::Tuple{Vararg{Tuple, N}},
-    backend,
+    backend::AbstractBcubeBackend,
 ) where {N}
     f(x) = __update_b!(b, idofs, x, backend)
     map(f, intvals)
     nothing
 end
-function __update_b!(b::AbstractVector, dofs, vals, backend::B) where {B}
+function __update_b!(
+    b::AbstractVector,
+    idofs,
+    intvals::Tuple{Vararg{Tuple, N}},
+    backend::BcubeBackendCPUSerial,  # to remove method ambiguity
+) where {N}
+    f(x) = __update_b!(b, idofs, x, backend)
+    map(f, intvals)
+    nothing
+end
+function __update_b!(b::AbstractVector, dofs, vals, backend::BcubeBackendCPUSerial)
     for (i, val) in zip(dofs, vals)
         b[i] += val
     end
     nothing
 end
 
-__update_b!(b::AbstractVector, dofs, vals::NullOperator, backend::B) where {B} = nothing
+function __update_b!(
+    b::AbstractVector,
+    dofs,
+    vals::NullOperator,
+    backend::AbstractBcubeBackend,
+)
+    nothing
+end
 
 """
     _count_n_elts(
