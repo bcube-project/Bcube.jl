@@ -23,6 +23,8 @@ import .LazyOperators:
     materialize, materialize_args, AbstractLazyOperator, get_args, get_operator, unwrap
 export lazy_compose
 
+include("backend.jl")
+
 include("utils.jl")
 
 include("./mesh/transformation.jl")
