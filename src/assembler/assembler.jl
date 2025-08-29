@@ -43,20 +43,21 @@ function assemble_bilinear(
     U::Union{TrialFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}}},
     V::Union{TestFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}}};
     T = Float64,
-    backend = nothing,
+    backend = get_bcube_backend(),
 ) where {N}
+    @show backend
     I, J, X = allocate_bilinear(backend, a, U, V, T)
 
     # Compute
-    assemble_bilinear!(I, J, X, a, U, V)
+    assemble_bilinear!(I, J, X, a, U, V, backend)
     nrows = get_ndofs(V)
     ncols = get_ndofs(U)
     return sparse(I, J, X, nrows, ncols)
 end
 
-function assemble_bilinear!(I, J, X, a, U, V)
+function assemble_bilinear!(I, J, X, a, U, V, backend)
     return_type_a = a(_null_operator(U), _null_operator(V))
-    _assemble_bilinear!(I, J, X, a, U, V, return_type_a)
+    _assemble_bilinear!(I, J, X, a, U, V, return_type_a, backend)
     return nothing
 end
 
@@ -68,10 +69,11 @@ function _assemble_bilinear!(
     U,
     V,
     integration::Integration,
+    backend,
 )
     f(u, v) = get_function(get_integrand(a(u, v)))
     measure = get_measure(integration)
-    assemble_bilinear!(I, J, X, f, measure, U, V)
+    assemble_bilinear!(I, J, X, f, measure, U, V, backend)
     return nothing
 end
 
@@ -83,37 +85,22 @@ function _assemble_bilinear!(
     U,
     V,
     multiIntegration::MultiIntegration{N},
+    backend,
 ) where {N}
     for i in 1:N
         ival = Val(i)
         aᵢ(u, v) = a(u, v)[ival]
-        _assemble_bilinear!(I, J, X, aᵢ, U, V, multiIntegration[ival])
+        _assemble_bilinear!(I, J, X, aᵢ, U, V, multiIntegration[ival], backend)
     end
     nothing
 end
 
 """
-    assemble_bilinear!(
-        I::Vector{Int},
-        J::Vector{Int},
-        X::Vector{T},
-        f::Function,
-        measure::Measure,
-        U::TrialFESpace,
-        V::TestFESpace,
-    )
+    assemble_bilinear!(I, J, X, f, measure::Measure, U, V, backend)
 
 In-place version of [`assemble_bilinear`](@ref).
 """
-function assemble_bilinear!(
-    I::Vector{Int},
-    J::Vector{Int},
-    X::Vector,
-    f::Function,
-    measure::Measure,
-    U::TrialFESpace,
-    V::TestFESpace,
-)
+function assemble_bilinear!(I, J, X, f, measure::Measure, U, V, backend)
     # Alias
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
@@ -123,7 +110,7 @@ function assemble_bilinear!(
         λu, λv = blockmap_bilinear_shape_functions(U, V, elementInfo)
         g1 = materialize(f(λu, λv), elementInfo)
         values = integrate_on_ref_element(g1, elementInfo, quadrature)
-        _append_contribution!(X, I, J, U, V, values, elementInfo, domain)
+        _append_contribution!(X, I, J, U, V, values, elementInfo, domain, backend)
     end
 
     return nothing
@@ -137,6 +124,7 @@ function assemble_bilinear!(
     measure::Measure,
     U::AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}},
     V::AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}},
+    backend,
 ) where {N}
 
     # Loop over all combinations
@@ -157,7 +145,7 @@ function assemble_bilinear!(
             sizehint!.((_I, _J), n)
 
             # Perform assembly on SingleFESpace
-            assemble_bilinear!(_I, _J, X, _f, measure, _U, _V)
+            assemble_bilinear!(_I, _J, X, _f, measure, _U, _V, backend)
 
             # Update global indices
             push!(I, get_mapping(V, i)[_I]...)
@@ -212,12 +200,13 @@ In-place version of [`assemble_linear`](@ref).
 function assemble_linear!(
     b::AbstractVector,
     l::Function,
-    V::Union{TestFESpace, AbstractMultiTestFESpace},
+    V::Union{TestFESpace, AbstractMultiTestFESpace};
+    backend = nothing,
 )
     # apply `l` on `NullOperator` to get the type
     # of the result of `l` and use it for dispatch
     # (`Integration` or `MultiIntegration` case).
-    _assemble_linear!(b, l, V, l(_null_operator(V)))
+    _assemble_linear!(b, l, V, l(_null_operator(V)), backend)
     return nothing
 end
 
@@ -235,10 +224,10 @@ These functions act as a function barrier in order to:
 The case `integration::MultiIntegration{N}` is treated by looping over
 each `Integration` contained in the `MultiIntegration`
 """
-function _assemble_linear!(b, l, V, integration::Integration)
+function _assemble_linear!(b, l, V, integration::Integration, backend)
     f(v) = get_function(get_integrand(l(v)))
     measure = get_measure(integration)
-    __assemble_linear!(_may_reshape_b(b, V), f, V, measure)
+    __assemble_linear!(_may_reshape_b(b, V), f, V, measure, backend)
     return nothing
 end
 
@@ -257,7 +246,7 @@ end
 Two levels of "LazyMapOver" because first we LazyMapOver the Tuple of argument of the linear form,
 and the for each item of this Tuple we LazyMapOver the shape functions.
 """
-function __assemble_linear!(b, f, V, measure::Measure)
+function __assemble_linear!(b, f, V, measure::Measure, backend)
     # Alias
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
@@ -267,7 +256,7 @@ function __assemble_linear!(b, f, V, measure::Measure)
         vₑ = blockmap_shape_functions(V, elementInfo)
         fᵥ = materialize(f(vₑ), elementInfo)
         values = integrate_on_ref_element(fᵥ, elementInfo, quadrature)
-        _update_b!(b, V, values, elementInfo, domain)
+        _update_b!(b, V, values, elementInfo, domain, backend)
     end
     nothing
 end
@@ -287,7 +276,17 @@ end
 """
 bilinear case
 """
-function _append_contribution!(X, I, J, U, V, values, elementInfo::CellInfo, domain)
+function _append_contribution!(
+    X,
+    I,
+    J,
+    U,
+    V,
+    values,
+    elementInfo::CellInfo,
+    domain,
+    backend,
+)
     icell = cellindex(elementInfo)
     nU = Val(get_ndofs(U, shape(celltype(elementInfo))))
     nV = Val(get_ndofs(V, shape(celltype(elementInfo))))
@@ -295,11 +294,21 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::CellInfo, dom
     Vdofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
     unwrapValues = _unwrap_cell_integrate(V, values)
     matrixvalues = _pack_bilinear_cell_contribution(unwrapValues, Udofs, Vdofs)
-    _append_bilinear!(I, J, X, Vdofs, Udofs, matrixvalues)
+    _append_bilinear!(I, J, X, Vdofs, Udofs, matrixvalues, backend)
     return nothing
 end
 
-function _append_contribution!(X, I, J, U, V, values, elementInfo::FaceInfo, domain)
+function _append_contribution!(
+    X,
+    I,
+    J,
+    U,
+    V,
+    values,
+    elementInfo::FaceInfo,
+    domain,
+    backend,
+)
     cellinfo_n = get_cellinfo_n(elementInfo)
     cellinfo_p = get_cellinfo_p(elementInfo)
     cellindex_n = cellindex(cellinfo_n)
@@ -328,19 +337,19 @@ function _append_contribution!(X, I, J, U, V, values, elementInfo::FaceInfo, dom
     for (k, (row, col)) in enumerate(
         Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
     )
-        _append_bilinear!(I, J, X, row, col, matrixvalues[k])
+        _append_bilinear!(I, J, X, row, col, matrixvalues[k], backend)
     end
     return nothing
 end
 
-function _append_bilinear!(I, J, X, row, col, vals)
+function _append_bilinear!(I, J, X, row, col, vals, backend)
     _rows, _cols = _cartesian_product(row, col)
     @assert length(_rows) == length(_cols) == length(vals)
     append!(I, _rows)
     append!(J, _cols)
     append!(X, vec(vals))
 end
-_append_bilinear!(I, J, X, row, col, vals::NullOperator) = nothing
+_append_bilinear!(I, J, X, row, col, vals::NullOperator, backend) = nothing
 function _append_bilinear!(
     I,
     J,
@@ -348,6 +357,7 @@ function _append_bilinear!(
     row,
     col,
     vals::Union{T, SMatrix{M, N, T}},
+    backend,
 ) where {M, N, T <: NullOperator}
     nothing
 end
@@ -386,52 +396,67 @@ end
 _recursive_unwrap(a::LazyOperators.AbstractMapOver) = map(_recursive_unwrap, unwrap(a))
 _recursive_unwrap(a) = unwrap(a)
 
-function _update_b!(b, V, values, elementInfo::CellInfo, domain)
+function _update_b!(b, V, values, elementInfo::CellInfo, domain, backend::B) where {B}
     idofs = get_dofs(V, cellindex(elementInfo))
     unwrapValues = _unwrap_cell_integrate(V, values)
-    _update_b!(b, idofs, unwrapValues)
+    __update_b!(b, idofs, unwrapValues, backend)
 end
 _unwrap_cell_integrate(::TestFESpace, a) = map(unwrap, unwrap(a))
 _unwrap_cell_integrate(::AbstractMultiTestFESpace, a) = map(unwrap, unwrap(a))
 
-function _update_b!(b, V, values, elementInfo::FaceInfo, domain)
+function _update_b!(
+    b::B,
+    V::TV,
+    values::Tval,
+    elementInfo::FaceInfo,
+    domain,
+    backend::Ba,
+) where {B, TV, Tval, Ba}
     # First, we get the values from the integration on the positive/negative side
     # Then, if the face has two side, we seek the values from the opposite side
     unwrapValues = _unwrap_face_integrate(V, values)
     values_i = map(identity, map(identity, map(first, unwrapValues)))
     idofs = get_dofs(V, cellindex(get_cellinfo_n(elementInfo)))
-    _update_b!(b, idofs, values_i)
+    __update_b!(b, idofs, values_i, backend)
     if (domain isa InteriorFaceDomain) ||
        (domain isa BoundaryFaceDomain{<:AbstractMesh, <:PeriodicBCType})
         values_j = map(identity, map(identity, map(last, unwrapValues)))
         jdofs = get_dofs(V, cellindex(get_cellinfo_p(elementInfo)))
-        _update_b!(b, jdofs, values_j)
+        __update_b!(b, jdofs, values_j, backend)
     end
 end
 function _unwrap_face_integrate(::Union{TestFESpace, AbstractMultiTestFESpace}, a)
     return unwrap(unwrap(unwrap(a)))
 end
 
-function _update_b!(
+function __update_b!(
     b::Tuple{Vararg{Any, N}},
     idofs::Tuple{Vararg{Any, N}},
     intvals::Tuple{Vararg{Any, N}},
+    backend::B,
+) where {N, B}
+    f(x1, x2, x3) = __update_b!(x1, x2, x3, backend)
+    map(f, b, idofs, intvals)
+    nothing
+end
+function __update_b!(
+    b::AbstractVector,
+    idofs,
+    intvals::Tuple{Vararg{Tuple, N}},
+    backend,
 ) where {N}
-    map(_update_b!, b, idofs, intvals)
+    f(x) = __update_b!(b, idofs, x, backend)
+    map(f, intvals)
     nothing
 end
-function _update_b!(b::AbstractVector, idofs, intvals::Tuple{Vararg{Tuple, N}}) where {N}
-    map(x -> _update_b!(b, idofs, x), intvals)
-    nothing
-end
-function _update_b!(b::AbstractVector, dofs, vals)
+function __update_b!(b::AbstractVector, dofs, vals, backend::B) where {B}
     for (i, val) in zip(dofs, vals)
         b[i] += val
     end
     nothing
 end
 
-_update_b!(b::AbstractVector, dofs, vals::NullOperator) = nothing
+__update_b!(b::AbstractVector, dofs, vals::NullOperator, backend::B) where {B} = nothing
 
 """
     _count_n_elts(
