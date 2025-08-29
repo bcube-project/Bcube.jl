@@ -590,6 +590,14 @@ function _build_mapping_SoA(feSpaces::Tuple{Vararg{TrialOrTest}}, ncells::Int)
     return ndofs, mapping
 end
 
+"""
+    build_jacobian_sparsity_pattern(u::AbstractMultiFESpace, mesh::AbstractMesh)
+
+Build the jacobian sparsity pattern corresponding to the "FESpace U".
+
+A jacobian is associated to a given function, here this function is assumed to mix (i.e "link")
+all the variables of the FESpace together.
+"""
 function build_jacobian_sparsity_pattern(u::TrialFESpace, mesh::AbstractMesh)
     build_jacobian_sparsity_pattern(MultiFESpace(u), mesh)
 end
@@ -610,6 +618,9 @@ function _build_jacobian_sparsity_pattern_AoS(u::AbstractMultiFESpace, mesh)
     f2c = connectivities_indices(mesh, :f2c)
     c2f = connectivities_indices(mesh, :c2f)
 
+    all_discontinuous = all(is_discontinuous.(u))
+    c2c = all_discontinuous ? nothing : connectivity_cell2cell_by_nodes(mesh)
+
     for ic in 1:ncells(mesh)
         for (j, uj) in enumerate(u)
             for (i, ui) in enumerate(u)
@@ -624,9 +635,29 @@ function _build_jacobian_sparsity_pattern_AoS(u::AbstractMultiFESpace, mesh)
             end
         end
 
-        for ifa in c2f[ic]
-            for ic2 in f2c[ifa]
-                ic2 == ic && continue
+        if all_discontinuous
+            # For discontinuous FESpaces, we look to neighbors by faces
+            for ifa in c2f[ic]
+                for ic2 in f2c[ifa]
+                    ic2 == ic && continue
+                    for (j, uj) in enumerate(u)
+                        for (i, ui) in enumerate(u)
+                            if true #varsDependency[i, j]
+                                for jdof in get_mapping(u, j)[get_dofs(uj, ic2)]
+                                    for idof in get_mapping(u, i)[get_dofs(ui, ic)]
+                                        push!(I, idof)
+                                        push!(J, jdof)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        else
+            # If a continuous FESpace is present, we look to neighbors by nodes.
+            # Rq: this is very conservative but better than nothing
+            for ic2 in c2c[ic]
                 for (j, uj) in enumerate(u)
                     for (i, ui) in enumerate(u)
                         if true #varsDependency[i, j]
@@ -646,7 +677,7 @@ function _build_jacobian_sparsity_pattern_AoS(u::AbstractMultiFESpace, mesh)
     return sparse(I, J, 1.0, m, n, max)
 end
 
-function _build_jacobian_sparsity_pattern_SoA(u::MultiFESpace, mesh)
+function _build_jacobian_sparsity_pattern_SoA(::MultiFESpace, mesh)
     error("Function `_build_jacobian_sparsity_pattern_SoA` is not implemented yet")
 end
 
