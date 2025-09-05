@@ -13,14 +13,15 @@ The main features are:
 - Lagrange (continuous & discontinuous) and Taylor (discontinuous) finite elements (line, quad, tri, hexa, penta)
 - arbitrary order for hypercube Lagrange elements
 
-Commented tutorials as well as various examples can be found in the dedicated project [BcubeTutorials.jl](https://github.com/bcube-project/BcubeTutorials.jl).
+!!! tip
+    Commented tutorials as well as various examples can be found in the dedicated project [BcubeTutorials.jl](https://github.com/bcube-project/BcubeTutorials.jl).
 
 ## Installation
 
 Bcube can be added to your Julia environment with this simple line :
 
 ```julia-repl
-pkg> add https://github.com/bcube-project/Bcube.jl
+pkg> add Bcube
 ```
 
 ## Alternatives

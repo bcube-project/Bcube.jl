@@ -14,7 +14,7 @@ Modules = [Bcube]
 Pages   = ["integration.jl"]
 ```
 
-## Quadrature rules
+## [Quadrature rules](@id quadratures)
 
 ```@autodocs
 Modules = [Bcube]
