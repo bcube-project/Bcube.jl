@@ -25,7 +25,7 @@
         A.nzval .= 1.0
         J = Bcube.build_jacobian_sparsity_pattern(U, mesh)
         D = J - A
-        @test all(D.nzval .> 0.0)
+        @test all(D.nzval .> 0.0) # test that non-zeros elements of "A" are included in "J"
 
         function f(q, ∇q, v, ∇v)
             u1, u2 = q
@@ -47,6 +47,6 @@
         A.nzval .= 1.0
         J = Bcube.build_jacobian_sparsity_pattern(U, mesh)
         D = J - A
-        @test all(D.nzval .> 0.0)
+        @test all(D.nzval .> 0.0) # test that non-zeros elements of "A" are included in "J"
     end
 end
