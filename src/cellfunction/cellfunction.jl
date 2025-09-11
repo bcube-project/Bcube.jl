@@ -423,7 +423,8 @@ end
 
 """
 Hypersurface "face" operator that rotates around the face-axis to virtually
-bring back the two adjacent cells in the same plane.
+bring back the two adjacent cells in the same plane. To perform the rotation
+Rodrigues' rotation formula is applied.
 """
 struct CoplanarRotation <: AbstractLazy end
 
