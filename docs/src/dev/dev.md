@@ -1,7 +1,3 @@
----
-lang: EN
----
-
 # Dev
 
 This section is intended for `Bcube` developers.
