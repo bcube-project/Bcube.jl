@@ -1,47 +1,53 @@
+---
+lang: EN
+---
+
 # Dev
 
 This section is intended for `Bcube` developers.
 
 ## Interpolating a vector field on a curved surfacic element
 
-Here we consider an $$n$$-dimensionnal surface in a $$\mathbb{R}^{n+1}$$ space, i.e an hypersurface (for instance a sphere in $$\mathbb{R}^3$$). To ease the notations, we consider 2-dimensionnal surface in $$\mathbb{R}^3$$. The physical coordinate system $$(x,y,z)$$ is associated to a vector basis $$\mathcal{B}_p = (e_x,e_y,e_z)$$. In the reference element, the coordinates are noted $$(\xi, \eta, \zeta)$$ and are associated to a local basis $$\mathcal{B}_r(\xi,\eta,\zeta) = (u,v,w)$$. The $$u$$, $$v$$ and $$w$$ are nothing else than the normalized $$\partial_\xi F$$, $$\partial_\eta F$$ and $$\nu$$, where $$F$$ is the reference to physical mapping, and $$\nu$$ the cell normal.Note that $$\mathcal{B}_p$$ is "constant" while $$\mathcal{B}_r$$ depends on the position in the reference element in the case of a curved element. In the rest of this section, we will use $$x$$ for $$(x,y,z)$$ and $$\xi$$ for $$(\xi, \eta, \zeta)$$.
+Here we consider an $$n$$-dimensionnal surface in a $$\mathbb{R}^{n+1}$$ space, i.e an hypersurface (for instance a sphere in $$\mathbb{R}^3$$). To ease the notations, we consider a 2-dimensionnal surface in $$\mathbb{R}^3$$. The physical coordinate system $$(x,y,z)$$ is associated to the "universe" vector basis $$\mathcal{B}_p = (\vec{e}_x,\vec{e}_y,\vec{e}_z)$$. On each point of the surface, there also exists a so-called "local" vector basis $$\mathcal{B}_l(x,y,z)$$ formed by the surface tangent plane and the normal. Recall that this vector basis depends on the position on the surface. Finally, the vector basis associated with the reference element is noted $$\mathcal{B}_r$$, and the coordinates are noted $$(\xi,\eta)$$. Since our reference elements are "flat" (a square, a cube, etc), the basis $$\mathcal{B}_r$$ does not depend on the position in the reference element. Note that in practice $$\mathcal{B}_r$$ is actually identified to $$\mathcal{B}_p$$ by considering an additionnal direction along the normal of the reference element.
 
-Now, let's consider a discrete vector field $q$ over this cell. We restrict ourselves to nodal FE basis. For a "planar" (ie not curved) element the discrete representation of $q$ on a point $\xi$ in the reference element reads
+To ease the notations, we introduce the vectors $$\vec{x}=(x,y,z)$$ and $$\vec{\xi}=(\xi,\eta,\zeta)$$. The mapping between the reference element and the physical element is noted $$\vec{x} = \vec{F}(\vec{\xi})$$. For an hypersurface, since the mapping is $$\vec{F}(\vec{\xi}) = \vec{F}_\Gamma(\xi,\eta) + \vec{\nu}(\xi,\eta) \zeta$$ where $$\vec{F}_\Gamma$$ is the "classic" [reference to physical mapping](#geometry-and-mesh) and $$\vec{\nu}$$ is the surface normal vector (in $$\mathcal{B}_p$$). This allows to identify the $$\mathcal{B}_l(x,y,z)$$ basis vectors as $$(\partial_\xi \vec{F}_\Gamma, \partial_\eta \vec{F}_\Gamma, \vec{\nu})$$. This triplet of vectors form the mapping jacobian $$J(\xi)$$. This jacobian is nothing else than the change-of-basis operator/matrix between $$\mathcal{B}_l$$ and $$\mathcal{B}_p$$.
+
+Now, let's a cell in the mesh of the surface, and consider a discrete vector field $\vec{q}$ over this cell. We restrict ourselves to nodal FE basis. For a "planar" (ie not curved) element the discrete representation of $\vec{q}$ on a point $\vec{\xi}$ in the reference element reads
 ```math
 \begin{equation}
     \label{eqn-std-interpolation}
-    q(\xi) = \sum_{i=1}^N q_i \hat{\lambda}_i(\xi)
+    \vec{q}(\vec{\xi}) = \sum_{i=1}^N \vec{q}_i \hat{\lambda}_i(\vec{\xi})
 \end{equation}
 ```
-where $$N$$ is the number of dofs and $q_i$ are the dof values of the vector $q$ in the physical basis $$\mathcal{B}_p$$. Since we resctrict to Lagrange element, $$q_i = q(\xi_i)$$.
+where $$N$$ is the number of dofs and $\vec{q}_i$ are the dof values of the vector $\vec{q}$ in the physical basis $$\mathcal{B}_p$$. Since we resctrict to Lagrange element, $$\vec{q}_i = \vec{q}(\vec{\xi_i})$$.
 
-It gets harder when dealing with a curved element. Imagine that all $q_i$ have a given angle with respect to the surface. We would like the interpolation of $q$ to have this angle with the surface on any point $\xi$. A standard interpolation like ``\eqref{eqn-std-interpolation}`` doesn't ensure this property. Imagine that instead of knowning the $q_i$ (in the physical element), we know $\tilde{q}_i$, the dof values of $q$ in the reference coordinate system, ie in the basis $$\mathcal{B}_r$$. We would then write
+It gets harder when dealing with a curved element. Imagine that all $\vec{q}_i$ have a given angle with respect to the surface. We would like the interpolation of $\vec{q}$ to have this angle with the surface on any point $$\vec{\xi}$$. A standard interpolation like ``\eqref{eqn-std-interpolation}`` doesn't ensure this property. Imagine that instead of knowning the $\vec{q}_i$ (in the physical element), we know $\vec{\tilde{q}}_i$, the dof values of $\vec{q}$ in the local basis $$\mathcal{B}_l$$. We would then write
 ```math
 \begin{equation}
     \label{eqn-interpolation-in-ref}
-    q(\xi) = P_\xi^x(\xi) \sum_{i=1}^N \tilde{q}_i \hat{\lambda}_i(\xi)
+    \vec{q}(\xi) = J(\xi) \sum_{i=1}^N \vec{\tilde{q}}_i \hat{\lambda}_i(\vec{\xi})
 \end{equation}
 ```
-where $$P_\xi^x(\xi)$$ is the change-of-basis matrix from $$\mathcal{B}_r(\xi)$$ to $$\mathcal{B}_p$$. In other words, the interpolation is performed in the reference element basis, and the result is mapped to the physical basis. Note that $$P_\xi^x(\xi)$$ is actually the jacobian matrix of the mapping $$F$$: $$P_\xi^x(\xi)=J(\xi)$$. Now if we don't know the $$\tilde{q}_i$$ but only the $$q_i$$ (ie the dofs in the physical basis), we look for the rotation / linear map $$R_\xi^x$$ to apply on each dof such that
+where we recall that $$J$$ is the change-of-basis matrix from $$\mathcal{B}_l(\xi)$$ to $$\mathcal{B}_p$$. In other words, the interpolation is performed in the local basis, and the result is mapped to the physical basis. Now, if we don't know the $$\vec{\tilde{q}}_i$$ but only the $$\vec{q}_i$$ (ie the dofs in the physical basis), we look for the rotation / linear map $$R_\xi^x$$ to apply on each dof such that
 ```math
 \begin{equation}
   \label{eqn-interpolation-in-phys-with-rot}
-    q(\xi) = \sum_{i=1}^N R_\xi^x(\xi, \xi_i) q_i \hat{\lambda}_i(\xi).
+    \vec{q}(\vec{\xi}) = \sum_{i=1}^N R_\xi^x(\vec{\xi}, \vec{\xi}_i) \vec{q}_i \hat{\lambda}_i(\vec{\xi}).
 \end{equation}
 ```
-We used two arguments ($$\xi$$ and $$\xi_i$$) for $$R_\xi^x$$ to emphasize that for each value of $\xi$, there is one different $$R_\xi^x$$ to apply on each dof node $$\xi_i$$. Combining ``\eqref{eqn-interpolation-in-ref}`` with ``\eqref{eqn-interpolation-in-phys-with-rot}`` leads to
+We used two arguments ($$\vec{\xi}$$ and $$\vec{\xi}_i$$) for $$R_\xi^x$$ to emphasize that for each point $\vec{\xi}$, there is one different $$R_\xi^x$$ to apply on each dof node $$\vec{\xi}_i$$. Combining ``\eqref{eqn-interpolation-in-ref}`` with ``\eqref{eqn-interpolation-in-phys-with-rot}`` leads to
 ```math
-    \forall i,~P_\xi^x(\xi)\tilde{q}_i = R_\xi^x(\xi, \xi_i) q_i.
+    \forall i,~J(\vec{\xi})\vec{\tilde{q}}_i = R_\xi^x(\vec{\xi}, \vec{\xi}_i) \vec{q}_i.
 ```
-Then, by definition the $\tilde{q}_i$ are the representation of $q_i$ in the reference basis, that is to say $$\tilde{q}_i = P_x^\xi(x_i) q_i$$, where $$P_x^\xi(x_i)$$ is the change-of-basis matrix from $$\mathcal{B}_p$$ to $$\mathcal{B}_r(F^{-1}(x_i))$$. And note that
+Then, by definition the $$\vec{\tilde{q}}_i$ are the representation of $\vec{q}_i$ in the local basis, that is to say $$\vec{\tilde{q}}_i = P_x^\xi(\vec{x_i}) \vec{q}_i$$, where $$P_x^\xi(\vec{x_i})$$ is the change-of-basis matrix from $$\mathcal{B}_p$$ to $$\mathcal{B}_l(F^{-1}(\vec{x_i}))$$. And note that
 ```math
-    P_x^\xi(x_i) = (P_\xi^x(F^{-1}(x_i)))^{-1} = (J(\xi_i))^{-1}.
+    P_x^\xi(\vec{x_i}) = (P_\xi^x(\vec{F}^{-1}(\vec{x}_i)))^{-1} = (J(\vec{\xi}_i))^{-1}.
 ```
-Hence $$R_\xi^x(\xi, \xi_i)$$ is identified to $$J(\xi)J^{-1}(F(\xi_i))$$. Finally, the correct interpolation to apply is
+Hence, $$R_\xi^x(\vec{\xi}, \vec{\xi}_i)$$ is identified to $$J(\vec{\xi})J^{-1}(\vec{F}(\vec{\xi}_i))$$. Finally, the correct interpolation to apply is
 ```math
 \begin{equation}
     \label{eqn-corrected-interpolation}
-    q(\xi) = J(\xi) \sum_{i=1}^N (J(\xi_i))^{-1} q_i \hat{\lambda_i}(\xi_i).
+    \vec{q}(\vec{\xi}) = J(\vec{\xi}) \sum_{i=1}^N (J(\vec{\xi}_i))^{-1} \vec{q}_i \hat{\lambda_i}(\vec{\xi}_i).
 \end{equation}
 ```
 
