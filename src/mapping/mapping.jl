@@ -192,7 +192,7 @@ Inverse of mapping's jacobian matrix for the reference square [-1,1] x [-1,1]
 to the 4-quadrilateral
 """
 function mapping_jacobian_inv(ctype::AbstractEntityType, cnodes, ξ)
-    inv(ForwardDiff.jacobian(mapping(ctype, cnodes), ξ))
+    inv(mapping_jacobian(ctype, cnodes, ξ))
 end
 
 """
