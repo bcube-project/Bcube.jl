@@ -13,7 +13,6 @@ using Printf # just for tmp vtk, to be removed
 import LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
 using NearestNeighbors
-import AcceleratedKernels as AK
 
 const MAX_LENGTH_STATICARRAY = (10^6)
 
