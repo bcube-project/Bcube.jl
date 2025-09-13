@@ -13,7 +13,7 @@ function allocate_bilinear(backend::BcubeBackendCPUSerial, a, U, V, T)
 end
 
 """
-    assemble_bilinear(a::Function, U, V)
+    assemble_bilinear(a::Function, U, V; T = Float64, backend::AbstractBcubeBackend = get_bcube_backend())
 
 Assemble the (sparse) Matrix corresponding to the given bilinear form `a`
 on the trial and test finite element spaces `U` and `V`.
@@ -47,7 +47,6 @@ function assemble_bilinear(
     T = Float64,
     backend::AbstractBcubeBackend = get_bcube_backend(),
 ) where {N}
-    @show backend
     I, J, X = allocate_bilinear(backend, a, U, V, T)
 
     # Compute
@@ -98,7 +97,7 @@ function _assemble_bilinear!(
 end
 
 """
-    assemble_bilinear!(I, J, X, f, measure::Measure, U, V, backend)
+    assemble_bilinear!(I, J, X, f, measure::Measure, U::TrialFESpace, V::TestFESpace, backend::BcubeBackendCPUSerial)
 
 In-place version of [`assemble_bilinear`](@ref).
 """
@@ -108,8 +107,8 @@ function assemble_bilinear!(
     X,
     f,
     measure::Measure,
-    U,
-    V,
+    U::TrialFESpace,
+    V::TestFESpace,
     backend::BcubeBackendCPUSerial,
 )
     # Alias
@@ -128,9 +127,9 @@ function assemble_bilinear!(
 end
 
 function assemble_bilinear!(
-    I::Vector{Int},
-    J::Vector{Int},
-    X::Vector,
+    I::AbstractVector,
+    J::AbstractVector,
+    X::AbstractVector,
     f::Function,
     measure::Measure,
     U::AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}},
@@ -168,7 +167,7 @@ function assemble_bilinear!(
 end
 
 """
-    assemble_linear(l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace})
+    assemble_linear(l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace}; T = Float64, backend::AbstractBcubeBackend = get_bcube_backend())
 
 Assemble the vector corresponding to a linear form `l` on the finite element space `V`
 
@@ -200,12 +199,12 @@ function assemble_linear(
     backend::AbstractBcubeBackend = get_bcube_backend(),
 )
     b = allocate_linear(backend, V, T)
-    assemble_linear!(b, l, V, backend)
+    assemble_linear!(b, l, V; backend = backend)
     return b
 end
 
 """
-    assemble_linear!(b::AbstractVector, l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace})
+    assemble_linear!(b::AbstractVector, l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace}; backend::AbstractBcubeBackend = get_bcube_backend())
 
 In-place version of [`assemble_linear`](@ref).
 """
@@ -223,8 +222,8 @@ function assemble_linear!(
 end
 
 """
-    _assemble_linear!(b, l, V, integration::Integration)
-    _assemble_linear!(b, l, V, integration::MultiIntegration{N}) where {N}
+    _assemble_linear!(b, l, V, integration::Integration, backend::AbstractBcubeBackend)
+    _assemble_linear!(b, l, V, integration::MultiIntegration{N}, backend::AbstractBcubeBackend) where {N}
 
 These functions act as a function barrier in order to:
 * get the function corresponding to the operand in the linear form
@@ -243,12 +242,24 @@ function _assemble_linear!(b, l, V, integration::Integration, backend::AbstractB
     return nothing
 end
 
-function _assemble_linear!(b, l, V, integration::MultiIntegration{N}) where {N}
+function _assemble_linear!(
+    b,
+    l,
+    V,
+    integration::MultiIntegration{N},
+    backend::AbstractBcubeBackend,
+) where {N}
     ival = Val(N)
     lᵢ(v) = l(v)[ival]
-    _assemble_linear!(b, lᵢ, V, integration[ival])
+    _assemble_linear!(b, lᵢ, V, integration[ival], backend)
     if N > 1 # recursive calls
-        _assemble_linear!(b, l, V, MultiIntegration(Base.front(integration.integrations)))
+        _assemble_linear!(
+            b,
+            l,
+            V,
+            MultiIntegration(Base.front(integration.integrations)),
+            backend,
+        )
     end
     return nothing
 end
@@ -380,6 +391,19 @@ function _append_bilinear!(
     col,
     vals::Union{T, SMatrix{M, N, T}},
     backend::AbstractBcubeBackend,
+) where {M, N, T <: NullOperator}
+    nothing
+end
+
+#fix ambiguity:
+function _append_bilinear!(
+    I,
+    J,
+    X,
+    row,
+    col,
+    vals::Union{T, SMatrix{M, N, T}},
+    ::Bcube.BcubeBackendCPUSerial,
 ) where {M, N, T <: NullOperator}
     nothing
 end
