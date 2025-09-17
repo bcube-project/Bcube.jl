@@ -70,8 +70,7 @@ end
 @inline Base.getindex(c::Connectivity) = c.indices
 @propagate_inbounds Base.getindex(c::Connectivity, i) = view(c.indices, axes(c, i))
 function Base.getindex(c::Connectivity, i, ::Val{N}) where {N}
-    # Rq bmxam : I comment this check for GPU compatibility
-    #length(c, i) == N || error("invalid length $N (length(c,i)=$(length(c,i)))")
+    #@assert length(c, i) == N "invalid length $N (length(c,i)=$(length(c, i)))" # not compatible with gpu kernel
     SVector{N}(c[i])
 end
 

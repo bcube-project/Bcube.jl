@@ -233,7 +233,7 @@ Base.parent(mesh::Mesh) = mesh
 @inline get_nodes(mesh::Mesh, i) = view(mesh.nodes, i)
 @inline get_nodes(mesh::Mesh, i::Int) = mesh.nodes[i]
 
-@inline set_nodes(mesh::Mesh, nodes) = mesh.nodes .= nodes
+@inline set_nodes!(mesh::Mesh, nodes) = mesh.nodes .= nodes
 
 @inline entities(mesh::Mesh) = mesh.entities
 @inline entities(mesh::Mesh, e::Symbol) = entities(mesh)[e]

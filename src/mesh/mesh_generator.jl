@@ -920,7 +920,7 @@ end
 function transform!(mesh::AbstractMesh, fun)
     new_nodes = [Node(fun(n.x)) for n in get_nodes(mesh)]
     #mesh.nodes .= new_nodes # bmxam : I don't understand why this is not working
-    set_nodes(mesh, new_nodes)
+    set_nodes!(mesh, new_nodes)
 end
 
 """
