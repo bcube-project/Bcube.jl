@@ -13,27 +13,11 @@ Base.size(::AbstractConnectivity) = error("Undefined")
 
 Type for connectivity with elements of type `T`.
 """
-struct Connectivity{T <: Integer} <: AbstractConnectivity{T}
+struct Connectivity{T <: Integer, O, I} <: AbstractConnectivity{T}
     minsize::T
     maxsize::T
-    offsets::Vector{T}
-    indices::Vector{T}
-
-    function Connectivity(
-        minsize::T,
-        maxsize::T,
-        offsets::Vector{T},
-        indices::Vector{T},
-    ) where {T <: Integer}
-        if offsets[end] - 1 ≠ length(indices)
-            @show offsets[end] - 1, length(indices)
-            error("Invalid offset range")
-        end
-        for i in firstindex(offsets):(lastindex(offsets) - 1)
-            offsets[i + 1] < offsets[i] ? error("Invalid offset ", i) : nothing
-        end
-        new{T}(minsize, maxsize, offsets, indices)
-    end
+    offsets::O
+    indices::I
 end
 
 function Connectivity(
@@ -48,7 +32,23 @@ function Connectivity(
     for (i, size) in enumerate(numIndices)
         offsets[i + 1] = offsets[i] + size
     end
-    return Connectivity(minsize, maxsize, offsets, indices)
+    _check_connectivity(minsize, maxsize, offsets, indices)
+    return Connectivity{T, typeof(offsets), typeof(indices)}(
+        minsize,
+        maxsize,
+        offsets,
+        indices,
+    )
+end
+
+function _check_connectivity(minsize, maxsize, offsets, indices)
+    if offsets[end] - 1 ≠ length(indices)
+        @show offsets[end] - 1, length(indices)
+        error("Invalid offset range")
+    end
+    for i in firstindex(offsets):(lastindex(offsets) - 1)
+        offsets[i + 1] < offsets[i] ? error("Invalid offset ", i) : nothing
+    end
 end
 
 Base.length(c::Connectivity) = length(c.offsets) - 1
@@ -69,8 +69,8 @@ end
 
 @inline Base.getindex(c::Connectivity) = c.indices
 @propagate_inbounds Base.getindex(c::Connectivity, i) = view(c.indices, axes(c, i))
-@propagate_inbounds function Base.getindex(c::Connectivity, i, ::Val{N}) where {N}
-    length(c, i) == N || error("invalid length $N (length(c,i)=$(length(c,i)))")
+function Base.getindex(c::Connectivity, i, ::Val{N}) where {N}
+    @assert length(c, i) == N "invalid length (length(c,i)!=N)"
     SVector{N}(c[i])
 end
 

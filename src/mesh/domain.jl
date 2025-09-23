@@ -45,7 +45,6 @@ abstract type AbstractFaceDomain{M} <: AbstractDomain{M} end
 struct InteriorFaceDomain{M, I} <: AbstractFaceDomain{M}
     mesh::M
     indices::I
-    InteriorFaceDomain(mesh, indices) = new{typeof(mesh), typeof(indices)}(mesh, indices)
 end
 @inline topodim(d::InteriorFaceDomain) = topodim(get_mesh(d)) - 1
 InteriorFaceDomain(mesh::AbstractMesh) = InteriorFaceDomain(parent(mesh))
@@ -211,29 +210,24 @@ or several labels (=names).
 If no label is provided, all the `BoundaryFaceDomain` corresponds
 to all the boundary faces.
 """
-function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{String, Vararg{String}})
-    tags = map(label -> boundary_tag(mesh, label), labels)
-
-    # Check all tags have been found
-    for tag in tags
-        (tag isa Nothing) && error(
-            "Failed to build a `BoundaryFaceDomain` with labels '$(labels...)' -> double-check that your mesh contains these labels",
-        )
-    end
-
-    bndfaces = vcat(map(tag -> boundary_faces(mesh, tag), tags)...)
+function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol, Vararg{Symbol}})
+    bndfaces = vcat(map(label -> boundary_faces(mesh, label), labels)...)
     cache = bndfaces
     bc = nothing
-    BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(labels), typeof(cache)}(
+    _labels = (; zip(labels, ntuple(i -> i, length(labels)))...) # store labels as keys of a namedtuple for make it isbits
+    BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(_labels), typeof(cache)}(
         mesh,
         bc,
-        labels,
+        _labels,
         cache,
     )
 end
+function BoundaryFaceDomain(mesh::AbstractMesh, labels::Tuple{String, Vararg{String}})
+    BoundaryFaceDomain(mesh, map(Symbol, labels))
+end
 BoundaryFaceDomain(mesh::AbstractMesh, label::String) = BoundaryFaceDomain(mesh, (label,))
 function BoundaryFaceDomain(mesh::AbstractMesh)
-    BoundaryFaceDomain(mesh, Tuple(values(boundary_names(mesh))))
+    BoundaryFaceDomain(mesh, values(boundary_names(mesh)))
 end
 function BoundaryFaceDomain(mesh::AbstractMesh, args...; kwargs...)
     BoundaryFaceDomain(parent(mesh), args...; kwargs...)
@@ -320,12 +314,17 @@ are duplicate from the negative ones.
 - For performance reason (type stability), nodes and type of the face
 is stored explicitely in `FaceInfo` even if it could have been
 computed by collecting info from the side of the negative or positive cells.
+- For GPU compatibility, it has been necessary to introduce two additional type
+parameters, namely `CSN` and `CSP` whereas in practice `CSN == CSP == Int`
+(bmxam : I've done multiple tests and this is the only solution I have for now.
+But I don't understand this solution and this might not be necessary)
 """
-struct FaceInfo{CN <: CellInfo, CP <: CellInfo, FT, FN, F2N, I} <: AbstractFaceInfo
+struct FaceInfo{CN <: CellInfo, CP <: CellInfo, CSN, CSP, FT, FN, F2N, I} <:
+       AbstractFaceInfo
     cellinfo_n::CN
     cellinfo_p::CP
-    cellside_n::Int
-    cellside_p::Int
+    cellside_n::CSN
+    cellside_p::CSP
     faceType::FT
     faceNodes::FN
     f2n::F2N
@@ -347,19 +346,20 @@ function FaceInfo(
 )
     cellside_n = cell_side(celltype(cellinfo_n), get_nodes_index(cellinfo_n), f2n)
     cellside_p = cell_side(celltype(cellinfo_p), get_nodes_index(cellinfo_p), f2n)
-    if cellside_n === nothing || cellside_p === nothing
-        printstyled("\n=== ERROR in FaceInfo ===\n"; color = :red)
-        @show cellside_n
-        @show cellside_p
-        @show celltype(cellinfo_n)
-        @show get_nodes_index(cellinfo_n)
-        @show celltype(cellinfo_p)
-        @show get_nodes_index(cellinfo_p)
-        @show faceType
-        @show faceNodes
-        @show f2n
-        error("Invalid cellside in `FaceInfo`")
-    end
+    # Rq bmxam : I have to comment this block for GPU compatibility
+    #    if cellside_n === nothing || cellside_p === nothing
+    #        printstyled("\n=== ERROR in FaceInfo ===\n"; color = :red)
+    #        @show cellside_n
+    #        @show cellside_p
+    #        @show celltype(cellinfo_n)
+    #        @show get_nodes_index(cellinfo_n)
+    #        @show celltype(cellinfo_p)
+    #        @show get_nodes_index(cellinfo_p)
+    #        @show faceType
+    #        @show faceNodes
+    #        @show f2n
+    #        error("Invalid cellside in `FaceInfo`")
+    #    end
     FaceInfo(
         cellinfo_n,
         cellinfo_p,
@@ -467,12 +467,12 @@ end
 
 Base.getindex(iter::DomainIterator, i) = _get_index(get_domain(iter), i)
 
-function _get_index(domain::AbstractCellDomain, i::Integer)
+function _get_index(domain::D, i::Integer) where {D <: AbstractCellDomain}
     icell = indices(domain)[i]
     mesh = get_mesh(domain)
     _get_cellinfo(mesh, icell)
 end
-function _get_cellinfo(mesh, icell)
+function _get_cellinfo(mesh::M, icell) where {M <: AbstractMesh}
     c2n = connectivities_indices(mesh, :c2n)
     celltypes = cells(mesh)
     ctype = celltypes[icell]
@@ -482,7 +482,7 @@ function _get_cellinfo(mesh, icell)
     CellInfo(icell, ctype, cnodes, _c2n)
 end
 
-function _get_index(domain::AbstractFaceDomain, i::Integer)
+function _get_index(domain::D, i::Integer) where {D <: AbstractFaceDomain}
     iface = indices(domain)[i]
     mesh = get_mesh(domain)
     f2n = connectivities_indices(mesh, :f2n)
@@ -632,11 +632,17 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
     # Filter bc nodes
     # First, we filter to remove bnd conditions that does not exist in the new mesh
     # Second, we remove non-existing nodes from the boundary
-    d1 = filter(((tag, inodes),) -> any(view(hasNode, inodes)), boundary_nodes(mesh))
+    dict_bc_names = Dict(((i => string(a)) for (i, a) in pairs(boundary_names(mesh)))...)
+    dict_bc_nodes =
+        Dict(((i => boundary_nodes(mesh, i)) for (i, a) in pairs(dict_bc_names))...)
+    dict_bc_faces =
+        Dict(((i => boundary_faces(mesh, i)) for (i, a) in pairs(dict_bc_names))...)
+
+    d1 = filter(((tag, inodes),) -> any(view(hasNode, inodes)), dict_bc_nodes)
     bnd_nodes = Dict(
         tag => I_nodes_o2n[filter(inode -> hasNode[inode], inodes)] for (tag, inodes) in d1
     )
-    bnd_names = filter(((tag, name),) -> tag ∈ keys(bnd_nodes), boundary_names(mesh))
+    bnd_names = filter(((tag, name),) -> tag ∈ keys(bnd_nodes), dict_bc_names)
 
     # Assign boundary condition to nodes that were not boundary nodes in the old mesh
     # but are bnd nodes in the new mesh

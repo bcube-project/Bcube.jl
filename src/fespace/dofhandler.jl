@@ -2,7 +2,7 @@
 The `DofHandler` handles the degree of freedom numbering. To each degree of freedom
 is associated a unique integer.
 """
-struct DofHandler
+struct DofHandler{A, B}
     # N : number of components
 
     # Naturally, `iglob` would be a (ndofs, ncell) array. Since
@@ -13,17 +13,17 @@ struct DofHandler
     # `iglob = 1:ndofs_tot`,
     # but if a continous variable is present, `iglob` reflects that two dofs
     # of different cells can share the same global index.
-    iglob::Vector{Int}
+    iglob::A
 
     # Array of size (ncell, ncomps) indicating the positions in `iglob` of the
     # global dof indices for a given cell and a given component (=1 for scalar).
     # So `offset[icell,icomp] + idof` is the position, in `iglob` of the `idof`
     # local dof for the component `icomp` in cell `icell`
-    offset::Matrix{Int}
+    offset::B
 
     # Number of dofs in each cell for each component. This can be computed from `offset`
     # but easily. It's faster and easier to store the information in this (ncells, ncomps)
-    ndofs::Matrix{Int}
+    ndofs::B
 
     # Total number of unique DoFs
     ndofs_tot::Int
@@ -152,7 +152,7 @@ function DofHandler(
     # Create a cell number remapping to ensure a dense numbering
     densify!(iglob)
     ndofs_tot = length(unique(iglob))
-    return DofHandler(iglob, offset, _ndofs, ndofs_tot)
+    return DofHandler{typeof(iglob), typeof(offset)}(iglob, offset, _ndofs, ndofs_tot)
 end
 
 @inline get_offset(dhl::DofHandler) = dhl.offset

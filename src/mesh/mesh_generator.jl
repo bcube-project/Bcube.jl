@@ -110,7 +110,10 @@ function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"
         Δx = l / (n - 1)
 
         # Nodes
-        nodes = [Node([xmin + (i - 1) * Δx]) for i in 1:n]
+        nodes = Vector{Node{1, Float64}}(undef, n)
+        for i in 1:n
+            nodes[i] = Node(SA[xmin + (i - 1) * Δx])
+        end
 
         # Cell type is constant
         celltypes = [Bar2_t() for ielt in 1:nelts]
@@ -917,7 +920,7 @@ end
 function transform!(mesh::AbstractMesh, fun)
     new_nodes = [Node(fun(n.x)) for n in get_nodes(mesh)]
     #mesh.nodes .= new_nodes # bmxam : I don't understand why this is not working
-    set_nodes(mesh, new_nodes)
+    set_nodes!(mesh, new_nodes)
 end
 
 """
@@ -936,13 +939,22 @@ translate!(mesh::AbstractMesh, t::AbstractVector) = transform!(mesh, x -> x + t)
 Make an exact copy of the input mesh.
 """
 function _duplicate_mesh(mesh::AbstractMesh)
+    if isempty(boundary_names(mesh))
+        bc_names = Dict{Int, String}()
+        bc_nodes = Dict{Int, Vector{Int}}()
+        bc_faces = Dict{Int, Vector{Int}}()
+    else
+        bc_names = Dict(((i => string(a)) for (i, a) in pairs(boundary_names(mesh)))...)
+        bc_nodes = Dict(((i => boundary_nodes(mesh, i)) for (i, a) in pairs(bc_names))...)
+        bc_faces = Dict(((i => boundary_faces(mesh, i)) for (i, a) in pairs(bc_names))...)
+    end
     Mesh(
-        get_nodes(mesh),
-        cells(mesh),
-        connectivities(mesh, :c2n).indices;
-        bc_names = boundary_names(mesh),
-        bc_nodes = boundary_nodes(mesh),
-        bc_faces = boundary_faces(mesh),
+        deepcopy(get_nodes(mesh)),
+        deepcopy(cells(mesh)),
+        deepcopy(connectivities(mesh, :c2n).indices);
+        bc_names = deepcopy(bc_names),
+        bc_nodes = deepcopy(bc_nodes),
+        bc_faces = deepcopy(bc_faces),
     )
 end
 

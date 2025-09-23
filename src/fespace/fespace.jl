@@ -107,11 +107,11 @@ A FESpace can be either scalar (to represent a Temperature for instance)
 or vector (to represent a Velocity). In case of a "vector" `SingleFESpace`,
 all the components necessarily share the same `FunctionSpace`.
 """
-struct SingleFESpace{S, FS <: AbstractFunctionSpace} <: AbstractSingleFESpace{S, FS}
+struct SingleFESpace{S, FS <: AbstractFunctionSpace, DHL, D} <: AbstractSingleFESpace{S, FS}
     fSpace::FS # function space
-    dhl::DofHandler # degrees of freedom of this FESpace
+    dhl::DHL # degrees of freedom of this FESpace
     isContinuous::Bool # finite-element or discontinuous-galerkin
-    dirichletBndTags::Vector{Int} # mesh boundary tags where Dirichlet condition applies
+    dirichletBndTags::D # mesh boundary names (as Symbol) where Dirichlet condition applies
 end
 
 Base.parent(feSpace::SingleFESpace) = feSpace
@@ -186,15 +186,18 @@ function SingleFESpace(
 )
     dhl = DofHandler(mesh, fSpace, size, isContinuous)
 
-    # Rq : cannot use a "map" here because `dirichletBndNames` can be a Set
-    dirichletBndTags = Int[]
-    bndNames = values(boundary_names(mesh))
-    for name in dirichletBndNames
-        @assert name ∈ bndNames "Error with the Dirichlet condition on '$name' : this is not a boundary name. Boundary names are : $bndNames"
-        push!(dirichletBndTags, boundary_tag(mesh, name))
+    # Convert String -> Symbols and ensure that every input boundary name is known in the mesh
+    dirichletBndSymbols = Symbol.(dirichletBndNames)
+    for name in dirichletBndSymbols
+        @assert Symbol(name) ∈ boundary_names(mesh) "Error with the Dirichlet condition on '$name' : this is not a boundary name. Boundary names are : $bndNames"
     end
 
-    return SingleFESpace{size, typeof(fSpace)}(fSpace, dhl, isContinuous, dirichletBndTags)
+    return SingleFESpace{size, typeof(fSpace), typeof(dhl), typeof(dirichletBndSymbols)}(
+        fSpace,
+        dhl,
+        isContinuous,
+        dirichletBndSymbols,
+    )
 end
 
 @inline allocate_dofs(feSpace::SingleFESpace, T = Float64) = zeros(T, get_ndofs(feSpace))
@@ -205,9 +208,9 @@ A TrialFESpace is basically a SingleFESpace plus other attributes (related to bo
 # Dev notes
 * we cannot directly store Dirichlet values on dofs because the Dirichlet values needs "time" to apply
 """
-struct TrialFESpace{S, FE <: AbstractSingleFESpace} <: AbstractFESpace{S}
+struct TrialFESpace{S, FE <: AbstractSingleFESpace, D} <: AbstractFESpace{S}
     feSpace::FE
-    dirichletValues::Dict{Int, Function} # <boundary tag> => <dirichlet value (function of x, t)>
+    dirichletValues::D # <boundary name (as a Symbol)> => <dirichlet value (function of x, t)>
 end
 
 """
@@ -266,15 +269,19 @@ function TrialFESpace(
     feSpace = SingleFESpace(fSpace, mesh, keys(dirichlet); size, isContinuous, kwargs...)
 
     # Transform any constant value into a function of (x,t)
-    dirichletValues = Dict(
-        boundary_tag(mesh, k) => (v isa Function ? v : (x, t) -> v) for (k, v) in dirichlet
-    )
+    d = Dict(Symbol(k) => (v isa Function ? v : (x, t) -> v) for (k, v) in dirichlet)
+
+    # Transform the dict into a NamedTuple (for GPU compatibility)
+    dirichletValues = (; zip(keys(d), values(d))...)
 
     return TrialFESpace(feSpace, dirichletValues)
 end
 
 function TrialFESpace(feSpace, dirichletValues)
-    TrialFESpace{get_size(feSpace), typeof(feSpace)}(feSpace, dirichletValues)
+    TrialFESpace{get_size(feSpace), typeof(feSpace), typeof(dirichletValues)}(
+        feSpace,
+        dirichletValues,
+    )
 end
 
 function TrialFESpace(
@@ -297,31 +304,38 @@ function TrialFESpace(
 end
 
 """
-A MultiplierFESpace can be viewed as a set of independant P0 elements.
-It is used to define Lagrange multipliers and assemble the associated augmented system (the system that adds the multipliers as unknowns).
+A MultiplierFESpace can be viewed as a set of independent P0 elements.
+It is used to define Lagrange multipliers and assemble the associated augmented
+system (the system that adds the multipliers as unknowns).
 """
 function MultiplierFESpace(mesh::AbstractMesh, size::Int = 1, kwargs...)
     fSpace = FunctionSpace(:Lagrange, 0)
 
     iglob = collect(1:size)
-    offset = zeros(ncells(mesh), size)
+    offset = zeros(Int, ncells(mesh), size)
     for i in 1:size
         offset[:, i] .= i - 1
     end
-    ndofs = ones(ncells(mesh), size)
-    ndofs_tot = length(unique(iglob))
+    ndofs = ones(Int, ncells(mesh), size)
+    ndofs_tot = length(unique(iglob)) # TODO : why using length∘unique, isn't it just `size`?
     dhl = DofHandler(iglob, offset, ndofs, ndofs_tot)
+    diri = Int[]
 
-    feSpace = SingleFESpace{size, typeof(fSpace)}(fSpace, dhl, true, Int[])
+    feSpace = SingleFESpace{size, typeof(fSpace), typeof(dhl), typeof(diri)}(
+        fSpace,
+        dhl,
+        true,
+        diri,
+    )
 
-    return TrialFESpace{size, typeof(feSpace)}(feSpace, Dict{Int, Function}())
+    return TrialFESpace(feSpace, (;)) # Empty NamedTuple for dirichlet values
 end
 
 """
 Return the values associated to a Dirichlet condition
 """
 get_dirichlet_values(feSpace::TrialFESpace) = feSpace.dirichletValues
-get_dirichlet_values(feSpace::TrialFESpace, ibnd::Int) = feSpace.dirichletValues[ibnd]
+get_dirichlet_values(feSpace::TrialFESpace, bnd::Symbol) = feSpace.dirichletValues[bnd]
 
 """
 A TestFESpace is basically a SingleFESpace plus other attributes (related to boundary conditions)
