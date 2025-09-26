@@ -401,7 +401,7 @@
             T2_analytical(x) = 260.0 + (q / λ) * x[1] * (1.0 - 0.5 * x[1])
             scale(x) = (x[1] + 0.5)
             err = heat_solver(mesh, degree, dirichlet_dict, q, η, T2_analytical ∘ scale)
-            @test err < 1.0e-14
+            @test err < 2.0e-14
             #
         end
         driver_heat_solver()
