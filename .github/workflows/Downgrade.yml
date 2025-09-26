@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         downgrade_mode: ['deps']
-        julia-version: ['1.11']
+        julia-version: ['1.10']
     env:
       GITHUB_CI: "true"
     steps:
