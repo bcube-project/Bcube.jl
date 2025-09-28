@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        downgrade_mode: ['alldeps']
+        downgrade_mode: ['deps']
         julia-version: ['1.10']
     env:
       GITHUB_CI: "true"
@@ -24,11 +24,10 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia-version }}
-      - uses: julia-actions/julia-downgrade-compat@v2
+      - uses: julia-actions/julia-downgrade-compat@v1
         with:
-          mode: ${{ matrix.downgrade_mode }}
+          strict: "true"
           skip: Pkg, TOML
-          julia_version: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
