@@ -44,7 +44,6 @@ function isapprox_arrays(a::AbstractArray, b::AbstractArray; rtol::Real = eps())
 end
 
 import Bcube:
-    absolute_indices,
     boundary_faces,
     boundary_nodes,
     by,

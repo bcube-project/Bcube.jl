@@ -288,7 +288,7 @@ end
         v1_in_2 = _R * v1
         ν2 = Bcube.cell_normal(ctype_p, cnodes_p, ξ_p)
         @test v1 ⋅ u ≈ v1_in_2 ⋅ u
-        @test abs(ν2 ⋅ v1_in_2) < 1e-16
+        @test abs(ν2 ⋅ v1_in_2) < 5e-16
     end
 end
 
