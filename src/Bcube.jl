@@ -13,13 +13,8 @@ using Printf # just for tmp vtk, to be removed
 import LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
 using NearestNeighbors
-import AcceleratedKernels as AK
 
 const MAX_LENGTH_STATICARRAY = (10^6)
-const DEFAULT_NUMBER = Float64
-const DEFAULT_INTEGER = Int64
-const DNumber = DEFAULT_NUMBER
-const DInt = DEFAULT_INTEGER
 
 include("LazyOperators/LazyOperators.jl")
 using .LazyOperators
