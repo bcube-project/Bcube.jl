@@ -156,7 +156,7 @@ function get_dofs(feSpace::SingleFESpace, icell::I, n::Val{N}) where {I <: Integ
 end
 get_ndofs(feSpace::SingleFESpace) = get_ndofs(_get_dhl(feSpace))
 
-get_dirichlet_boundary_tags(feSpace::SingleFESpace) = feSpace.dirichletBndTags
+get_dirichlet_boundary_tags(feSpace::SingleFESpace) = keys(feSpace.dirichletBndTags)
 
 """
     SingleFESpace(
@@ -192,7 +192,8 @@ function SingleFESpace(
     dhl = DofHandler(mesh, fSpace, size, isContinuous)
 
     # Convert String -> Symbols and ensure that every input boundary name is known in the mesh
-    dirichletBndSymbols = Symbol.(dirichletBndNames)
+    # Rq: for GPU compatibility, we wrap theses symbols into a NamedTuple
+    dirichletBndSymbols = (; zip(Symbol.(dirichletBndNames), Symbol.(dirichletBndNames))...)
     for name in dirichletBndSymbols
         @assert Symbol(name) ∈ boundary_names(mesh) "Error with the Dirichlet condition on '$name' : this is not a boundary name. Boundary names are : $bndNames"
     end

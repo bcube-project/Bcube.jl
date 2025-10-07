@@ -2,6 +2,26 @@ abstract type AbstractQuadratureType end
 struct QuadratureLegendre <: AbstractQuadratureType end
 struct QuadratureLobatto <: AbstractQuadratureType end
 struct QuadratureUniform <: AbstractQuadratureType end
+struct QuadratureGaussFloat32 <: Bcube.AbstractQuadratureType end
+
+function quadrature_rule(::Bcube.Line, ::Val{1}, ::QuadratureGaussFloat32)
+    return (Float32(2.0), Float32(0.0))
+end
+
+function quadrature_rule(::Bcube.Line, ::Val{2}, ::QuadratureGaussFloat32)
+    return (SA{Float32}[0.99999994, 0.99999994], SA{Float32}[-0.57735026, 0.57735026])
+end
+
+function quadrature_rule(::Bcube.Line, ::Val{3}, ::QuadratureGaussFloat32)
+    return (
+        SA{Float32}[0.55555564, 0.88888896, 0.55555564],
+        SA{Float32}[-0.77459663, 0.0, 0.77459663],
+    )
+end
+
+function quadrature_rule(::Bcube.Line, ::Val{D}, ::QuadratureGaussFloat32) where {D}
+    error("not handled")
+end
 
 """
     AbstractQuadrature{T,D}

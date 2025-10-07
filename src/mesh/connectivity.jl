@@ -71,7 +71,9 @@ end
 @propagate_inbounds Base.getindex(c::Connectivity, i) = view(c.indices, axes(c, i))
 function Base.getindex(c::Connectivity, i, ::Val{N}) where {N}
     @assert length(c, i) == N "invalid length (length(c,i)!=N)"
-    SVector{N}(c[i])
+    # SVector{N}(c[i])
+    a = ntuple(k -> c.indices[c.offsets[i] + k - 1], Val(N))
+    SVector{N}(a...)
 end
 
 @inline minsize(c::Connectivity) = c.minsize

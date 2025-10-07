@@ -88,6 +88,7 @@ function apply_quadrature(
     # --> TEMPORARY: ALTERING THE QUADNODES TO BYPASS OPERATORS / TestFunctionInterpolator
     quadnodes = map(get_coords, get_quadnodes(quadrule))
     # <-- TEMPORARY:
+    return Float32(0.0)
     _apply_quadrature(g_ref, get_weights(quadrule), quadnodes, g_ref(quadnodes[1]))
 end
 # splitting the previous function to have function barrier...

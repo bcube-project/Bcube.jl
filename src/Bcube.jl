@@ -13,8 +13,10 @@ using Printf # just for tmp vtk, to be removed
 import LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
 using NearestNeighbors
+using QuadGK
 
 const MAX_LENGTH_STATICARRAY = (10^6)
+const DInt = Int
 
 include("LazyOperators/LazyOperators.jl")
 using .LazyOperators
