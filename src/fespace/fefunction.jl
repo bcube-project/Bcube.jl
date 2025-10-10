@@ -90,8 +90,17 @@ end
     FEFunction(feSpace::AbstractFESpace, dofValues)
     FEFunction(feSpace::AbstractFESpace, constant::Number)
     FEFunction(feSpace::AbstractFESpace, mesh::AbstractMesh, f::AbstractLazy)
+    FEFunction(mfeSpace::AbstractMultiFESpace, dofValues::AbstractVector = allocate_dofs(mfeSpace))
+    FEFunction(mfeSpace::AbstractMultiFESpace, args...)
 
-Build a FEFunction from an `AbstractFESpace` and, optionally, some init infos (constant, vector, or AbstractLazy).
+Build a finite-element function (`FEFunction`) from an `AbstractFESpace` or an `AbstractMultiFESpace` and, optionally,
+some init infos (constant, vector, or `AbstractLazy`).
+
+To initialize with an `AbstractLazy`, the underlying function-space must be _nodal_. Then the dofs values are initialized
+with the `AbstractLazy` evaluated at the corresponding node.
+
+To build an `FEFunction` of a `AbstractMultiFESpace`, provide either a vector of values of length equal to the total number
+of dofs of the system, or use any previous constructors. By default, without any argument, the dofs are initialized to zero.
 """
 function FEFunction(feSpace::AbstractFESpace, dofValues)
     SingleFieldFEFunction(feSpace, dofValues)
@@ -226,10 +235,6 @@ function get_dof_values(mfeFunc::MultiFieldFEFunction)
     return u
 end
 
-"""
-Constructor for a FEFunction built on a MultiFESpace. All dofs are initialized to zero by default,
-but an array `dofValues` can be passed.
-"""
 function FEFunction(
     mfeSpace::AbstractMultiFESpace,
     dofValues::AbstractVector = allocate_dofs(mfeSpace),
@@ -239,6 +244,22 @@ function FEFunction(
             get_fespace(mfeSpace, iSpace),
             view(dofValues, get_mapping(mfeSpace, iSpace)),
         ),
+        get_n_fespace(mfeSpace),
+    )
+    return MultiFieldFEFunction(feFunctions, mfeSpace)
+end
+
+function FEFunction(mfeSpace::AbstractMultiFESpace, args...)
+    feFunctions = ntuple(
+        iSpace -> FEFunction(get_fespace(mfeSpace, iSpace), args...),
+        get_n_fespace(mfeSpace),
+    )
+    return MultiFieldFEFunction(feFunctions, mfeSpace)
+end
+
+function FEFunction(mfeSpace::AbstractMultiFESpace, mesh, f::Tuple{Vararg{<:AbstractLazy}})
+    feFunctions = ntuple(
+        iSpace -> FEFunction(get_fespace(mfeSpace, iSpace), mesh, f[iSpace]),
         get_n_fespace(mfeSpace),
     )
     return MultiFieldFEFunction(feFunctions, mfeSpace)
