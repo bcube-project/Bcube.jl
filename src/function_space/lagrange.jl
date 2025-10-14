@@ -438,39 +438,18 @@ function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Cube, ξ)
     SA[_zero _zero _zero]
 end
 
-# Prism
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Prism, ξ) = SA[one(eltype(ξ))]
-function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Prism, ξ)
-    _zero = zero(eltype(ξ))
-    SA[_zero _zero _zero]
-end
-get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Prism) = 1
-
-function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Prism, ξηζ)
+# Prism : Lagrange prismatic elements are built from the cartesian product of the Triangle and
+# the Line
+function _scalar_shape_functions(fs::FunctionSpace{<:Lagrange, N}, ::Prism, ξηζ) where {N}
     ξ, η, ζ = ξηζ
-    return SA[
-        (1 - ξ - η) * (1 - ζ)
-        ξ * (1 - ζ)
-        η * (1 - ζ)
-        (1 - ξ - η) * (1 + ζ)
-        ξ * (1 + ζ)
-        η * (1 + ζ)
-    ] ./ 2.0
+    λ_tri = _scalar_shape_functions(fs, Triangle(), SA[ξ, η])
+    λ_line = _scalar_shape_functions(fs, Line(), SA[ζ])
+    return SVector{length(λ_tri) * length(λ_line)}(λt * λl for λt in λ_tri, λl in λ_line)
 end
 
-function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Prism, ξηζ)
-    ξ, η, ζ = ξηζ
-    return SA[
-        (-(1 - ζ)) (-(1 - ζ)) (-(1 - ξ - η))
-        ((1-ζ)) (0.0) (-ξ)
-        (0.0) ((1-ζ)) (-η)
-        (-(1 + ζ)) (-(1 + ζ)) ((1 - ξ-η))
-        ((1+ζ)) (0.0) (ξ)
-        (0.0) ((1+ζ)) (η)
-    ] ./ 2.0
+function get_ndofs(fs::FunctionSpace{<:Lagrange, N}, ::Prism) where {N}
+    get_ndofs(fs, Triangle()) * get_ndofs(fs, Line())
 end
-
-get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Prism) = 6
 
 # Pyramid
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Pyramid, ξ) = SA[one(eltype(ξ))]
@@ -757,6 +736,7 @@ function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Tetra)
 end
 
 # Prism
+
 function idof_by_edge(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
     ntuple(i -> SA[], nedges(shape))
 end
@@ -774,11 +754,54 @@ function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
     )
 end
 
+function idof_by_face(::FunctionSpace{<:Lagrange, 0}, shape::Prism)
+    ntuple(i -> SA[], nfaces(shape))
+end
 function idof_by_face(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
     ntuple(i -> SA[], nfaces(shape))
 end
-function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
-    (SA[1, 2, 5, 4], SA[2, 3, 6, 5], SA[3, 1, 4, 6], SA[1, 3, 2], SA[4, 5, 6])
+function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::Prism)
+    ntuple(i -> SA[], nfaces(shape))
+end
+
+# Note : recall that the Prism is obtained by cartesian product between Triangle and Line.
+# Every inner dof on the "edge" of a Triangle becomes a dof of a side-face of the Prism, excluding the
+# one lying on the bottom and top edges.
+# WARNING : only Triangle WITHOUT INSIDE NODE are supported
+function idof_by_face(fs::FunctionSpace{<:Lagrange, N}, ::Prism) where {N}
+    idof_edge_tri = idof_by_edge(fs, Triangle())
+    ndofs_tri = get_ndofs(fs, Triangle())
+    ndofs_line = get_ndofs(fs, Line()) # >=3 (ensured by multi-dispatch on N)
+    ndofs_line_inner = ndofs_line - 2 # exclude bottom and top edges
+
+    #  Re "(i+1)" because "i" starts at "1" whereas the first element is "2"
+    # Ideally, we would write vcat(ntuple(i -> idof_edge_tri[1] .+ (i - 1) * ndofs_tri, 2:ndofs_line_inner-1)...)
+    return (
+        vcat(ntuple(i -> idof_edge_tri[1] .+ (i + 1 - 1) * ndofs_tri, ndofs_line_inner)...),
+        vcat(ntuple(i -> idof_edge_tri[2] .+ (i + 1 - 1) * ndofs_tri, ndofs_line_inner)...),
+        vcat(ntuple(i -> idof_edge_tri[3] .+ (i + 1 - 1) * ndofs_tri, ndofs_line_inner)...),
+        SA[], # bottom face (z=zmin)
+        SA[], # top face (z=zmax)
+    )
+end
+
+# Note : recall that the Prism is obtained by cartesian product between Triangle and Line.
+# Every dof on the "edge" of a Triangle becomes a dof of a side-face of the Prism. Additionnaly,
+# every dof of the Triangle becomes a dof of the bottom and top faces of the Prism.
+function idof_by_face_with_bounds(fs::FunctionSpace{<:Lagrange, N}, ::Prism) where {N}
+    idof_edge_tri = idof_by_edge_with_bounds(fs, Triangle())
+    ndofs_tri = get_ndofs(fs, Triangle())
+    ndofs_line = get_ndofs(fs, Line())
+
+    return (
+        vcat(ntuple(i -> idof_edge_tri[1] .+ (i - 1) * ndofs_tri, ndofs_line)...),
+        vcat(ntuple(i -> idof_edge_tri[2] .+ (i - 1) * ndofs_tri, ndofs_line)...),
+        vcat(ntuple(i -> idof_edge_tri[3] .+ (i - 1) * ndofs_tri, ndofs_line)...),
+        SVector{ndofs_tri}(i for i in 1:ndofs_tri), # bottom face (z=zmin)
+        SVector{ndofs_tri}(
+            i for i in ((ndofs_tri * (ndofs_line - 1)) + 1):(ndofs_tri * ndofs_line)
+        ), # top face (z=zmax)
+    )
 end
 
 # Pyramid
