@@ -323,66 +323,57 @@ end
             test_lagrange_shape_function(Prism(), deg)
         end
 
-        # Lagrange 2
+        # The "reference" results below are obtained "by hand" (with drawings)
+
+        # Lagrange 1 - idof_by_edge_with_bounds
+        fs = FunctionSpace(:Lagrange, 1)
+        idofs = Bcube.idof_by_edge_with_bounds(fs, Bcube.Prism())
+        ref_idofs = ((1, 2), (2, 3), (3, 1), (1, 4), (2, 5), (3, 6), (4, 5), (5, 6), (6, 4))
+        for (_idofs, _ref_idofs) in zip(idofs, ref_idofs)
+            @test Set(_idofs) == Set(_ref_idofs)
+        end
+
+        # Lagrange 2 - idof_by_edge, idof_by_edge_with_bounds
         fs = FunctionSpace(:Lagrange, 2)
-        p = Bcube.Prism()
-        idofs = Bcube.idof_by_face_with_bounds(fs, p)
+        idofs = Bcube.idof_by_edge(fs, Bcube.Prism())
+        ref_idofs = ((4,), (5,), (6,), (7,), (8,), (9,), (16,), (17,), (18,))
+        for (_idofs, _ref_idofs) in zip(idofs, ref_idofs)
+            @test Set(_idofs) == Set(_ref_idofs)
+        end
+        idofs = Bcube.idof_by_edge_with_bounds(fs, Bcube.Prism())
+        ref_idofs = (
+            (1, 2, 4),
+            (2, 3, 5),
+            (3, 1, 6),
+            (1, 7, 13),
+            (2, 8, 14),
+            (3, 9, 15),
+            (13, 14, 16),
+            (14, 15, 17),
+            (15, 13, 18),
+        )
+        for (_idofs, _ref_idofs) in zip(idofs, ref_idofs)
+            @test Set(_idofs) == Set(_ref_idofs)
+        end
+
+        # Lagrange 2 - idof_by_face, idof_by_face_with_bounds
+        fs = FunctionSpace(:Lagrange, 2)
+        idofs = Bcube.idof_by_face_with_bounds(fs, Bcube.Prism())
         ref_idofs = (
             [1, 2, 4, 7, 8, 10, 13, 14, 16],
             [2, 3, 5, 8, 9, 11, 14, 15, 17],
             [3, 1, 6, 9, 7, 12, 15, 13, 18],
             [1, 2, 3, 4, 5, 6],
             [13, 14, 15, 16, 17, 18],
-        ) # computed by hand (ie, with a drawing)
+        )
         for (_idofs, _ref_idofs) in zip(idofs, ref_idofs)
             @test Set(_idofs) == Set(_ref_idofs)
         end
 
-        idofs = Bcube.idof_by_face(fs, p)
+        idofs = Bcube.idof_by_face(fs, Bcube.Prism())
         @test idofs[1][1] == 10
         @test idofs[2][1] == 11
         @test idofs[3][1] == 12
         @test length(idofs[4]) == 0
-
-        # Integration
-        error("a mettre en forme")
-        l = 1.5
-        mesh = one_cell_mesh(
-            :prism;
-            xmin = 0.0,
-            xmax = 1.0,
-            ymin = 0.0,
-            ymax = 1.0,
-            zmin = 0.0,
-            zmax = l,
-        )
-        dΩ = Measure(CellDomain(mesh), 2)
-
-        x = sum(Bcube.compute(∫(PhysicalFunction(x -> 1.0))dΩ))
-        @show x
-
-        a = 3
-        x = sum(Bcube.compute(∫(PhysicalFunction(x -> a * x[1]^2))dΩ))
-        @show x, a * l * (1 / 3 - 1 / 4)
-
-        b = 4
-        x = sum(Bcube.compute(∫(PhysicalFunction(x -> b * x[1] * x[2]))dΩ))
-        @show x, b * l / 2 * (1 / 2 - 2 / 3 + 1 / 4)
-
-        c = 5
-        x = sum(Bcube.compute(∫(PhysicalFunction(x -> c * x[1] * x[3]))dΩ))
-        @show x, c * l^2 / 2 * (1 / 2 - 1 / 3)
-
-        d = 6
-        x = sum(Bcube.compute(∫(PhysicalFunction(x -> d * x[2]^2))dΩ))
-        @show x, d * l / 12
-
-        e = 7
-        x = sum(Bcube.compute(∫(PhysicalFunction(x -> e * x[2] * x[3]))dΩ))
-        @show x, e * l^2 / 12
-
-        f = 8
-        x = sum(Bcube.compute(∫(PhysicalFunction(x -> f * x[3]^2))dΩ))
-        @show x, f * l^3 / 6
     end
 end

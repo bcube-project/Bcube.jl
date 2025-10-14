@@ -736,21 +736,49 @@ function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Tetra)
 end
 
 # Prism
-
+function idof_by_edge(::FunctionSpace{<:Lagrange, 0}, shape::Prism)
+    ntuple(i -> SA[], nedges(shape))
+end
 function idof_by_edge(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
     ntuple(i -> SA[], nedges(shape))
 end
-function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
-    (
-        SA[1, 2],
-        SA[2, 3],
-        SA[3, 1],
-        SA[1, 4],
-        SA[2, 5],
-        SA[3, 6],
-        SA[4, 5],
-        SA[5, 6],
-        SA[6, 4],
+function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::Prism)
+    ntuple(i -> SA[], nedges(shape))
+end
+
+function idof_by_edge(fs::FunctionSpace{<:Lagrange, N}, ::Prism) where {N}
+    idof_edge_tri = idof_by_edge(fs, Triangle())
+    ndofs_tri = get_ndofs(fs, Triangle())
+    ndofs_line = get_ndofs(fs, Line())
+
+    return (
+        idof_edge_tri[1],
+        idof_edge_tri[2],
+        idof_edge_tri[3],
+        SVector{ndofs_line - 2}(1 + (i - 1) * ndofs_tri for i in 2:(ndofs_line - 1)),
+        SVector{ndofs_line - 2}(2 + (i - 1) * ndofs_tri for i in 2:(ndofs_line - 1)),
+        SVector{ndofs_line - 2}(3 + (i - 1) * ndofs_tri for i in 2:(ndofs_line - 1)),
+        idof_edge_tri[1] .+ (ndofs_line - 1) * ndofs_tri,
+        idof_edge_tri[2] .+ (ndofs_line - 1) * ndofs_tri,
+        idof_edge_tri[3] .+ (ndofs_line - 1) * ndofs_tri,
+    )
+end
+
+function idof_by_edge_with_bounds(fs::FunctionSpace{<:Lagrange, N}, ::Prism) where {N}
+    idof_edge_tri = idof_by_edge_with_bounds(fs, Triangle())
+    ndofs_tri = get_ndofs(fs, Triangle())
+    ndofs_line = get_ndofs(fs, Line())
+
+    return (
+        idof_edge_tri[1],
+        idof_edge_tri[2],
+        idof_edge_tri[3],
+        SVector{ndofs_line}(1 + (i - 1) * ndofs_tri for i in 1:ndofs_line),
+        SVector{ndofs_line}(2 + (i - 1) * ndofs_tri for i in 1:ndofs_line),
+        SVector{ndofs_line}(3 + (i - 1) * ndofs_tri for i in 1:ndofs_line),
+        idof_edge_tri[1] .+ (ndofs_line - 1) * ndofs_tri,
+        idof_edge_tri[2] .+ (ndofs_line - 1) * ndofs_tri,
+        idof_edge_tri[3] .+ (ndofs_line - 1) * ndofs_tri,
     )
 end
 
