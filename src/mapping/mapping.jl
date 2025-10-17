@@ -80,35 +80,6 @@ F^{-1} \\begin{pmatrix} x \\\\ y \\end{pmatrix} =
     (y_1-y_2)x + (x_2 - x_1)x + (x_1 y_2 - x_2 y_1)
 \\end{pmatrix}
 ```
-
-# ::`Quad4_t`
-Map the  PARALLELOGRAM quadrilateral on the reference 4-nodes square [-1,1] x [-1,1].
-Warning : this mapping is only corrects for parallelogram quadrilateral, not for any quadrilateral.
-
------
-TODO: check this formulae with SYMPY
------
-
-```math
-F^{-1} \\begin{pmatrix} x \\\\ y \\end{pmatrix} =
-\\begin{pmatrix}
-    a_1 x + b_1 y + c_1 \\\\
-    a_2 x + b_2 y + c_2
-\\end{pmatrix}
-```
-with
-```math
-\\begin{aligned}
-    a_1 & = \\dfrac{-2 (y_3-y_2)}{\\Delta} \\\\
-    b_1 & = \\dfrac{2 (x_3-x_2)}{\\Delta} \\\\
-    c_1 & = -1 - a_1 x_1 - b_1 y_1 \\\\
-    a_2 & = \\dfrac{-2 (y_1-y_2)}{\\Delta} \\\\
-    b_2 & = \\dfrac{2 (x_1 - x_2)}{\\Delta} \\\\
-    c_2 & = -1 - a_2 x_1 - b_2 y_1
-\\end{aligned}
-```
-where
-`` \\Delta = (x_1 - x_2)(y_3 - y_2) - (x_3 - x_2)(y_1 - y_2)``
 """
 function mapping_inv(ctype::AbstractEntityType, cnodes, x)
     nmax = 20 # max number of iterations
@@ -499,24 +470,6 @@ function mapping(::Quad4_t, cnodes, ξ)
         (ξ[1] - 1) * (ξ[2] - 1) .* cnodes[1].x - (ξ[1] + 1) * (ξ[2] - 1) .* cnodes[2].x +
         (ξ[1] + 1) * (ξ[2] + 1) .* cnodes[3].x - (ξ[1] - 1) * (ξ[2] + 1) .* cnodes[4].x
     ) ./ 4
-end
-
-function mapping_inv(::Quad4_t, cnodes, x)
-    # Alias (should be inlined, but waiting for Ghislain's modification of Node)
-    x1 = cnodes[1].x[1]
-    x2 = cnodes[2].x[1]
-    x3 = cnodes[3].x[1]
-    y1 = cnodes[1].x[2]
-    y2 = cnodes[2].x[2]
-    y3 = cnodes[3].x[2]
-
-    # Copied from fortran
-    delta = (x1 - x2) * (y3 - y2) - (x3 - x2) * (y1 - y2)
-    a = SA[-2.0 * (y3 - y2), -2.0 * (y1 - y2)] ./ delta
-    b = SA[2.0 * (x3 - x2), 2.0 * (x1 - x2)] ./ delta
-    c = SA[-1.0 - a[1] * x1 - b[1] * y1, -1.0 - a[2] * x1 - b[2] * y1]
-
-    return a .* x[1] + b .* x[2] + c
 end
 
 function mapping_jacobian(::Quad4_t, cnodes, ξ)
