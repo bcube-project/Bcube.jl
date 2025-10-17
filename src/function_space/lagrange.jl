@@ -489,22 +489,17 @@ get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Pyramid) = 5
 # Moreover, it's easier to gather them all in one place instead of mixing them with `shape_functions` definitions
 
 # Generic rule 1 : no dof per vertex, edge or face for any Lagrange element of degree 0
-function idof_by_vertex(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape)
-    ntuple(i -> SA[], nvertices(shape))
-end
-
-function idof_by_edge(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape)
-    ntuple(i -> SA[], nedges(shape))
-end
-function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape)
-    ntuple(i -> SA[], nedges(shape))
-end
-
-function idof_by_face(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape)
-    ntuple(i -> SA[], nfaces(shape))
-end
-function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape)
-    ntuple(i -> SA[], nfaces(shape))
+for S in (:Line, :Triangle, :Square, :Cube, :Tetra, :Prism, :Pyramid)
+    @eval idof_by_vertex(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
+        ntuple(i -> SA[], nvertices(shape))
+    @eval idof_by_edge(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
+        ntuple(i -> SA[], nedges(shape))
+    @eval idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
+        ntuple(i -> SA[], nedges(shape))
+    @eval idof_by_face(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
+        ntuple(i -> SA[], nfaces(shape))
+    @eval idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
+        ntuple(i -> SA[], nfaces(shape))
 end
 
 # Generic rule 2 (for non tensorial elements): one dof per vertex for any Lagrange element of degree > 0
@@ -696,9 +691,6 @@ function _idof_by_face(fs::FunctionSpace{<:Lagrange, degree}, shape::Cube) where
     return :(tuple($(expr...)))
 end
 
-function idof_by_face(::FunctionSpace{<:Bcube.Lagrange, 0}, shape::Cube)
-    ntuple(i -> SA[], nedges(shape))
-end
 @generated function idof_by_face(fs::FunctionSpace{<:Lagrange}, shape::Union{Cube})
     return _idof_by_face(fs(), shape())
 end
@@ -736,13 +728,7 @@ function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Tetra)
 end
 
 # Prism
-function idof_by_edge(::FunctionSpace{<:Lagrange, 0}, shape::Prism)
-    ntuple(i -> SA[], nedges(shape))
-end
 function idof_by_edge(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
-    ntuple(i -> SA[], nedges(shape))
-end
-function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::Prism)
     ntuple(i -> SA[], nedges(shape))
 end
 
@@ -782,13 +768,7 @@ function idof_by_edge_with_bounds(fs::FunctionSpace{<:Lagrange, N}, ::Prism) whe
     )
 end
 
-function idof_by_face(::FunctionSpace{<:Lagrange, 0}, shape::Prism)
-    ntuple(i -> SA[], nfaces(shape))
-end
 function idof_by_face(::FunctionSpace{<:Lagrange, 1}, shape::Prism)
-    ntuple(i -> SA[], nfaces(shape))
-end
-function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::Prism)
     ntuple(i -> SA[], nfaces(shape))
 end
 
@@ -848,8 +828,13 @@ function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid
 end
 
 # Generic versions for Lagrange 0 and 1 (any shape)
-get_coords(::FunctionSpace{<:Lagrange, 0}, shape::AbstractShape) = (center(shape),)
-get_coords(::FunctionSpace{<:Lagrange, 1}, shape::AbstractShape) = get_coords(shape)
+# Rq: proceeding with "@eval" rather than using `AbstractShape` helps solving ambiguities
+for S in (:Line, :Triangle, :Square, :Cube, :Tetra, :Prism, :Pyramid)
+    @eval get_coords(::FunctionSpace{<:Lagrange, 0}, shape::$S) = (center(shape),)
+end
+for S in (:Triangle, :Tetra, :Prism, :Pyramid)
+    @eval get_coords(::FunctionSpace{<:Lagrange, 1}, shape::$S) = get_coords(shape)
+end
 
 # Line, Square, Cube
 function _make_staticvector(x)
@@ -879,12 +864,6 @@ function _get_coords(
     quad = Quadrature(quadtype, Val(D))
     _coords_gen(shape, quad)
 end
-get_coords(::FunctionSpace{<:Lagrange, 0}, shape::Line) = (center(shape),)
-get_coords(::FunctionSpace{<:Lagrange, 0}, shape::Square) = (center(shape),)
-get_coords(::FunctionSpace{<:Lagrange, 0}, shape::Cube) = (center(shape),)
-get_coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Line) = _get_coords(fs, shape)
-get_coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Square) = _get_coords(fs, shape)
-get_coords(fs::FunctionSpace{<:Lagrange, 1}, shape::Cube) = _get_coords(fs, shape)
 get_coords(fs::FunctionSpace{<:Lagrange, D}, shape::Line) where {D} = _get_coords(fs, shape)
 function get_coords(fs::FunctionSpace{<:Lagrange, D}, shape::Square) where {D}
     _get_coords(fs, shape)
