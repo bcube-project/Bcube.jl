@@ -235,6 +235,21 @@
         @test isapprox_arrays(F([1.0, 1.0, 1.0]), [2.0, 2.0, 2.0])
         @test isapprox_arrays(F([-1.0, 1.0, 1.0]), [1.0, 2.0, 2.0])
 
+        mesh = one_cell_mesh(
+            :hexa;
+            xmin = -1,
+            xmax = 2,
+            ymin = -3,
+            ymax = 4,
+            zmin = -5,
+            zmax = 6,
+        )
+        cnodes = get_nodes(mesh)
+        ctype = first(Bcube.cells(mesh))
+        x = [1.0, 2.0, 3.0]
+        ξ = Bcube.mapping_inv(ctype, cnodes, x)
+        @test norm(x - Bcube.mapping(ctype, cnodes, ξ)) < 1e-9
+
         # Hexa order 2
         # Very trivial test for now. To be improved.
         mesh = one_cell_mesh(
