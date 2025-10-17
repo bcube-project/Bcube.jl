@@ -913,3 +913,19 @@ function get_coords(::FunctionSpace{<:Lagrange, 3}, shape::Triangle)
         sum(get_coords(shape)) / 3,
     )
 end
+
+# Prism : cartesian product between the Triangle and the Line
+
+# Rq: this implementation triggers a small allocation due to the call to
+# `get_coords(fs, Bcube.Triangle())`. The rest of the function does not
+# allocate
+function get_coords(fs::FunctionSpace{<:Bcube.Lagrange}, ::Bcube.Prism)
+    x_tri = get_coords(fs, Bcube.Triangle())
+    x_line = get_coords(fs, Bcube.Line())
+
+    return mapreduce(
+        xl -> map(xt -> SA[xt..., xl], x_tri),
+        (a, b) -> (a..., b...),
+        first.(x_line),
+    )
+end
