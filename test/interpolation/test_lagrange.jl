@@ -304,6 +304,10 @@ end
         @test λ[7]([0.0, 0.0]) == 0.0
         @test λ[8]([0.0, 0.0]) == 0.0
         @test λ[9]([0.0, 0.0]) == 0.0
+
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0)) == SA[1]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1)) == SA[]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 2)) == SA[5]
     end
 
     @testset "Cube" begin

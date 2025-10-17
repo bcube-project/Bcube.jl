@@ -249,6 +249,27 @@ function idof_by_vertex(::AbstractFunctionSpace, ::AbstractShape)
 end
 
 """
+    idof_by_volume(::AbstractFunctionSpace, ::AbstractShape)
+
+Return the local indices of the dofs lying inside the element, that is to say
+not on a vertex, an edge or a face. This is for instance the centered dof of
+`Square` with a `FunctionSpace{:Lagrange, 2}`.
+
+# Implementation
+This is simply the (ensemble) difference between all the element dofs and the
+ones returned by `idof_by_face_with_bounds`.
+"""
+@generated idof_by_volume(fs::AbstractFunctionSpace, shape::AbstractShape) =
+    _idof_by_volume(fs(), shape())
+
+function _idof_by_volume(fs, shape)
+    idofs = ones(Bool, get_ndofs(fs, shape))
+    idofs_face = idof_by_face_with_bounds(fs, shape)
+    foreach(indices -> idofs[indices] .= false, idofs_face)
+    return :(SA[$(findall(idofs)...)])
+end
+
+"""
     get_ndofs(fs::AbstractFunctionSpace, shape::AbstractShape)
 
 Number of dofs associated to the given interpolation.
