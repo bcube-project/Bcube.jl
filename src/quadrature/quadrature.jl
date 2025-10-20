@@ -486,18 +486,22 @@ function quadrature_rule(::Cube, deg::Val{D}, quadtype::AbstractQuadratureType) 
     return w, x
 end
 
-# Prism quadratures
-function quadrature_rule(::Prism, ::Val{1}, ::QuadratureLegendre)
-    w, x = raw_unzip(get_quadrature_points(Val{:GLWED6}))
-    _w = SVector{length(w), eltype(w)}(w)
-    _x = SVector{length(x), eltype(x)}(x)
-    return _w, _x
-end
-function quadrature_rule(::Prism, ::Val{2}, ::QuadratureLegendre)
-    w, x = raw_unzip(get_quadrature_points(Val{:GLWED21}))
-    _w = SVector{length(w), eltype(w)}(w)
-    _x = SVector{length(x), eltype(x)}(x)
-    return _w, _x
+# Prism quadratures : built from cartesian product between Triangle and Line
+function quadrature_rule(::Prism, deg::Val{D}, quadtype::AbstractQuadratureType) where {D}
+    quad_tri = QuadratureRule(Triangle(), Quadrature(quadtype, deg))
+    Nt = length(quad_tri)
+    wt = get_weights(quad_tri)
+    xt = get_nodes(quad_tri)
+
+    quad_line = QuadratureRule(Line(), Quadrature(quadtype, deg))
+    Nl = length(quad_line)
+    wl = get_weights(quad_line)
+    xl = get_nodes(quad_line)
+
+    w = SVector{Nt * Nl}(_wt * _wl for _wt in wt, _wl in wl)
+    x = SVector{Nt * Nl}(SA[_xt[1], _xt[2], _xl[1]] for _xt in xt, _xl in xl)
+
+    return w, x
 end
 
 # Pyramid quadratures
@@ -631,8 +635,6 @@ function quadrature_rule(::Pyramid, ::Val{5}, ::QuadratureLegendre)
     ]
     return weights, points
 end
-
-# To be completed (available in FEMQuad): tetra, hexa, prism
 
 # Conversion to barycentric rules for 'face' integration
 function quadrature_rule_bary(iside::Int, shape::Triangle, ::Val{1})

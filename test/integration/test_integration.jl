@@ -580,6 +580,43 @@
         g = PhysicalFunction(x -> 1)
         b = compute(∫(g)dΩ)
         @test sum(b) ≈ 3.1365484905459
+
+        # Integrate a polynomial (reference results have been obtained analytically)
+        l = 1.5
+        mesh = one_cell_mesh(
+            :prism;
+            xmin = 0.0,
+            xmax = 1.0,
+            ymin = 0.0,
+            ymax = 1.0,
+            zmin = 0.0,
+            zmax = l,
+        )
+        dΩ = Measure(CellDomain(mesh), 2)
+
+        a = 3
+        x = sum(Bcube.compute(∫(PhysicalFunction(x -> a * x[1]^2))dΩ))
+        @test isapprox(x, a * l * (1 / 3 - 1 / 4))
+
+        b = 4
+        x = sum(Bcube.compute(∫(PhysicalFunction(x -> b * x[1] * x[2]))dΩ))
+        @test isapprox(x, b * l / 2 * (1 / 2 - 2 / 3 + 1 / 4))
+
+        c = 5
+        x = sum(Bcube.compute(∫(PhysicalFunction(x -> c * x[1] * x[3]))dΩ))
+        @test isapprox(x, c * l^2 / 2 * (1 / 2 - 1 / 3))
+
+        d = 6
+        x = sum(Bcube.compute(∫(PhysicalFunction(x -> d * x[2]^2))dΩ))
+        @test isapprox(x, d * l / 12)
+
+        e = 7
+        x = sum(Bcube.compute(∫(PhysicalFunction(x -> e * x[2] * x[3]))dΩ))
+        @test isapprox(x, e * l^2 / 12)
+
+        f = 8
+        x = sum(Bcube.compute(∫(PhysicalFunction(x -> f * x[3]^2))dΩ))
+        @test isapprox(x, f * l^3 / 6)
     end
 
     @testset "Lagrange pyramid" begin
