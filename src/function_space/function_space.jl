@@ -205,6 +205,21 @@ function idof_by_face_with_bounds(::AbstractFunctionSpace, ::AbstractShape)
     )
 end
 
+# Generic rule for `AbstractShape` of topology dimension less than `3`, `idof_by_face` alias `idof_by_edge`
+const AbstractShape_1_2 = Union{AbstractShape{1}, AbstractShape{2}}
+function idof_by_face(
+    fs::FunctionSpace{type, degree},
+    shape::AbstractShape_1_2,
+) where {type, degree}
+    idof_by_edge(fs, shape)
+end
+function idof_by_face_with_bounds(
+    fs::FunctionSpace{type, degree},
+    shape::AbstractShape_1_2,
+) where {type, degree}
+    idof_by_edge_with_bounds(fs, shape)
+end
+
 """
     idof_by_edge(::AbstractFunctionSpace, ::AbstractShape)
 
