@@ -316,8 +316,7 @@ function _append_contribution!(
     Udofs = get_dofs(U, icell, nU) # columns correspond to the TrialFunction
     Vdofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
     unwrapValues = _unwrap_cell_integrate(V, values)
-    matrixvalues = _pack_bilinear_cell_contribution(unwrapValues, Udofs, Vdofs)
-    _append_bilinear!(I, J, X, Vdofs, Udofs, matrixvalues, backend)
+    _append_bilinear!(I, J, X, Vdofs, Udofs, unwrapValues, backend)
     return nothing
 end
 
@@ -349,18 +348,10 @@ function _append_contribution!(
     col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
     row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
 
-    matrixvalues = _pack_bilinear_face_contribution(
-        unwrapValues,
-        col_dofs_U_n,
-        row_dofs_V_n,
-        col_dofs_U_p,
-        row_dofs_V_p,
-    )
-
     for (k, (row, col)) in enumerate(
         Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
     )
-        _append_bilinear!(I, J, X, row, col, matrixvalues[k], backend)
+        _append_bilinear!(I, J, X, row, col, values[k], backend)
     end
     return nothing
 end
@@ -368,11 +359,9 @@ end
 function _append_bilinear!(I, J, X, row, col, vals, backend::BcubeBackendCPUSerial)
     _rows, _cols = _cartesian_product(row, col)
     @assert length(_rows) == length(_cols) == sum(length, vals)
-    # @assert length(_rows) == length(_cols) == length(vals)
     append!(I, _rows)
     append!(J, _cols)
     append!(X, vals...)
-    # append!(X, vec(vals))
 end
 function _append_bilinear!(
     I,
@@ -383,17 +372,6 @@ function _append_bilinear!(
     vals::NullOperator,
     backend::AbstractBcubeBackend,
 )
-    nothing
-end
-function _append_bilinear!(
-    I,
-    J,
-    X,
-    row,
-    col,
-    vals::Union{T, SMatrix{M, N, T}},
-    backend::AbstractBcubeBackend,
-) where {M, N, T <: NullOperator}
     nothing
 end
 
@@ -410,32 +388,6 @@ function _append_bilinear!(
     nothing
 end
 
-function _pack_bilinear_cell_contribution(
-    values,
-    col_dofs_U::SVector{NU},
-    row_dofs_V::SVector{NV},
-) where {NU, NV}
-    return values
-    # return SMatrix{NV, NU}(values[j][i] for i in 1:NV, j in 1:NU)
-end
-
-function _pack_bilinear_face_contribution(
-    values,
-    col_dofs_U_n::SVector{NUn},
-    row_dofs_V_n::SVector{NVn},
-    col_dofs_U_p::SVector{NUp},
-    row_dofs_V_p::SVector{NVp},
-) where {NUn, NVn, NUp, NVp}
-    a11 = values[1]
-    a21 = values[2]
-    a12 = values[3]
-    a22 = values[4]
-    # a11 = SMatrix{NVn, NUn}(values[1][j][i] for i in 1:NVn, j in 1:NUn)
-    # a21 = SMatrix{NVp, NUn}(values[2][j][i] for i in 1:NVp, j in 1:NUn)
-    # a12 = SMatrix{NVn, NUp}(values[3][j][i] for i in 1:NVn, j in 1:NUp)
-    # a22 = SMatrix{NVp, NUp}(values[4][j][i] for i in 1:NVp, j in 1:NUp)
-    return a11, a21, a12, a22
-end
 Base.getindex(::Bcube.LazyOperators.NullOperator, i) = NullOperator()
 
 function _unwrap_face_integrate(
