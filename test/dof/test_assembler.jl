@@ -210,6 +210,8 @@
         @test all((A[3, 1], A[3, 2]) .≈ (-1.0 / 6.0, 1.0 / 6.0))
 
         # Below : checked analytically
+        U = TrialFESpace(FunctionSpace(:Lagrange, 2), mesh)
+        V = TestFESpace(FunctionSpace(:Lagrange, 1), mesh)
         a(u, v) = ∫(u ⋅ v)dΩ
         A = assemble_bilinear(a, U, V)
         @test all((A[1, 1], A[1, 2], A[1, 3]) .≈ (1.0 / 3.0, 2.0 / 3.0, 0.0))
