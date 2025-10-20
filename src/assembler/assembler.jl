@@ -364,10 +364,12 @@ end
 
 function _append_bilinear!(I, J, X, row, col, vals, backend::BcubeBackendCPUSerial)
     _rows, _cols = _cartesian_product(row, col)
-    @assert length(_rows) == length(_cols) == length(vals)
+    @assert length(_rows) == length(_cols) == sum(length, vals)
+    # @assert length(_rows) == length(_cols) == length(vals)
     append!(I, _rows)
     append!(J, _cols)
-    append!(X, vec(vals))
+    append!(X, vals...)
+    # append!(X, vec(vals))
 end
 function _append_bilinear!(
     I,
@@ -399,9 +401,9 @@ function _append_bilinear!(
     X,
     row,
     col,
-    vals::Union{T, SMatrix{M, N, T}},
+    vals::NullOperator,
     ::Bcube.BcubeBackendCPUSerial,
-) where {M, N, T <: NullOperator}
+)
     nothing
 end
 
@@ -410,7 +412,8 @@ function _pack_bilinear_cell_contribution(
     col_dofs_U::SVector{NU},
     row_dofs_V::SVector{NV},
 ) where {NU, NV}
-    return SMatrix{NV, NU}(values[j][i] for i in 1:NV, j in 1:NU)
+    return values
+    # return SMatrix{NV, NU}(values[j][i] for i in 1:NV, j in 1:NU)
 end
 
 function _pack_bilinear_face_contribution(
@@ -420,10 +423,14 @@ function _pack_bilinear_face_contribution(
     col_dofs_U_p::SVector{NUp},
     row_dofs_V_p::SVector{NVp},
 ) where {NUn, NVn, NUp, NVp}
-    a11 = SMatrix{NVn, NUn}(values[1][j][i] for i in 1:NVn, j in 1:NUn)
-    a21 = SMatrix{NVp, NUn}(values[2][j][i] for i in 1:NVp, j in 1:NUn)
-    a12 = SMatrix{NVn, NUp}(values[3][j][i] for i in 1:NVn, j in 1:NUp)
-    a22 = SMatrix{NVp, NUp}(values[4][j][i] for i in 1:NVp, j in 1:NUp)
+    a11 = values[1]
+    a21 = values[2]
+    a12 = values[3]
+    a22 = values[4]
+    # a11 = SMatrix{NVn, NUn}(values[1][j][i] for i in 1:NVn, j in 1:NUn)
+    # a21 = SMatrix{NVp, NUn}(values[2][j][i] for i in 1:NVp, j in 1:NUn)
+    # a12 = SMatrix{NVn, NUp}(values[3][j][i] for i in 1:NVn, j in 1:NUp)
+    # a22 = SMatrix{NVp, NUp}(values[4][j][i] for i in 1:NVp, j in 1:NUp)
     return a11, a21, a12, a22
 end
 Base.getindex(::Bcube.LazyOperators.NullOperator, i) = NullOperator()
