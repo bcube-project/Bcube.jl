@@ -254,12 +254,13 @@ function _deal_with_dofs_on_edges!(
     # Exit prematurely if there are no dof on any edge of the shape
     length(idofs_array_l[1]) > 0 || return
 
-    etypes = edgetypes(celltypes[icell])
-
     # Loop over the cell edges
-    for iedge in 1:nedges(s)
-        inodes_g = e2n_g[iedge] # This is a Tuple of Int (global indices of nodes defining the edge)
-        idofs_l = idofs_array_l[iedge] # This is an Array of Int (local indices of dofs of edge 'i')
+    # inodes_g is a Tuple of Int (global indices of nodes defining the edge)
+    # idofs_l is an Array of Int (local indices of dofs of edge 'i')
+    for (inodes_g, idofs_l) in zip(e2n_g, idofs_array_l)
+
+        # Skip the face if no dof is lying on it
+        length(idofs_l) == 0 && continue
 
         key = (kvar, Set(inodes_g))
 
