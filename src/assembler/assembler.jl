@@ -345,6 +345,8 @@ function _append_contribution!(
     col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
     row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
 
+    matrixvalues = (values[1], values[2], values[3], values[4])
+
     for (k, (row, col)) in enumerate(
         Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
     )
