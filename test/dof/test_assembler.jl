@@ -208,6 +208,15 @@
         @test all((A[1, 1], A[1, 2]) .≈ (-1.0 / 6.0, 1.0 / 6.0))
         @test all((A[2, 1], A[2, 2]) .≈ (-2.0 / 3.0, 2.0 / 3.0))
         @test all((A[3, 1], A[3, 2]) .≈ (-1.0 / 6.0, 1.0 / 6.0))
+
+        a(u, v) = ∫(∇(u) ⋅ v)dΩ
+        l(v) = ∫(v)dΩ
+
+        # Below : checked analytically
+        a(u, v) = ∫(u ⋅ v)dΩ
+        A = assemble_bilinear(a, U, V)
+        @test all((A[1, 1], A[1, 2], A[1, 3]) .≈ (1.0 / 3.0, 2.0 / 3.0, 0.0))
+        @test all((A[2, 1], A[2, 2], A[2, 3]) .≈ (0.0, 2.0 / 3.0, 1.0 / 3.0))
     end
 
     @testset "Poisson DG" begin
