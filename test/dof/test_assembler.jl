@@ -209,9 +209,6 @@
         @test all((A[2, 1], A[2, 2]) .≈ (-2.0 / 3.0, 2.0 / 3.0))
         @test all((A[3, 1], A[3, 2]) .≈ (-1.0 / 6.0, 1.0 / 6.0))
 
-        a(u, v) = ∫(∇(u) ⋅ v)dΩ
-        l(v) = ∫(v)dΩ
-
         # Below : checked analytically
         a(u, v) = ∫(u ⋅ v)dΩ
         A = assemble_bilinear(a, U, V)
