@@ -140,6 +140,23 @@ function map_over(f::F, args::Vararg{AbstractMapOver, N}) where {F <: Function, 
     T = get_basetype(typeof(first(args)))
     T(f_a)
 end
+"""
+    gen_map_over(f, M, N, args...)
+
+The purpose is to build an `Expr` corresponding to the application of `f` on each
+"line" of the `Tuple`s `args`. For instance if `f = +` and `args = ((a,b,c), (d,e,f))`,
+we want to build the `Expr`` of the `Tuple` `(a+d, b+e, c+f)`
+"""
+function gen_map_over(f, M, N, args...)
+    exprs = ntuple(M) do j
+        x = ntuple(i -> :(args[$i][$j]), N)
+        return :(f($(x...)))
+    end
+    return :(($(exprs...),))
+end
+@generated function _map_over(f::F, args::Vararg{NTuple{M}, N}) where {F <: Function, N, M}
+    gen_map_over(f, M, N, args)
+end
 function _map_over(f::F, a::Vararg{Tuple, N}) where {F <: Function, N}
     _heads = Base.heads(a...)
     _tails = Base.tails(a...)
