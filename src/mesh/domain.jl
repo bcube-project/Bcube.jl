@@ -285,17 +285,25 @@ to all the boundary faces.
 """
 function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol, Vararg{Symbol}})
     bndfaces = vcat(map(label -> boundary_faces(mesh, label), labels)...)
-    subdomains = build_subdomains_by_facetypes(mesh, indices)
-    tags = unique(map(get_tag, subdomains))
     cache = bndfaces
     bc = nothing
     _labels = (; zip(labels, ntuple(i -> i, length(labels)))...) # store labels as keys of a namedtuple for make it isbits
-    BoundaryFaceDomain{typeof(mesh), typeof(bc), typeof(_labels), typeof(cache)}(
+    subdomains = build_subdomains_by_facetypes(mesh, bndfaces)
+    tags = unique(map(get_tag, subdomains))
+    BoundaryFaceDomain{
+        typeof(mesh),
+        typeof(bc),
+        typeof(_labels),
+        typeof(cache),
+        typeof(subdomains),
+        typeof(tags),
+    }(
         mesh,
         bc,
         _labels,
-        subdomains,
         cache,
+        subdomains,
+        tags,
     )
 end
 function BoundaryFaceDomain(mesh::AbstractMesh, labels::Tuple{String, Vararg{String}})
@@ -642,28 +650,29 @@ function _get_face_cellinfo(domain::InteriorFaceDomain, subdomain, iface)
     return cellinfo1, cellinfo2
 end
 
-function _get_face_cellinfo(domain::AllFaceDomain, i)
+function _get_face_cellinfo(domain::AllFaceDomain, subdomain, iface)
     mesh = get_mesh(domain)
     f2c = connectivities_indices(mesh, :f2c)
-    iface = indices(domain)[i]
-    if length(f2c[iface]) > 1
+    if length(get_elementtype(subdomain)) > 2 #if it's an interior face (eqv to: length(f2c[iface]) > 1)
+        _, ctype1, ctype2 = get_elementtype(subdomain)
         icell1, icell2 = f2c[iface]
-        cellinfo1 = _get_cellinfo(mesh, icell1)
-        cellinfo2 = _get_cellinfo(mesh, icell2)
+        cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
+        cellinfo2 = _get_cellinfo(mesh, ctype2, icell2)
         return cellinfo1, cellinfo2
     else
+        _, ctype1 = get_elementtype(subdomain)
         icell1, = f2c[iface]
-        cellinfo1 = _get_cellinfo(mesh, icell1)
+        cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
         return cellinfo1, cellinfo1
     end
 end
 
-function _get_face_cellinfo(domain::BoundaryFaceDomain, i)
+function _get_face_cellinfo(domain::BoundaryFaceDomain, subdomain, iface::Integer)
     mesh = get_mesh(domain)
     f2c = connectivities_indices(mesh, :f2c)
-    iface = indices(domain)[i]
     icell1, = f2c[iface]
-    cellinfo1 = _get_cellinfo(mesh, icell1)
+    _, ctype1, = get_elementtype(subdomain)
+    cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
     return cellinfo1, cellinfo1
 end
 
