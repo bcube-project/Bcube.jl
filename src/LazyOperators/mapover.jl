@@ -147,15 +147,12 @@ The purpose is to build an `Expr` corresponding to the application of `f` on eac
 "line" of the `Tuple`s `args`. For instance if `f = +` and `args = ((a,b,c), (d,e,f))`,
 we want to build the `Expr`` of the `Tuple` `(a+d, b+e, c+f)`
 """
-function gen_map_over(f, M, N, args)
-    exprs = ntuple(M) do j
-        x = ntuple(i -> :(args[$i][$j]), N)
-        return :(f($(x...)))
-    end
+function gen_map_over_two_tuples(f, N, a, b)
+    exprs = [:(f(a[$i], b[$i])) for i in 1:N]
     return :(($(exprs...),))
 end
-@generated function _map_over(f::F, args::Vararg{NTuple{M}, N}) where {F <: Function, N, M}
-    gen_map_over(f, M, N, args)
+@generated function _map_over(f::F, a::NTuple{N}, b::NTuple{N}) where {F <: Function, N}
+    gen_map_over_two_tuples(f, N, a, b)
 end
 function _map_over(f::F, a::Vararg{Tuple, N}) where {F <: Function, N}
     _heads = Base.heads(a...)
