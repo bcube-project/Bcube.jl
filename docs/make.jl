@@ -13,6 +13,7 @@ makedocs(;
     format = Documenter.HTML(;
         prettyurls = get(ENV, "CI", "false") == "true",
         canonical = "https://bcube-project.github.io/Bcube.jl",
+        mathengine = Documenter.HTMLWriter.MathJax3(),
         assets = String[],
     ),
     checkdocs = :none,
@@ -41,6 +42,7 @@ makedocs(;
             "api/io/io_interface.md",
         ],
         "How to... (FAQ)" => "howto/howto.md",
+        "Dev" => "dev/dev.md",
     ],
 )
 
