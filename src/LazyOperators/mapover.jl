@@ -147,7 +147,7 @@ The purpose is to build an `Expr` corresponding to the application of `f` on eac
 "line" of the `Tuple`s `args`. For instance if `f = +` and `args = ((a,b,c), (d,e,f))`,
 we want to build the `Expr`` of the `Tuple` `(a+d, b+e, c+f)`
 """
-function gen_map_over(f, M, N, args...)
+function gen_map_over(f, M, N, args)
     exprs = ntuple(M) do j
         x = ntuple(i -> :(args[$i][$j]), N)
         return :(f($(x...)))
