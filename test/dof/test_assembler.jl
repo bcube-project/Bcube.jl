@@ -212,10 +212,41 @@
         # Below : checked analytically
         U = TrialFESpace(FunctionSpace(:Lagrange, 2), mesh)
         V = TestFESpace(FunctionSpace(:Lagrange, 1), mesh)
-        a(u, v) = ∫(u ⋅ v)dΩ
-        A = assemble_bilinear(a, U, V)
+        a2(u, v) = ∫(u ⋅ v)dΩ
+        A = assemble_bilinear(a2, U, V)
         @test all((A[1, 1], A[1, 2], A[1, 3]) .≈ (1.0 / 3.0, 2.0 / 3.0, 0.0))
         @test all((A[2, 1], A[2, 2], A[2, 3]) .≈ (0.0, 2.0 / 3.0, 1.0 / 3.0))
+    end
+
+    @testset "P2 - P1 assemble" begin
+        # Ref results have been obtained using TypedPolynomials:
+        # using TypedPolynomials
+        # @polyvar x y
+        # l_tri1 = (1 - x - y, x, y)
+        # l_tri2 = (
+        #     (1 - x - y) * (1 - 2x - 2y),
+        #     x * (2x - 1),
+        #     y * (2y - 1),
+        #     4x * (1 - x - y),
+        #     4x * y,
+        #     4y * (1 - x - y),
+        # )
+        # _u = 1 * l_tri2[1] + 2 * l_tri2[2] + 3 * l_tri2[3] + 4 * l_tri2[4] + 5 * l_tri2[5] + 6 * l_tri2[6]
+        # for l in l_tri1
+        #     a = antidifferentiate(_u * l, y)
+        #     px = a(y => 1 - x) - a(y => 0)
+        #     b = antidifferentiate(px, x)
+        #     res = b(x => 1) - b(x => 0)
+        #     @show res, Float64(res)
+        # end
+        mesh = one_cell_mesh(:triangle; xmin = 0, xmax = 1, ymin = 0, ymax = 1)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 2), mesh)
+        V = TestFESpace(TrialFESpace(FunctionSpace(:Lagrange, 1), mesh))
+        u = FEFunction(U, 1:6)
+        dΩ = Measure(CellDomain(mesh), 3)
+        @test all(
+            assemble_linear(v -> ∫(u * v)dΩ, V) .≈ (97.0 / 120.0, 4.0 / 5.0, 107.0 / 120.0),
+        )
     end
 
     @testset "Poisson DG" begin
