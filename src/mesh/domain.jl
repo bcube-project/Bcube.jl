@@ -269,7 +269,7 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
     end
 
     # Retain only relevant faces
-    return bnd_f2f, bnd_f2n1, bnd_f2n2, bnd_f2c, bnd_ftypes, bnd_n2n
+    return bnd_f2f, bnd_f2n1, bnd_f2n2, bnd_f2c, bnd_ftypes, bnd_n2n, bndfaces1, bndfaces2
 end
 
 """
@@ -689,9 +689,9 @@ function _get_index(
     # TODO : add a specific API for the domain cache:
     perio_cache = get_cache(domain)
     perio_trans = transformation(get_bc(domain))
-    bnd_f2f, bnd_f2n1, bnd_f2n2, bnd_f2c, bnd_ftypes, bnd_n2n = perio_cache
+    _, bnd_f2n1, bnd_f2n2, bnd_f2c, bnd_ftypes, bnd_n2n, bndfaces1, bndfaces2 = perio_cache
 
-    icell1, icell2 = bnd_f2c[bnd_f2f[iface], :]
+    icell1, icell2 = bnd_f2c[iface, :]
 
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
 
@@ -705,13 +705,21 @@ function _get_index(
     cellinfo2 = CellInfo(icell2, ctype2, cnodes_j_perio, _c2n_j_perio)
 
     # Face info
-    fnodes = get_nodes(mesh, bnd_f2n1[bnd_f2f[iface]])
-    cside_i =
-        cell_side(celltype(cellinfo1), get_nodes_index(cellinfo1), bnd_f2n1[bnd_f2f[iface]])
-    cside_j = cell_side(celltype(cellinfo2), _c2n_j, bnd_f2n2[bnd_f2f[iface]])
-    _f2n = bnd_f2n1[bnd_f2f[iface]]
+    fnodes = get_nodes(mesh, bnd_f2n1[iface])
+    cside_i = cell_side(celltype(cellinfo1), get_nodes_index(cellinfo1), bnd_f2n1[iface])
+    cside_j = cell_side(celltype(cellinfo2), _c2n_j, bnd_f2n2[iface])
+    _f2n = bnd_f2n1[iface]
 
-    return FaceInfo(cellinfo1, cellinfo2, cside_i, cside_j, ftype, fnodes, _f2n, iface)
+    return FaceInfo(
+        cellinfo1,
+        cellinfo2,
+        cside_i,
+        cside_j,
+        ftype,
+        fnodes,
+        _f2n,
+        bndfaces1[iface],
+    )
 end
 
 """
