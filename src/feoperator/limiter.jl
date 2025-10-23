@@ -141,14 +141,15 @@ function _minmax_cells!(minval, maxval, v, dω)
     domain = get_domain(dω)
     quadrature = get_quadrature(dω)
 
-    for (i, cellInfo) in enumerate(DomainIterator(domain))
+    foreach_element(domain) do cellInfo
         # mᵢ, Mᵢ : min/max at cell quadrature points
         vᵢ = materialize(v, cellInfo)
         fᵢ(ξ) = vᵢ(CellPoint(ξ, cellInfo, ReferenceDomain()))
         quadrule = QuadratureRule(shape(celltype(cellInfo)), quadrature)
         mᵢ, Mᵢ = _minmax(fᵢ, quadrule)
-        minval[i] = min(mᵢ, minval[i])
-        maxval[i] = max(Mᵢ, maxval[i])
+        icell = cellindex(cinfo)
+        minval[icell] = min(mᵢ, minval[icell])
+        maxval[icell] = max(Mᵢ, maxval[icell])
     end
     return nothing
 end
@@ -161,7 +162,7 @@ end
 function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractFaceDomain})
     quadrature = get_quadrature(dω)
 
-    for faceInfo in DomainIterator(get_domain(dω))
+    foreach_element(get_domain(dω)) do faceInfo
         i = cellindex(get_cellinfo_n(faceInfo))
         j = cellindex(get_cellinfo_p(faceInfo))
 
