@@ -7,7 +7,8 @@ function linear_scaling_limiter_coef(
     bounds,
     DMPrelax,
     periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}},
-    check = true,
+    check = true;
+    backend::BcubeBackendCPUSerial = get_bcube_backend(),
 ) where {N, Me, BC <: PeriodicBCType}
     @assert is_discontinuous(get_fespace(v)) "LinearScalingLimiter only support discontinuous variables"
 
@@ -20,8 +21,8 @@ function linear_scaling_limiter_coef(
     minval .= typemax(eltype(minval))
     maxval = similar(mean)
     maxval .= -minval
-    _minmax_cells!(minval, maxval, v, dω)
-    _minmax_faces!(minval, maxval, v, dω)
+    _minmax_cells!(minval, maxval, v, dω, backend)
+    _minmax_faces!(minval, maxval, v, dω, backend)
     if !isnothing(periodicBCs)
         for domain in periodicBCs
             _minmax_faces_periodic!(minval, maxval, v, degquad, domain)
@@ -159,10 +160,16 @@ function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractCellDo
     _minmax_faces!(minval, maxval, v, dΓ)
 end
 
-function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractFaceDomain})
+function _minmax_faces!(
+    minval,
+    maxval,
+    v,
+    dω::AbstractMeasure{<:AbstractFaceDomain},
+    backend::AbstractBcubeBackend,
+)
     quadrature = get_quadrature(dω)
 
-    foreach_element(get_domain(dω)) do faceInfo
+    foreach_element(get_domain(dω), backend) do faceInfo
         i = cellindex(get_cellinfo_n(faceInfo))
         j = cellindex(get_cellinfo_p(faceInfo))
 
