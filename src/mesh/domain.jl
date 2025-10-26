@@ -51,7 +51,7 @@ function build_subdomains_by_facetypes(mesh, indices)
     _ftypes = [(_ftypes[i], cells(mesh)[f2c[i]]...) for i in 1:length(_ftypes)]
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
-        map(ft -> indices[filter(i -> all(_ftypes[i] .== ft), 1:length(_ftypes))], ftypes)
+        map(ft -> indices[filter(i -> _ftypes[i] == ft, 1:length(_ftypes))], ftypes)
     return SubDomain.(nothing, ftypes, indice_by_ftypes)
 end
 
@@ -164,6 +164,11 @@ struct AllFaceDomain{M, SD, T} <: AbstractFaceDomain{M}
 end
 @inline topodim(d::AllFaceDomain) = topodim(get_mesh(d)) - 1
 AllFaceDomain(mesh::AbstractMesh) = AllFaceDomain(mesh, 1:nfaces(mesh))
+function AllFaceDomain(mesh::AbstractMesh, indices)
+    subdomains = build_subdomains_by_facetypes(mesh, indices)
+    tags = unique(map(get_tag, subdomains))
+    AllFaceDomain(mesh, subdomains, tags)
+end
 LazyOperators.pretty_name(domain::AllFaceDomain) = "AllFaceDomain"
 
 struct BoundaryFaceDomain{M, BC, L, C, SD, T} <: AbstractFaceDomain{M}
