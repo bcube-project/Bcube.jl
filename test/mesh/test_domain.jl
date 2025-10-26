@@ -46,4 +46,82 @@
         @test "ymin" ∉ values(boundary_names(new_mesh))
         @test Bcube.boundary_faces(new_mesh, "ymax") == [7, 10]
     end
+
+    @testset "subdomains" begin
+        @testset "CellDomain" begin
+            mesh = read_mesh(
+                joinpath(
+                    @__DIR__,
+                    "..",
+                    "assets",
+                    "rectangle-mesh-tri-quad-nx10-ny10.msh22",
+                );
+                warn = false,
+            )
+            Ω = CellDomain(mesh)
+            subdomains = Bcube.get_subdomains(Ω)
+            @test length(subdomains) == 2
+            @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) == ncells(mesh)
+            # subdomain #1
+            @test Bcube.get_elementtype(subdomains[1]) == Bcube.Tri3_t()
+            @test length(Bcube.get_indices(subdomains[1])) == 112
+            @test all(Bcube.get_indices(subdomains[1])[1:5] .== [1, 2, 3, 4, 5])
+            @test all(
+                Bcube.get_indices(subdomains[1])[(end - 5):end] .==
+                [107, 108, 109, 110, 111, 112],
+            )
+            # subdomain #2
+            @test Bcube.get_elementtype(subdomains[2]) == Bcube.Quad4_t()
+            @test length(Bcube.get_indices(subdomains[2])) == 45
+            @test all(Bcube.get_indices(subdomains[2])[1:5] .== [113, 114, 115, 116, 117])
+            @test all(
+                Bcube.get_indices(subdomains[2])[(end - 5):end] .==
+                [152, 153, 154, 155, 156, 157],
+            )
+        end
+
+        @testset "FaceDomain" begin
+            mesh = read_mesh(
+                joinpath(
+                    @__DIR__,
+                    "..",
+                    "assets",
+                    "rectangle-mesh-tri-quad-nx10-ny10.msh22",
+                );
+                warn = false,
+            )
+            Γ = InteriorFaceDomain(mesh)
+            subdomains = Bcube.get_subdomains(Γ)
+            @test length(subdomains) == 3
+            @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) ==
+                  length(inner_faces(mesh))
+            # subdomain #1
+            @test Bcube.get_elementtype(subdomains[1]) ==
+                  (Bcube.Bar2_t(), Bcube.Tri3_t(), Bcube.Tri3_t())
+            @test length(Bcube.get_indices(subdomains[1])) == 154
+            @test all(Bcube.get_indices(subdomains[1])[1:5] .== [1, 2, 3, 4, 5])
+            @test all(
+                Bcube.get_indices(subdomains[1])[(end - 5):end] .==
+                [177, 178, 179, 180, 181, 182],
+            )
+            # subdomain #2
+            @test Bcube.get_elementtype(subdomains[2]) ==
+                  (Bcube.Bar2_t(), Bcube.Tri3_t(), Bcube.Quad4_t())
+            @test length(Bcube.get_indices(subdomains[2])) == 9
+            @test all(Bcube.get_indices(subdomains[2])[1:5] .== [41, 43, 65, 76, 84])
+            @test all(
+                Bcube.get_indices(subdomains[2])[(end - 5):end] .==
+                [76, 84, 91, 93, 135, 141],
+            )
+            # subdomain #3
+            @test Bcube.get_elementtype(subdomains[3]) ==
+                  (Bcube.Bar2_t(), Bcube.Quad4_t(), Bcube.Quad4_t())
+            @test length(Bcube.get_indices(subdomains[3])) == 76
+            @test all(Bcube.get_indices(subdomains[3])[1:5] .== [183, 184, 186, 187, 189])
+            @test all(
+                Bcube.get_indices(subdomains[3])[(end - 5):end] .==
+                [265, 266, 269, 271, 273, 275],
+            )
+        end
+    end
 end
