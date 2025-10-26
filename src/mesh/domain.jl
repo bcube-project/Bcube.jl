@@ -7,6 +7,21 @@ get_tag(sdom::SubDomain) = sdom.tag
 get_indices(sdom::SubDomain) = sdom.indices
 get_elementtype(sdom::SubDomain) = sdom.elementtype
 
+"""
+    build_subdomains_by_celltypes(mesh, indices)
+
+Construct sub‑domains of a mesh grouped by cell type.
+
+# Arguments
+- `mesh`: the mesh from which cells are taken.
+- `indices`: a collection of cell indices to be considered.
+
+# Returns
+A tuple of `SubDomain` objects, each containing:
+- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- the cell type,
+- the list of indices belonging to that type.
+"""
 function build_subdomains_by_celltypes(mesh, indices)
     _ctypes = cells(mesh)[indices]
     ctypes = tuple(unique(_ctypes)...)
@@ -15,6 +30,21 @@ function build_subdomains_by_celltypes(mesh, indices)
     return SubDomain.(nothing, ctypes, indice_by_ctypes)
 end
 
+"""
+    build_subdomains_by_facetypes(mesh, indices)
+
+Construct sub‑domains of a mesh grouped by face type (including adjacent cell types).
+
+# Arguments
+- `mesh`: the mesh containing the faces.
+- `indices`: a collection of face indices to be considered.
+
+# Returns
+A tuple of `SubDomain` objects, each containing:
+- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- a tuple `(face_type, cell_type₁, cell_type₂…)` describing the face and its neighboring cells,
+- the list of indices belonging to that tuple.
+"""
 function build_subdomains_by_facetypes(mesh, indices)
     _ftypes = faces(mesh)[indices]
     f2c = [connectivities_indices(mesh, :f2c)[i] for i in indices]
@@ -25,6 +55,22 @@ function build_subdomains_by_facetypes(mesh, indices)
     return SubDomain.(nothing, ftypes, indice_by_ftypes)
 end
 
+"""
+    build_subdomains_periodic_by_facetypes(mesh, perio_cache)
+
+Construct sub‑domains for periodic boundaries, grouped by face type (including adjacent cell types).
+
+# Arguments
+- `mesh`: the mesh on which the periodic boundary is defined.
+- `perio_cache`: a cache tuple returned by `_compute_periodicity`, containing at least
+  `bnd_f2c` (boundary face to cell connectivity) and `bnd_ftypes` (boundary face types).
+
+# Returns
+A tuple of `SubDomain` objects, each containing:
+- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- a tuple `(face_type, cell_type₁, cell_type₂)` describing the periodic face and its two neighboring cells,
+- the list of indices belonging to that tuple.
+"""
 function build_subdomains_periodic_by_facetypes(mesh, perio_cache)
     _, _, _, bnd_f2c, bnd_ftypes, _ = perio_cache
     indices = 1:length(bnd_ftypes)
@@ -827,30 +873,82 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
     )
 end
 
-function foreach_element(f, domain::AbstractDomain)
+"""
+    foreach_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial = get_bcube_backend())
+
+Apply the in-place function `f` to every element of `domain`.
+
+The iteration proceeds over all `subdomains`, grouped by their tags, using the
+CPU‑serial backend (default obtained via `get_bcube_backend()`).
+For each subdomain the lower‑level `foreach_element` overload is invoked,
+ensuring that `f` receives the appropriate element information.
+
+# Arguments
+- `f`: Callable to be applied to each element. `f` must capture the variables
+  that are modified during the loop.
+- `domain::AbstractDomain`: The domain whose elements are processed.
+- `backend::BcubeBackendCPUSerial`: Backend handling the iteration (default:
+  `get_bcube_backend()`).
+
+# Returns
+`nothing`.
+"""
+function foreach_element(
+    f,
+    domain::AbstractDomain,
+    backend::BcubeBackendCPUSerial = get_bcube_backend(),
+)
     for subdomains in DomainIteratorByTags(domain)
         for subdomain in subdomains
-            foreach_element(f, domain, subdomain)
+            foreach_element(f, domain, subdomain, backend)
         end
     end
     return nothing
 end
 
-function foreach_element(f, domain::AbstractDomain, subdomain)
+function foreach_element(
+    f,
+    domain::AbstractDomain,
+    subdomain,
+    backend::BcubeBackendCPUSerial,
+)
     for elementInfo in SubDomainIterator(domain, subdomain)
         f(elementInfo)
     end
     return nothing
 end
 
-function map_element(f, domain::AbstractDomain)
+"""
+    map_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial = get_bcube_backend())
+
+Apply the in-place function `f` to each element of `domain` using the CPU‑serial backend
+(default obtained via `get_bcube_backend()`).
+
+The iteration proceeds over all `subdomains`, grouped by their tags, using the default backend.
+For each subdomain, the lower‑level `map_element` overload is invoked, ensuring that
+`f` receives the appropriate element information.
+
+# Arguments
+- `f`: Callable to be applied to each element. `f` must capture the variables
+  that are modified during the loop.
+- `domain::AbstractDomain`: The domain whose elements are processed.
+- `backend::BcubeBackendCPUSerial`: Backend handling the iteration (default: `get_bcube_backend()`).
+
+# Returns
+An array containing the results of applying `f` to each element, with length equal to the number of elements in `domain`.
+"""
+function map_element(
+    f,
+    domain::AbstractDomain,
+    backend::BcubeBackendCPUSerial = get_bcube_backend(),
+)
     mapreduce(vcat, DomainIteratorByTags(domain)) do subdomains
         mapreduce(vcat, subdomains) do subdomain
-            map_element(f, domain, subdomain)
+            map_element(f, domain, subdomain, backend)
         end
     end
 end
 
-function map_element(f, domain::AbstractDomain, subdomain)
+function map_element(f, domain::AbstractDomain, subdomain, backend::BcubeBackendCPUSerial)
     map(f, SubDomainIterator(domain, subdomain))
 end
