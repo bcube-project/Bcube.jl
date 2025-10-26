@@ -525,6 +525,16 @@ function __update_b!(
     nothing
 end
 
+#fix ambiguity
+function __update_b!(
+    b::AbstractVector,
+    dofs,
+    vals::NullOperator,
+    backend::BcubeBackendCPUSerial,
+)
+    nothing
+end
+
 """
     _count_n_elts(
         U::TrialFESpace,
