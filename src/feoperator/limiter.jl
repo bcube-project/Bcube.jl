@@ -134,30 +134,36 @@ function _minmax_cells(v, mesh, quadrature)
 end
 
 """
-    _minmax_cells!(minval, maxval, v, dω)
+    _minmax_cells!(minval, maxval, v, dω, backend::AbstractBcubeBackend)
 
 Compute the min and max values of `v` in each cell of `dω`
 """
-function _minmax_cells!(minval, maxval, v, dω)
+function _minmax_cells!(minval, maxval, v, dω, backend::AbstractBcubeBackend)
     domain = get_domain(dω)
     quadrature = get_quadrature(dω)
 
-    foreach_element(domain) do cellInfo
+    foreach_element(domain, backend) do cellInfo
         # mᵢ, Mᵢ : min/max at cell quadrature points
         vᵢ = materialize(v, cellInfo)
         fᵢ(ξ) = vᵢ(CellPoint(ξ, cellInfo, ReferenceDomain()))
         quadrule = QuadratureRule(shape(celltype(cellInfo)), quadrature)
         mᵢ, Mᵢ = _minmax(fᵢ, quadrule)
-        icell = cellindex(cinfo)
+        icell = cellindex(cellInfo)
         minval[icell] = min(mᵢ, minval[icell])
         maxval[icell] = max(Mᵢ, maxval[icell])
     end
     return nothing
 end
 
-function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractCellDomain})
+function _minmax_faces!(
+    minval,
+    maxval,
+    v,
+    dω::AbstractMeasure{<:AbstractCellDomain},
+    backend::AbstractBcubeBackend,
+)
     dΓ = Measure(AllFaceDomain(get_mesh(get_domain(dω))), get_quadrature(dω))
-    _minmax_faces!(minval, maxval, v, dΓ)
+    _minmax_faces!(minval, maxval, v, dΓ, backend)
 end
 
 function _minmax_faces!(
