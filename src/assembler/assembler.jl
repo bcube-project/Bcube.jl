@@ -116,7 +116,7 @@ function assemble_bilinear!(
     domain = get_domain(measure)
 
     # Loop over cells
-    for elementInfo in DomainIterator(domain)
+    foreach_element(domain) do elementInfo
         λu, λv = blockmap_bilinear_shape_functions(U, V, elementInfo)
         g1 = materialize(f(λu, λv), elementInfo)
         values = integrate_on_ref_element(g1, elementInfo, quadrature)
@@ -270,29 +270,9 @@ Two levels of "LazyMapOver" because first we LazyMapOver the Tuple of argument o
 and the for each item of this Tuple we LazyMapOver the shape functions.
 """
 function __assemble_linear!(b, f, V, measure::Measure, backend::BcubeBackendCPUSerial)
-    domain = get_domain(measure)
-    for sdoms in Bcube.DomainIteratorByTags(domain)
-        for sdom in sdoms
-            __assemble_linear_subdomain!(b, f, V, measure, sdom, backend)
-        end
-    end
-    nothing
-end
-
-function __assemble_linear_subdomain!(
-    b,
-    f,
-    V,
-    measure::Measure,
-    subdomain::SubDomain,
-    backend::BcubeBackendCPUSerial,
-)
-    # Alias
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
-
-    for elementInfo in SubDomainIterator(domain, subdomain)
-        # Materialize the operation to perform on the current element
+    foreach_element(domain) do elementInfo
         vₑ = blockmap_shape_functions(V, elementInfo)
         fᵥ = materialize(f(vₑ), elementInfo)
         values = integrate_on_ref_element(fᵥ, elementInfo, quadrature)
@@ -883,11 +863,10 @@ function compute(integration::Integration)
     f = get_function(get_integrand(integration))
     quadrature = get_quadrature(measure)
 
-    values = map(DomainIterator(domain)) do elementInfo
+    values = map_element(domain) do elementInfo
         _f = materialize(f, elementInfo)
         integrate_on_ref_element(_f, elementInfo, quadrature)
     end
-
     return SparseVector(_domain_to_mesh_nelts(domain), collect(indices(domain)), values)
 end
 

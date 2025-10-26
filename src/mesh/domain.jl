@@ -826,3 +826,31 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
         bc_nodes = bnd_nodes,
     )
 end
+
+function foreach_element(f, domain::AbstractDomain)
+    for subdomains in DomainIteratorByTags(domain)
+        for subdomain in subdomains
+            foreach_element(f, domain, subdomain)
+        end
+    end
+    return nothing
+end
+
+function foreach_element(f, domain::AbstractDomain, subdomain)
+    for elementInfo in SubDomainIterator(domain, subdomain)
+        f(elementInfo)
+    end
+    return nothing
+end
+
+function map_element(f, domain::AbstractDomain)
+    mapreduce(vcat, DomainIteratorByTags(domain)) do subdomains
+        mapreduce(vcat, subdomains) do subdomain
+            map_element(f, domain, subdomain)
+        end
+    end
+end
+
+function map_element(f, domain::AbstractDomain, subdomain)
+    map(f, SubDomainIterator(domain, subdomain))
+end
