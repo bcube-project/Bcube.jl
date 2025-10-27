@@ -109,14 +109,14 @@ function assemble_bilinear!(
     measure::Measure,
     U::TrialFESpace,
     V::TestFESpace,
-    backend::BcubeBackendCPUSerial,
+    backend::AbstractBcubeBackend,
 )
     # Alias
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
 
     # Loop over cells
-    for elementInfo in DomainIterator(domain)
+    foreach_element(domain, backend) do elementInfo
         λu, λv = blockmap_bilinear_shape_functions(U, V, elementInfo)
         g1 = materialize(f(λu, λv), elementInfo)
         values = integrate_on_ref_element(g1, elementInfo, quadrature)
@@ -269,13 +269,10 @@ end
 Two levels of "LazyMapOver" because first we LazyMapOver the Tuple of argument of the linear form,
 and the for each item of this Tuple we LazyMapOver the shape functions.
 """
-function __assemble_linear!(b, f, V, measure::Measure, backend::BcubeBackendCPUSerial)
-    # Alias
+function __assemble_linear!(b, f, V, measure::Measure, backend::AbstractBcubeBackend)
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
-
-    for elementInfo in DomainIterator(domain)
-        # Materialize the operation to perform on the current element
+    foreach_element(domain, backend) do elementInfo
         vₑ = blockmap_shape_functions(V, elementInfo)
         fᵥ = materialize(f(vₑ), elementInfo)
         values = integrate_on_ref_element(fᵥ, elementInfo, quadrature)
@@ -524,6 +521,16 @@ function __update_b!(
     dofs,
     vals::NullOperator,
     backend::AbstractBcubeBackend,
+)
+    nothing
+end
+
+#fix ambiguity
+function __update_b!(
+    b::AbstractVector,
+    dofs,
+    vals::NullOperator,
+    backend::BcubeBackendCPUSerial,
 )
     nothing
 end
@@ -866,11 +873,10 @@ function compute(integration::Integration)
     f = get_function(get_integrand(integration))
     quadrature = get_quadrature(measure)
 
-    values = map(DomainIterator(domain)) do elementInfo
+    values = map_element(domain) do elementInfo
         _f = materialize(f, elementInfo)
         integrate_on_ref_element(_f, elementInfo, quadrature)
     end
-
     return SparseVector(_domain_to_mesh_nelts(domain), collect(indices(domain)), values)
 end
 

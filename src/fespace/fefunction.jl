@@ -117,7 +117,8 @@ function FEFunction(
     ::Type{<:Lagrange},
     feSpace::AbstractFESpace,
     mesh::AbstractMesh,
-    f::AbstractLazy,
+    f::AbstractLazy;
+    backend::BcubeBackendCPUSerial = get_bcube_backend(),
 )
     # Allocate the vector of dofs
     T, N = get_return_type_and_codim(f, mesh)
@@ -128,7 +129,7 @@ function FEFunction(
     # Alias
     dhl = Bcube._get_dhl(feSpace)
 
-    for cinfo in DomainIterator(CellDomain(mesh))
+    foreach_element(CellDomain(mesh), backend) do cinfo
         # Cell infos
         icell = cellindex(cinfo)
         ctype = celltype(cinfo)
