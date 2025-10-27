@@ -1,11 +1,21 @@
+"""
+A `SubDomain` groups a collection of mesh elements (cells, faces, …) that share
+the same `elementType`.
+
+The `indices` field stores the original mesh indices of
+those elements. The optional `tag` can be used to differentiate multiple
+sub‑domains of the same element type (e.g., for coloring or labeling). This
+structure is primarily intended for internal organization of mesh entities
+belonging to a `Domain`.
+"""
 struct SubDomain{A, E, I}
     tag::A
-    elementtype::E
+    elementType::E
     indices::I
 end
 get_tag(sdom::SubDomain) = sdom.tag
 get_indices(sdom::SubDomain) = sdom.indices
-get_elementtype(sdom::SubDomain) = sdom.elementtype
+get_elementtype(sdom::SubDomain) = sdom.elementType
 
 """
     build_subdomains_by_celltypes(mesh, indices)
@@ -42,7 +52,7 @@ Construct sub‑domains of a mesh grouped by face type (including adjacent cell 
 # Returns
 A tuple of `SubDomain` objects, each containing:
 - a tag to identify groups of `SubDomain` (`tag=nothing` by default),
-- a tuple `(face_type, cell_type₁, cell_type₂…)` describing the face and its neighboring cells,
+- a tuple `(face_type, cell_type₁, cell_type₂)` describing the face and its neighboring cells,
 - the list of indices belonging to that tuple.
 """
 function build_subdomains_by_facetypes(mesh, indices)
@@ -72,7 +82,7 @@ A tuple of `SubDomain` objects, each containing:
 - the list of indices belonging to that tuple.
 """
 function build_subdomains_periodic_by_facetypes(mesh, perio_cache)
-    _, _, _, bnd_f2c, bnd_ftypes, _ = perio_cache
+    bnd_f2c, bnd_ftypes = perio_cache.bnd_f2c, perio_cache.bnd_ftypes
     indices = 1:length(bnd_ftypes)
     _ftypes = bnd_ftypes
     _ftypes = [
@@ -99,7 +109,7 @@ end
 @inline topodim(::AbstractDomain) = error("undefined")
 @inline codimension(d::AbstractDomain) = topodim(get_mesh(d)) - topodim(d)
 LazyOperators.pretty_name(domain::AbstractDomain) = "AbstractDomain"
-get_tags(domains::AbstractDomain) = domains.tags
+get_unique_tags(domains::AbstractDomain) = domains.uniqueTags
 
 function get_subdomains(domain::AbstractDomain, tag, f = sdom -> get_tag(sdom) == tag)
     filter(f, get_subdomains(domain))
@@ -126,7 +136,7 @@ julia> Ω_selected = CellDomain(mesh, selectedCells)
 struct CellDomain{M, SD, T} <: AbstractCellDomain{M, I}
     mesh::M
     subdomains::SD
-    tags::T
+    uniqueTags::T
 end
 @inline topodim(d::CellDomain) = topodim(get_mesh(d))
 
@@ -145,7 +155,7 @@ abstract type AbstractFaceDomain{M} <: AbstractDomain{M} end
 struct InteriorFaceDomain{M, SD, T} <: AbstractFaceDomain{M}
     mesh::M
     subdomains::SD
-    tags::T
+    uniqueTags::T
 end
 @inline topodim(d::InteriorFaceDomain) = topodim(get_mesh(d)) - 1
 InteriorFaceDomain(mesh::AbstractMesh) = InteriorFaceDomain(parent(mesh))
@@ -160,7 +170,7 @@ LazyOperators.pretty_name(domain::InteriorFaceDomain) = "InteriorFaceDomain"
 struct AllFaceDomain{M, SD, T} <: AbstractFaceDomain{M}
     mesh::M
     subdomains::SD
-    tags::T
+    uniqueTags::T
 end
 @inline topodim(d::AllFaceDomain) = topodim(get_mesh(d)) - 1
 AllFaceDomain(mesh::AbstractMesh) = AllFaceDomain(mesh, 1:nfaces(mesh))
@@ -177,7 +187,7 @@ struct BoundaryFaceDomain{M, BC, L, C, SD, T} <: AbstractFaceDomain{M}
     labels::L
     cache::C
     subdomains::SD
-    tags::T
+    uniqueTags::T
 end
 @inline get_mesh(d::BoundaryFaceDomain) = d.mesh
 @inline topodim(d::BoundaryFaceDomain) = topodim(get_mesh(d)) - 1
@@ -320,7 +330,16 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
     end
 
     # Retain only relevant faces
-    return bnd_f2f, bnd_f2n1, bnd_f2n2, bnd_f2c, bnd_ftypes, bnd_n2n, bndfaces1, bndfaces2
+    return (;
+        bnd_f2f,
+        bnd_f2n1,
+        bnd_f2n2,
+        bnd_f2c,
+        bnd_ftypes,
+        bnd_n2n,
+        bndfaces1,
+        bndfaces2,
+    )
 end
 
 """
@@ -614,15 +633,22 @@ function Base.getindex(iter::DomainIterator, i)
     return nothing
 end
 
+"""
+A `DomainIteratorByTags` is a helper to iterate over a `Domain` by iterating
+over groups of `SubDomain`s sharing the same tag. This helps applying type-stable
+operations on the elements of the `Domain`.
+"""
 struct DomainIteratorByTags{D <: AbstractDomain} <: AbstractDomainIterator{D}
     domain::D
 end
 
 Base.eltype(::DomainIteratorByTags) = SubDomain
 
+Base.length(iter::DomainIteratorByTags) = length(get_unique_tags(iter.domain))
+
 function Base.iterate(iter::DomainIteratorByTags, i::Integer = 1)
     domain = get_domain(iter)
-    tags = get_tags(domain)
+    tags = get_unique_tags(domain)
     if i > length(tags)
         return nothing
     else
@@ -649,14 +675,13 @@ struct SubDomainIterator{D <: AbstractDomain, SD <: SubDomain} <: AbstractDomain
 end
 
 Base.eltype(a::SubDomainIterator) = eltype(a[1])
+Base.length(iter::SubDomainIterator) = length(get_indices(iter.subdomain))
 
 function Base.iterate(iter::SubDomainIterator, i::Integer = 1)
-    domain = iter.domain
-    subdomain = iter.subdomain
-    if i > length(get_indices(subdomain))
+    if i > length(get_indices(iter.subdomain))
         return nothing
     else
-        return _get_index(domain, subdomain, i), i + 1
+        return _get_index(iter.domain, iter.subdomain, i), i + 1
     end
 end
 
@@ -740,9 +765,8 @@ function _get_index(
     # TODO : add a specific API for the domain cache:
     perio_cache = get_cache(domain)
     perio_trans = transformation(get_bc(domain))
-    _, bnd_f2n1, bnd_f2n2, bnd_f2c, bnd_ftypes, bnd_n2n, bndfaces1, bndfaces2 = perio_cache
 
-    icell1, icell2 = bnd_f2c[iface, :]
+    icell1, icell2 = perio_cache.bnd_f2c[iface, :]
 
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
 
@@ -752,14 +776,18 @@ function _get_index(
     cnodes_j_perio = map(node -> Node(perio_trans(get_coords(node))), cnodes_j)
     # Build c2n for cell j with nodes indices taken from cell i
     # for those that are shared on the periodic BC:
-    _c2n_j_perio = map(k -> get(bnd_n2n, k, k), _c2n_j)
+    _c2n_j_perio = map(k -> get(perio_cache.bnd_n2n, k, k), _c2n_j)
     cellinfo2 = CellInfo(icell2, ctype2, cnodes_j_perio, _c2n_j_perio)
 
     # Face info
-    fnodes = get_nodes(mesh, bnd_f2n1[iface])
-    cside_i = cell_side(celltype(cellinfo1), get_nodes_index(cellinfo1), bnd_f2n1[iface])
-    cside_j = cell_side(celltype(cellinfo2), _c2n_j, bnd_f2n2[iface])
-    _f2n = bnd_f2n1[iface]
+    fnodes = get_nodes(mesh, perio_cache.bnd_f2n1[iface])
+    cside_i = cell_side(
+        celltype(cellinfo1),
+        get_nodes_index(cellinfo1),
+        perio_cache.bnd_f2n1[iface],
+    )
+    cside_j = cell_side(celltype(cellinfo2), _c2n_j, perio_cache.bnd_f2n2[iface])
+    _f2n = perio_cache.bnd_f2n1[iface]
 
     return FaceInfo(
         cellinfo1,
@@ -769,7 +797,7 @@ function _get_index(
         ftype,
         fnodes,
         _f2n,
-        bndfaces1[iface],
+        perio_cache.bndfaces1[iface],
     )
 end
 
@@ -926,16 +954,16 @@ end
 """
     map_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial = get_bcube_backend())
 
-Apply the in-place function `f` to each element of `domain` using the CPU‑serial backend
-(default obtained via `get_bcube_backend()`).
+Apply the out-of-place function `f` to each element of `domain` using the CPU‑serial backend
+(default obtained via `get_bcube_backend()`) and return an array whose size is equal to the
+number of elements of `domain`.
 
 The iteration proceeds over all `subdomains`, grouped by their tags, using the default backend.
 For each subdomain, the lower‑level `map_element` overload is invoked, ensuring that
 `f` receives the appropriate element information.
 
 # Arguments
-- `f`: Callable to be applied to each element. `f` must capture the variables
-  that are modified during the loop.
+- `f`: Callable to be applied to each element.
 - `domain::AbstractDomain`: The domain whose elements are processed.
 - `backend::BcubeBackendCPUSerial`: Backend handling the iteration (default: `get_bcube_backend()`).
 

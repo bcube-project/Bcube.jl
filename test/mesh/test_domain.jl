@@ -48,6 +48,10 @@
     end
 
     @testset "subdomains" begin
+        # Remark : cell indices were checked with Gmsh.
+        # Size and "elementType" of each subdomain were also checked
+        # with Gmsh.
+
         @testset "CellDomain" begin
             mesh = read_mesh(
                 joinpath(
@@ -251,5 +255,16 @@
             @test length(Bcube.get_indices(subdomains[2])) == 5
             @test all(Bcube.get_indices(subdomains[2]) .== [185, 188, 191, 194, 197])
         end
+    end
+
+    @testset "map_element" begin
+        mesh = read_mesh(
+            joinpath(@__DIR__, "..", "assets", "rectangle-mesh-tri-quad-nx10-ny10.msh22");
+            warn = false,
+        )
+        a = Bcube.map_element(CellDomain(mesh)) do element
+            Bcube.get_element_index(element)
+        end
+        @test length(a) == ncells(mesh)
     end
 end

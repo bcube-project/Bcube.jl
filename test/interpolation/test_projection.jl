@@ -10,37 +10,31 @@
         f = PhysicalFunction(x -> 2 * x[1] + 3)
         projection_l2!(u, f, dΩ)
 
-        _i1 = 0
+        function f_element(cInfo)
+            _u = materialize(u, cInfo)
+            _f = materialize(f, cInfo)
+            s = shape(celltype(cInfo))
+
+            # Loop over line vertices
+            for ξ in get_coords(s)
+                cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
+                @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
+            end
+        end
+
+        nelts_1 = 0
         for cInfo in DomainIterator(Ω)
-            _i1 += 1
-            _u = materialize(u, cInfo)
-            _f = materialize(f, cInfo)
-
-            s = shape(celltype(cInfo))
-
-            # Loop over line vertices
-            for ξ in get_coords(s)
-                cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
-                @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
-            end
+            nelts_1 += 1
+            f_element(cInfo)
         end
 
-        _i2 = 0
+        nelts_2 = 0
         foreach_element(Ω) do cInfo
-            _i2 += 1
-            _u = materialize(u, cInfo)
-            _f = materialize(f, cInfo)
-
-            s = shape(celltype(cInfo))
-
-            # Loop over line vertices
-            for ξ in get_coords(s)
-                cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
-                @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
-            end
+            nelts_2 += 1
+            f_element(cInfo)
         end
 
-        @test _i1 == _i2 == ncells(mesh)
+        @test nelts_1 == nelts_2 == ncells(mesh)
 
         # f(x) = c*x
         #- build mesh and variable
