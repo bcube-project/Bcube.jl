@@ -10,10 +10,9 @@
         f = PhysicalFunction(x -> 2 * x[1] + 3)
         projection_l2!(u, f, dΩ)
 
-        for cInfo in DomainIterator(Ω)
+        function f_element(cInfo)
             _u = materialize(u, cInfo)
             _f = materialize(f, cInfo)
-
             s = shape(celltype(cInfo))
 
             # Loop over line vertices
@@ -22,6 +21,20 @@
                 @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
             end
         end
+
+        nelts_1 = 0
+        for cInfo in DomainIterator(Ω)
+            nelts_1 += 1
+            f_element(cInfo)
+        end
+
+        nelts_2 = 0
+        foreach_element(Ω) do cInfo
+            nelts_2 += 1
+            f_element(cInfo)
+        end
+
+        @test nelts_1 == nelts_2 == ncells(mesh)
 
         # f(x) = c*x
         #- build mesh and variable
@@ -69,7 +82,9 @@
 
         projection_l2!(u, f, dΩ)
 
-        for cInfo in DomainIterator(Ω)
+        _count_cell = 0
+        foreach_element(Ω) do cInfo
+            _count_cell += 1
             _u = materialize(u, cInfo)
             _f = materialize(f, cInfo)
 
@@ -82,6 +97,7 @@
                 @test materialize(_u, cPoint) ≈ materialize(_f, cPoint)
             end
         end
+        @test ncells(mesh) == _count_cell
     end
 
     @testset "misc" begin

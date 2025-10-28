@@ -129,13 +129,15 @@ import Bcube:
     Bar2_t,
     Tri3_t,
     Quad4_t,
-    Quad9_t
+    Quad9_t,
+    foreach_element
 
 # This dir will be removed at the end of the tests
 tempdir = mktempdir()
 
 @testset "Bcube.jl" begin
     custom_include("./test_utils.jl")
+    custom_include("./lazyop/test_lazyop.jl")
     custom_include("./mesh/test_entity.jl")
     custom_include("./mesh/test_connectivity.jl")
     custom_include("./mesh/test_transformation.jl")

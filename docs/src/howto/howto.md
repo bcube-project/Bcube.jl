@@ -90,7 +90,7 @@ mesh = rectangle_mesh(2, 3)
 Λ = BoundaryFaceDomain(mesh, ("xmin", "ymin"))
 ```
 
-You can loop over the mesh cell and/or faces using the `DomainIterator` iterator associated to any "domain". Each item is either a `CellInfo` or a `FaceInfo` (or a `CellSide`) depending on the nature of the domain. This information contains all the geometric information about the entity:
+You can loop over the mesh cell and/or faces using the `foreach_element` function applied to any "domain". Each item is either a `CellInfo` or a `FaceInfo` (or a `CellSide`) depending on the nature of the domain. This information contains all the geometric information about the entity:
 ```julia
 # Loop over the different domains (to illustrate that it works for different kind of domains)
 for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces in Λ"))
@@ -99,7 +99,7 @@ for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces 
     println("-----------")
 
     # Loop over the elements (cells of faces) in this domain
-    for element in Bcube.DomainIterator(domain)
+    foreach_element(domain) do element
 
         # index of the cell/face in the mesh
         println("")

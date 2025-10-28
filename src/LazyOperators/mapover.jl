@@ -140,6 +140,26 @@ function map_over(f::F, args::Vararg{AbstractMapOver, N}) where {F <: Function, 
     T = get_basetype(typeof(first(args)))
     T(f_a)
 end
+"""
+    gen_map_over_two_tuples(f, N, a, b)
+
+The purpose is to build an `Expr` corresponding to the application of `f` on each
+"line" of the `Tuple`s `a` and `b`. For instance if `f = +` and `a = (a,b,c)`, `b = (d,e,f))`,
+we want to build the `Expr`` of the `Tuple` `(a+d, b+e, c+f)`.
+
+# Dev notes
+This `generated` is intended to solve stackoverflow problems encountered for elements with
+large number of dofs (for instance vector elements). The more generic version (not only
+two Tuples but any number) is working with julia>=1.11 but leads to dramatic allocations
+on julia=1.10. For this reason, only the 2-args version is specialized for now.
+"""
+function gen_map_over_two_tuples(f, N, a, b)
+    exprs = [:(f(a[$i], b[$i])) for i in 1:N]
+    return :(($(exprs...),))
+end
+@generated function _map_over(f::F, a::NTuple{N}, b::NTuple{N}) where {F <: Function, N}
+    gen_map_over_two_tuples(f, N, a, b)
+end
 function _map_over(f::F, a::Vararg{Tuple, N}) where {F <: Function, N}
     _heads = Base.heads(a...)
     _tails = Base.tails(a...)
