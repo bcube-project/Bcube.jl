@@ -841,65 +841,56 @@ end
 
 _domain_to_mesh_nelts(domain::AbstractCellDomain) = ncells(get_mesh(domain))
 _domain_to_mesh_nelts(domain::AbstractFaceDomain) = nfaces(get_mesh(domain))
+"""
+    _check_domains_compatibility(multi::MultiIntegration) -> Bool
+
+Return `true` iff all integrals in `multi` are defined on:
+1) the **same mesh instance** (pointer-equality with `===`), and
+2) the **same entity kind** (all `AbstractCellDomain` or all `AbstractFaceDomain`).
+
+Overlaps between subdomains are allowed.
+"""
+function _check_domains_compatibility(multi::MultiIntegration{N}) where {N}
+    # Collect measures, domains, meshes
+    measures = ntuple(i -> get_measure(multi[Val(i)]), Val(N))
+    domains  = map(get_domain, measures)
+    meshes   = map(get_mesh, domains)
+
+    # (1) same mesh instance
+    first_mesh = first(meshes)
+    all(m -> m === first_mesh, meshes) || return false
+
+    # (2) same entity kind
+    all(d -> d isa AbstractCellDomain, domains) && return true
+    all(d -> d isa AbstractFaceDomain, domains) && return true
+
+    return false
+end
 
 """
     compute(multi::MultiIntegration)
 
-Evaluates the sum of all integrals stored in `multi`, after checking that
-they share the same support — i.e. the same type of entities (`cells` or `faces`),
-the same mesh instance, and either the same subdomain indices or disjoint ones.
-Raises an error otherwise.
+Evaluates the sum of all integrals stored in `multi`, after checking that they
+are defined on the **same mesh instance** and the **same entity kind**
+(`cells` or `faces`). Subdomain overlaps are allowed and left to the user’s
+responsibility. Raises an error otherwise.
 """
 function compute(multi::MultiIntegration{N}) where {N}
-    # Trivial case: single integral
+    # Trivial case
     N == 1 && return compute(multi[Val(1)])
 
-    # 1) Use the first integral as reference for compatibility checks (mesh, entity type, indices)
-    first_int = multi[Val(1)]
-    meas₁ = get_measure(first_int)
-    dom₁ = get_domain(meas₁)
-    mesh₁ = get_mesh(dom₁)
-    kind₁ = if dom₁ isa AbstractCellDomain
-        :cells
-    elseif dom₁ isa AbstractFaceDomain
-        :faces
-    else
-        :unknown
-    end
-    inds₁ = collect(indices(dom₁))                # indices of the first integration domain
-    used = Set{Int}(inds₁)                       # set of all already-used entity indices
+    # Compatibility checks (same mesh, same entity kind)
+    @assert _check_domains_compatibility(multi) "Cannot sum integrals defined on different meshes or entities (cell/face)."
 
-    acc = compute(first_int) # Initialize accumulator with the first result
-
-    # 2) Loop over remaining integrals
+    # Accumulate
+    acc = compute(multi[Val(1)])
     for i in 2:N
-        intᵢ  = multi[Val(i)]
-        measᵢ = get_measure(intᵢ)
-        domᵢ  = get_domain(measᵢ)
-        meshᵢ = get_mesh(domᵢ)
-        kindᵢ = domᵢ isa AbstractCellDomain ? :cells : domᵢ isa AbstractFaceDomain ? :faces : :unknown
-        indsᵢ = collect(indices(domᵢ))
-
-        # Consistency checks
-        @assert kindᵢ == kind₁ "Cannot sum integrals over different entity types (cells vs faces)."
-        @assert meshᵢ === mesh₁ "Cannot sum integrals defined on different meshes."
-
-        # Allow: (a) identical indices as the first integral (ie ∫(f)dΩ + ∫(g)dΩ ), or (b) disjoint subdomains (ie ∫(f)dΩ₁ + ∫(f)dΩ₂ avec Ω₁ ∩ Ω₂ = ∅)
-        same_as_first = (indsᵢ == inds₁)
-        disjoint_all  = isempty(intersect(indsᵢ, used))
-        @assert (same_as_first || disjoint_all) "Integrals defined on overlapping subdomains cannot be summed."
-
-        # Register the new indices as used for subsequent iterations
-        foreach(x -> push!(used, x), indsᵢ)
-
-        # Numerical accumulation
-        tmp = compute(intᵢ)
+        tmp = compute(multi[Val(i)])
         @assert length(tmp) == length(acc) "Incompatible measures (vector size mismatch)."
         acc .+= tmp
     end
     return acc
 end
-
 """
     AbstractFaceSidePair{A} <: AbstractLazyWrap{A}
 
