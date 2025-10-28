@@ -841,7 +841,56 @@ end
 
 _domain_to_mesh_nelts(domain::AbstractCellDomain) = ncells(get_mesh(domain))
 _domain_to_mesh_nelts(domain::AbstractFaceDomain) = nfaces(get_mesh(domain))
+"""
+    _check_domains_compatibility(multi::MultiIntegration) -> Bool
 
+Return `true` iff all integrals in `multi` are defined on:
+1) the **same mesh instance** (pointer-equality with `===`), and
+2) the **same entity kind** (all `AbstractCellDomain` or all `AbstractFaceDomain`).
+
+Overlaps between subdomains are allowed.
+"""
+function _check_domains_compatibility(multi::MultiIntegration{N}) where {N}
+    # Collect measures, domains, meshes
+    measures = ntuple(i -> get_measure(multi[Val(i)]), Val(N))
+    domains  = map(get_domain, measures)
+    meshes   = map(get_mesh, domains)
+
+    # (1) same mesh instance
+    first_mesh = first(meshes)
+    all(m -> m === first_mesh, meshes) || return false
+
+    # (2) same entity kind
+    all(d -> d isa AbstractCellDomain, domains) && return true
+    all(d -> d isa AbstractFaceDomain, domains) && return true
+
+    return false
+end
+
+"""
+    compute(multi::MultiIntegration)
+
+Evaluates the sum of all integrals stored in `multi`, after checking that they
+are defined on the **same mesh instance** and the **same entity kind**
+(`cells` or `faces`). Subdomain overlaps are allowed and left to the user’s
+responsibility. Raises an error otherwise.
+"""
+function compute(multi::MultiIntegration{N}) where {N}
+    # Trivial case
+    N == 1 && return compute(multi[Val(1)])
+
+    # Compatibility checks (same mesh, same entity kind)
+    @assert _check_domains_compatibility(multi) "Cannot sum integrals defined on different meshes or entities (cell/face)."
+
+    # Accumulate
+    acc = compute(multi[Val(1)])
+    for i in 2:N
+        tmp = compute(multi[Val(i)])
+        @assert length(tmp) == length(acc) "Incompatible measures (vector size mismatch)."
+        acc .+= tmp
+    end
+    return acc
+end
 """
     AbstractFaceSidePair{A} <: AbstractLazyWrap{A}
 
