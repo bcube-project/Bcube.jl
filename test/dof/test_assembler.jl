@@ -459,6 +459,87 @@
         @test sum(Bcube.compute(∫(f)dΩ2)) == 0.5
     end
 
+    @testset "MultiIntegration (compute) – valid cases" begin
+        f = PhysicalFunction(x -> 1.0)
+
+        @testset "cells – same mesh, different functions" begin
+            mesh = line_mesh(4)
+            Ω = CellDomain(mesh)
+            dΩ = Measure(Ω, 2)
+
+            g = PhysicalFunction(x -> x[1])
+
+            int₁ = ∫(f)dΩ
+            int₂ = ∫(g)dΩ
+
+            res₁ = compute(int₁)
+            res₂ = compute(int₂)
+            res_sum = compute(int₁ + int₂)
+
+            # Should be equivalent to the sum of the individual integrals
+            @test maximum(abs.(res_sum .- (res₁ .+ res₂))) < 1e-12
+        end
+        @testset "cells – three disjoint subdomains" begin
+            mesh = line_mesh(8)  # 7 cells
+            dΩ₁ = Measure(CellDomain(mesh, 1:2), 2)
+            dΩ₂ = Measure(CellDomain(mesh, 3:4), 2)
+            dΩ₃ = Measure(CellDomain(mesh, 5:7), 2)
+
+            int₁ = ∫(f)dΩ₁
+            int₂ = ∫(f)dΩ₂
+            int₃ = ∫(f)dΩ₃
+
+            res₁ = compute(int₁)
+            res₂ = compute(int₂)
+            res₃ = compute(int₃)
+            res_sum = compute(int₁ + int₂ + int₃)
+
+            @test maximum(abs.(res_sum .- (res₁ .+ res₂ .+ res₃))) < 1e-12
+        end
+        @testset "faces – interior, disjoint subdomains" begin
+            mesh = line_mesh(8)  # 7 cells → interior faces indices = [2, 3, 4, 5, 6, 7]
+            f = PhysicalFunction(x -> 1.0)
+
+            Γ₁ = InteriorFaceDomain(mesh, 2:4)
+            Γ₂ = InteriorFaceDomain(mesh, 5:7)
+            dΓ₁ = Measure(Γ₁, 2)
+            dΓ₂ = Measure(Γ₂, 2)
+
+            int₁ = ∫(side⁻(f))dΓ₁
+            int₂ = ∫(side⁻(f))dΓ₂
+
+            res₁ = compute(int₁)
+            res₂ = compute(int₂)
+            res_sum = compute(int₁ + int₂)
+
+            @test maximum(abs.(res_sum .- (res₁ .+ res₂))) < 1e-12
+        end
+    end
+    @testset "Invalid multiIntegration (must fail)" begin
+        f = PhysicalFunction(x -> 1.0)
+        # Different meshes 
+        @test_throws AssertionError begin
+            mesh1, mesh2 = line_mesh(4), line_mesh(4)
+            dΩ1 = Measure(CellDomain(mesh1), 2)
+            dΩ2 = Measure(CellDomain(mesh2), 2)
+            compute(∫(f)dΩ1 + ∫(f)dΩ2)
+        end
+        # Cells vs faces
+        @test_throws AssertionError begin
+            mesh = line_mesh(3) # to have the same lenght: cells [1,2] and BoundaryFace = [3,1]
+            dΩ = Measure(CellDomain(mesh), 2)
+            dΓ = Measure(BoundaryFaceDomain(mesh), 2)
+            compute(∫(f)dΩ + ∫(side⁻(f))dΓ)
+        end
+
+        # Overlapping subdomains
+        @test_throws AssertionError begin
+            mesh = line_mesh(5)
+            dΩ₁ = Measure(CellDomain(mesh, 1:3), 2)
+            dΩ₂ = Measure(CellDomain(mesh, 3:5), 2)  # overlap on cell 3
+            compute(∫(f)dΩ₁ + ∫(f)dΩ₂)
+        end
+    end
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials

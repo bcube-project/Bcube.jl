@@ -842,44 +842,63 @@ end
 _domain_to_mesh_nelts(domain::AbstractCellDomain) = ncells(get_mesh(domain))
 _domain_to_mesh_nelts(domain::AbstractFaceDomain) = nfaces(get_mesh(domain))
 
-
 """
     compute(multi::MultiIntegration)
 
-Evaluates a sum of integrals stored in a `MultiIntegration` object.
-
-Each sub-integral is of the form `∫(f)dΩ`, computed over a specific domain
-with a given quadrature. The result of `compute(multi)` is the sum of the
-results of `compute` applied to each individual `Integration`.
-
-Returns a `SparseVector` whose indices correspond to the mesh entities
-(cells, faces, etc.) of the integration domains. The values represent the
-total integral contribution over those entities.
-
-# Example
-```julia
-mesh = line_mesh(4)
-Ω    = CellDomain(mesh)
-dΩ   = Measure(Ω, 2)
-f    = PhysicalFunction(x -> 1.0)
-int1 = ∫(f)dΩ
-int2 = 2.0 * int1
-multi = int1 + int2
-res = compute(multi)  # should be equal to 3 * compute(int1)
+Evaluates the sum of all integrals stored in `multi`, after checking that
+they share the same support — i.e. the same type of entities (`cells` or `faces`),
+the same mesh instance, and either the same subdomain indices or disjoint ones.
+Raises an error otherwise.
 """
-
 function compute(multi::MultiIntegration{N}) where {N}
-    ∑ = compute(multi[Val(1)]) 
-    N == 1 && return ∑
-    for i in 2:N
-        tmp = compute(multi[Val(i)])
-        @assert length(tmp) == length(∑) "Measures don't fit."
-        ∑ .+= tmp
+    # Trivial case: single integral
+    N == 1 && return compute(multi[Val(1)])
+
+    # 1) Use the first integral as reference for compatibility checks (mesh, entity type, indices)
+    first_int = multi[Val(1)]
+    meas₁ = get_measure(first_int)
+    dom₁ = get_domain(meas₁)
+    mesh₁ = get_mesh(dom₁)
+    kind₁ = if dom₁ isa AbstractCellDomain
+        :cells
+    elseif dom₁ isa AbstractFaceDomain
+        :faces
+    else
+        :unknown
     end
-    return ∑
+    inds₁ = collect(indices(dom₁))                # indices of the first integration domain
+    used = Set{Int}(inds₁)                       # set of all already-used entity indices
+
+    acc = compute(first_int) # Initialize accumulator with the first result
+
+    # 2) Loop over remaining integrals
+    for i in 2:N
+        intᵢ  = multi[Val(i)]
+        measᵢ = get_measure(intᵢ)
+        domᵢ  = get_domain(measᵢ)
+        meshᵢ = get_mesh(domᵢ)
+        kindᵢ = domᵢ isa AbstractCellDomain ? :cells : domᵢ isa AbstractFaceDomain ? :faces : :unknown
+        indsᵢ = collect(indices(domᵢ))
+
+        # Consistency checks
+        @assert kindᵢ == kind₁ "Cannot sum integrals over different entity types (cells vs faces)."
+        @assert meshᵢ === mesh₁ "Cannot sum integrals defined on different meshes."
+
+        # Allow: (a) identical indices as the first integral (ie ∫(f)dΩ + ∫(g)dΩ ), or (b) disjoint subdomains (ie ∫(f)dΩ₁ + ∫(f)dΩ₂ avec Ω₁ ∩ Ω₂ = ∅)
+        same_as_first = (indsᵢ == inds₁)
+        disjoint_all  = isempty(intersect(indsᵢ, used))
+        @assert (same_as_first || disjoint_all) "Integrals defined on overlapping subdomains cannot be summed."
+
+        # Register the new indices as used for subsequent iterations
+        foreach(x -> push!(used, x), indsᵢ)
+
+        # Numerical accumulation
+        tmp = compute(intᵢ)
+        @assert length(tmp) == length(acc) "Incompatible measures (vector size mismatch)."
+        acc .+= tmp
+    end
+    return acc
 end
-
-
 
 """
     AbstractFaceSidePair{A} <: AbstractLazyWrap{A}
