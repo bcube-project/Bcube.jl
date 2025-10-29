@@ -8,7 +8,6 @@ function linear_scaling_limiter_coef(
     DMPrelax,
     periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}},
     check = true;
-    backend::BcubeBackendCPUSerial = get_bcube_backend(),
 ) where {N, Me, BC <: PeriodicBCType}
     @assert is_discontinuous(get_fespace(v)) "LinearScalingLimiter only support discontinuous variables"
 
@@ -21,8 +20,8 @@ function linear_scaling_limiter_coef(
     minval .= typemax(eltype(minval))
     maxval = similar(mean)
     maxval .= -minval
-    _minmax_cells!(minval, maxval, v, dω, backend)
-    _minmax_faces!(minval, maxval, v, dω, backend)
+    _minmax_cells!(minval, maxval, v, dω)
+    _minmax_faces!(minval, maxval, v, dω)
     if !isnothing(periodicBCs)
         for domain in periodicBCs
             _minmax_faces_periodic!(minval, maxval, v, degquad, domain)
@@ -134,15 +133,15 @@ function _minmax_cells(v, mesh, quadrature)
 end
 
 """
-    _minmax_cells!(minval, maxval, v, dω, backend::AbstractBcubeBackend)
+    _minmax_cells!(minval, maxval, v, dω)
 
 Compute the min and max values of `v` in each cell of `dω`
 """
-function _minmax_cells!(minval, maxval, v, dω, backend::AbstractBcubeBackend)
+function _minmax_cells!(minval, maxval, v, dω)
     domain = get_domain(dω)
     quadrature = get_quadrature(dω)
 
-    foreach_element(domain, backend) do cellInfo
+    foreach_element(domain) do cellInfo
         # mᵢ, Mᵢ : min/max at cell quadrature points
         vᵢ = materialize(v, cellInfo)
         fᵢ(ξ) = vᵢ(CellPoint(ξ, cellInfo, ReferenceDomain()))
@@ -155,27 +154,15 @@ function _minmax_cells!(minval, maxval, v, dω, backend::AbstractBcubeBackend)
     return nothing
 end
 
-function _minmax_faces!(
-    minval,
-    maxval,
-    v,
-    dω::AbstractMeasure{<:AbstractCellDomain},
-    backend::AbstractBcubeBackend,
-)
+function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractCellDomain})
     dΓ = Measure(AllFaceDomain(get_mesh(get_domain(dω))), get_quadrature(dω))
-    _minmax_faces!(minval, maxval, v, dΓ, backend)
+    _minmax_faces!(minval, maxval, v, dΓ)
 end
 
-function _minmax_faces!(
-    minval,
-    maxval,
-    v,
-    dω::AbstractMeasure{<:AbstractFaceDomain},
-    backend::AbstractBcubeBackend,
-)
+function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractFaceDomain})
     quadrature = get_quadrature(dω)
 
-    foreach_element(get_domain(dω), backend) do faceInfo
+    foreach_element(get_domain(dω)) do faceInfo
         i = cellindex(get_cellinfo_n(faceInfo))
         j = cellindex(get_cellinfo_p(faceInfo))
 

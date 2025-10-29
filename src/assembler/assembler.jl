@@ -1,3 +1,6 @@
+_bilinear_integration_type(a, U, V) = a(_null_operator(U), _null_operator(V))
+_linear_integration_type(a, V) = a(_null_operator(V))
+
 allocate_linear(backend::BcubeBackendCPUSerial, V, T) = allocate_dofs(V, T)
 
 function allocate_bilinear(backend::BcubeBackendCPUSerial, a, U, V, T)
@@ -13,7 +16,7 @@ function allocate_bilinear(backend::BcubeBackendCPUSerial, a, U, V, T)
 end
 
 """
-    assemble_bilinear(a::Function, U, V; T = Float64, backend::AbstractBcubeBackend = get_bcube_backend())
+    assemble_bilinear(a::Function, U, V; T = Float64)
 
 Assemble the (sparse) Matrix corresponding to the given bilinear form `a`
 on the trial and test finite element spaces `U` and `V`.
@@ -45,8 +48,9 @@ function assemble_bilinear(
     U::Union{TrialFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}}},
     V::Union{TestFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}}};
     T = Float64,
-    backend::AbstractBcubeBackend = get_bcube_backend(),
 ) where {N}
+    backend = get_bcube_backend(_bilinear_integration_type(a, U, V))
+
     I, J, X = allocate_bilinear(backend, a, U, V, T)
 
     # Compute
@@ -57,7 +61,7 @@ function assemble_bilinear(
 end
 
 function assemble_bilinear!(I, J, X, a, U, V, backend::AbstractBcubeBackend)
-    return_type_a = a(_null_operator(U), _null_operator(V))
+    return_type_a = _bilinear_integration_type(a, U, V)
     _assemble_bilinear!(I, J, X, a, U, V, return_type_a, backend)
     return nothing
 end
@@ -116,7 +120,7 @@ function assemble_bilinear!(
     domain = get_domain(measure)
 
     # Loop over cells
-    foreach_element(domain, backend) do elementInfo
+    foreach_element(domain) do elementInfo
         λu, λv = blockmap_bilinear_shape_functions(U, V, elementInfo)
         g1 = materialize(f(λu, λv), elementInfo)
         values = integrate_on_ref_element(g1, elementInfo, quadrature)
@@ -167,7 +171,7 @@ function assemble_bilinear!(
 end
 
 """
-    assemble_linear(l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace}; T = Float64, backend::AbstractBcubeBackend = get_bcube_backend())
+    assemble_linear(l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace}; T = Float64)
 
 Assemble the vector corresponding to a linear form `l` on the finite element space `V`
 
@@ -196,28 +200,26 @@ function assemble_linear(
     l::Function,
     V::Union{TestFESpace, AbstractMultiTestFESpace};
     T = Float64,
-    backend::AbstractBcubeBackend = get_bcube_backend(),
 )
+    backend = get_bcube_backend(_linear_integration_type(l, V))
+
     b = allocate_linear(backend, V, T)
-    assemble_linear!(b, l, V; backend = backend)
+    assemble_linear!(b, l, V)
     return b
 end
 
 """
-    assemble_linear!(b::AbstractVector, l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace}; backend::AbstractBcubeBackend = get_bcube_backend())
+    assemble_linear!(b::AbstractVector, l::Function, V::Union{TestFESpace, AbstractMultiTestFESpace})
 
 In-place version of [`assemble_linear`](@ref).
 """
 function assemble_linear!(
     b::AbstractVector,
     l::Function,
-    V::Union{TestFESpace, AbstractMultiTestFESpace};
-    backend::AbstractBcubeBackend = get_bcube_backend(),
+    V::Union{TestFESpace, AbstractMultiTestFESpace},
 )
-    # apply `l` on `NullOperator` to get the type
-    # of the result of `l` and use it for dispatch
-    # (`Integration` or `MultiIntegration` case).
-    _assemble_linear!(b, l, V, l(_null_operator(V)), backend)
+    backend = get_bcube_backend(_linear_integration_type(l, V))
+    _assemble_linear!(b, l, V, _linear_integration_type(l, V), backend)
     return nothing
 end
 
@@ -272,7 +274,7 @@ and the for each item of this Tuple we LazyMapOver the shape functions.
 function __assemble_linear!(b, f, V, measure::Measure, backend::AbstractBcubeBackend)
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
-    foreach_element(domain, backend) do elementInfo
+    foreach_element(domain) do elementInfo
         vₑ = blockmap_shape_functions(V, elementInfo)
         fᵥ = materialize(f(vₑ), elementInfo)
         values = integrate_on_ref_element(fᵥ, elementInfo, quadrature)
