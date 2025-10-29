@@ -111,6 +111,15 @@ end
 LazyOperators.pretty_name(domain::AbstractDomain) = "AbstractDomain"
 get_unique_tags(domains::AbstractDomain) = domains.uniqueTags
 
+"""
+    get_bcube_backend(domain::AbstractDomain)
+
+Return the Bcube backend associated with the mesh underlying the given `AbstractDomain`.
+"""
+function get_bcube_backend(domain::AbstractDomain)
+    get_bcube_backend(get_mesh(domain))
+end
+
 function get_subdomains(domain::AbstractDomain, tag, f = sdom -> get_tag(sdom) == tag)
     filter(f, get_subdomains(domain))
 end
@@ -907,12 +916,11 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
 end
 
 """
-    foreach_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial = get_bcube_backend())
+    foreach_element(f, domain::AbstractDomain)
 
 Apply the in-place function `f` to every element of `domain`.
 
-The iteration proceeds over all `subdomains`, grouped by their tags, using the
-CPU‑serial backend (default obtained via `get_bcube_backend()`).
+The iteration proceeds over all `subdomains`, grouped by their tags.
 For each subdomain the lower‑level `foreach_element` overload is invoked,
 ensuring that `f` receives the appropriate element information.
 
@@ -920,26 +928,24 @@ ensuring that `f` receives the appropriate element information.
 - `f`: Callable to be applied to each element. `f` must capture the variables
   that are modified during the loop.
 - `domain::AbstractDomain`: The domain whose elements are processed.
-- `backend::BcubeBackendCPUSerial`: Backend handling the iteration (default:
-  `get_bcube_backend()`).
 
 # Returns
 `nothing`.
 """
-function foreach_element(
-    f,
-    domain::AbstractDomain,
-    backend::BcubeBackendCPUSerial = get_bcube_backend(),
-)
+function foreach_element(f, domain::AbstractDomain)
+    _foreach_element(f, domain, get_bcube_backend(domain))
+end
+
+function _foreach_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial)
     for subdomains in DomainIteratorByTags(domain)
         for subdomain in subdomains
-            foreach_element(f, domain, subdomain, backend)
+            _foreach_element(f, domain, subdomain, backend)
         end
     end
     return nothing
 end
 
-function foreach_element(
+function _foreach_element(
     f,
     domain::AbstractDomain,
     subdomain,
@@ -952,36 +958,34 @@ function foreach_element(
 end
 
 """
-    map_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial = get_bcube_backend())
+    map_element(f, domain::AbstractDomain)
 
-Apply the out-of-place function `f` to each element of `domain` using the CPU‑serial backend
-(default obtained via `get_bcube_backend()`) and return an array whose size is equal to the
-number of elements of `domain`.
+Apply the out-of-place function `f` to each element of `domain` and return an array
+whose size is equal to the number of elements of `domain`.
 
-The iteration proceeds over all `subdomains`, grouped by their tags, using the default backend.
+The iteration proceeds over all `subdomains`, grouped by their tags, using the backend of the domain.
 For each subdomain, the lower‑level `map_element` overload is invoked, ensuring that
 `f` receives the appropriate element information.
 
 # Arguments
 - `f`: Callable to be applied to each element.
 - `domain::AbstractDomain`: The domain whose elements are processed.
-- `backend::BcubeBackendCPUSerial`: Backend handling the iteration (default: `get_bcube_backend()`).
 
 # Returns
 An array containing the results of applying `f` to each element, with length equal to the number of elements in `domain`.
 """
-function map_element(
-    f,
-    domain::AbstractDomain,
-    backend::BcubeBackendCPUSerial = get_bcube_backend(),
-)
+function map_element(f, domain::AbstractDomain)
+    _map_element(f, domain, get_bcube_backend(domain))
+end
+
+function _map_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial)
     mapreduce(vcat, DomainIteratorByTags(domain)) do subdomains
         mapreduce(vcat, subdomains) do subdomain
-            map_element(f, domain, subdomain, backend)
+            _map_element(f, domain, subdomain, backend)
         end
     end
 end
 
-function map_element(f, domain::AbstractDomain, subdomain, backend::BcubeBackendCPUSerial)
+function _map_element(f, domain::AbstractDomain, subdomain, backend::BcubeBackendCPUSerial)
     map(f, SubDomainIterator(domain, subdomain))
 end
