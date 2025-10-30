@@ -1,3 +1,13 @@
+_offsets_bilinear_contribution(U, V, domain, backend::AbstractBcubeBackend) = nothing
+_get_element_offset(backend::AbstractBcubeBackend, offsets::Nothing, args...) = 0
+function _get_element_offset(
+    backend::AbstractBcubeBackend,
+    offsets::AbstractVector,
+    elementInfo,
+)
+    offsets[get_element_index(elementInfo)]
+end
+
 _bilinear_integration_type(a, U, V) = a(_null_operator(U), _null_operator(V))
 _linear_integration_type(a, V) = a(_null_operator(V))
 
@@ -119,12 +129,14 @@ function assemble_bilinear!(
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
 
+    offsets = _offsets_bilinear_contribution(U, V, domain, backend)
+
     # Loop over cells
     foreach_element(domain) do elementInfo
         λu, λv = blockmap_bilinear_shape_functions(U, V, elementInfo)
         g1 = materialize(f(λu, λv), elementInfo)
         values = integrate_on_ref_element(g1, elementInfo, quadrature)
-        _append_contribution!(X, I, J, U, V, values, elementInfo, domain, backend)
+        _append_contribution!(X, I, J, offsets, U, V, values, elementInfo, domain, backend)
     end
 
     return nothing
@@ -302,6 +314,7 @@ function _append_contribution!(
     X,
     I,
     J,
+    offsets,
     U,
     V,
     values,
@@ -315,7 +328,8 @@ function _append_contribution!(
     Udofs = get_dofs(U, icell, nU) # columns correspond to the TrialFunction
     Vdofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
     unwrapValues = _unwrap_cell_integrate(V, values)
-    _append_bilinear!(I, J, X, Vdofs, Udofs, unwrapValues, backend)
+    offset = _get_element_offset(backend, offsets, elementInfo)
+    _append_bilinear!(I, J, X, offset, Vdofs, Udofs, unwrapValues, backend)
     return nothing
 end
 
@@ -323,6 +337,7 @@ function _append_contribution!(
     X,
     I,
     J,
+    offsets,
     U,
     V,
     values,
@@ -350,12 +365,13 @@ function _append_contribution!(
     for (k, (row, col)) in enumerate(
         Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
     )
-        _append_bilinear!(I, J, X, row, col, unwrapValues[k], backend)
+        offset = _get_element_offset(backend, offsets, elementInfo)
+        _append_bilinear!(I, J, X, offset, row, col, unwrapValues[k], backend)
     end
     return nothing
 end
 
-function _append_bilinear!(I, J, X, row, col, vals, backend::BcubeBackendCPUSerial)
+function _append_bilinear!(I, J, X, offset, row, col, vals, backend::BcubeBackendCPUSerial)
     _rows, _cols = _cartesian_product(row, col)
     @assert length(_rows) == length(_cols) == sum(length, vals)
     append!(I, _rows)
@@ -366,6 +382,7 @@ function _append_bilinear!(
     I,
     J,
     X,
+    offset,
     row,
     col,
     vals::NullOperator,
@@ -379,6 +396,7 @@ function _append_bilinear!(
     I,
     J,
     X,
+    offset,
     row,
     col,
     vals::NullOperator,
