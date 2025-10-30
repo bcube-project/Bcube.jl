@@ -936,7 +936,7 @@ function foreach_element(f, domain::AbstractDomain)
     _foreach_element(f, domain, get_bcube_backend(domain))
 end
 
-function _foreach_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial)
+function _foreach_element(f, domain::AbstractDomain, backend::AbstractBcubeBackend)
     for subdomains in DomainIteratorByTags(domain)
         for subdomain in subdomains
             _foreach_element(f, domain, subdomain, backend)
@@ -949,7 +949,7 @@ function _foreach_element(
     f,
     domain::AbstractDomain,
     subdomain,
-    backend::BcubeBackendCPUSerial,
+    backend::AbstractBcubeBackend,
 )
     for elementInfo in SubDomainIterator(domain, subdomain)
         f(elementInfo)
@@ -978,7 +978,7 @@ function map_element(f, domain::AbstractDomain)
     _map_element(f, domain, get_bcube_backend(domain))
 end
 
-function _map_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial)
+function _map_element(f, domain::AbstractDomain, backend::AbstractBcubeBackend)
     mapreduce(vcat, DomainIteratorByTags(domain)) do subdomains
         mapreduce(vcat, subdomains) do subdomain
             _map_element(f, domain, subdomain, backend)
@@ -986,6 +986,6 @@ function _map_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial)
     end
 end
 
-function _map_element(f, domain::AbstractDomain, subdomain, backend::BcubeBackendCPUSerial)
+function _map_element(f, domain::AbstractDomain, subdomain, backend::AbstractBcubeBackend)
     map(f, SubDomainIterator(domain, subdomain))
 end
