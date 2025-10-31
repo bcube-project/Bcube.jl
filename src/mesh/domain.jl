@@ -28,16 +28,20 @@ Construct sub‑domains of a mesh grouped by cell type.
 
 # Returns
 A tuple of `SubDomain` objects, each containing:
-- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- a tag to identify groups of `SubDomain` (`tag=1` by default),
 - the cell type,
 - the list of indices belonging to that type.
 """
 function build_subdomains_by_celltypes(mesh, indices)
+    build_subdomains_by_celltypes(get_bcube_backend(mesh), mesh, indices)
+end
+
+function build_subdomains_by_celltypes(::AbstractBcubeBackend, mesh, indices)
     _ctypes = cells(mesh)[indices]
     ctypes = tuple(unique(_ctypes)...)
     indice_by_ctypes =
         map(ct -> indices[filter(i -> _ctypes[i] == ct, 1:length(indices))], ctypes)
-    return SubDomain.(nothing, ctypes, indice_by_ctypes)
+    return SubDomain.(1, ctypes, indice_by_ctypes)
 end
 
 """
@@ -51,18 +55,22 @@ Construct sub‑domains of a mesh grouped by face type (including adjacent cell 
 
 # Returns
 A tuple of `SubDomain` objects, each containing:
-- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- a tag to identify groups of `SubDomain` (`tag=1` by default),
 - a tuple `(face_type, cell_type₁, cell_type₂)` describing the face and its neighboring cells,
 - the list of indices belonging to that tuple.
 """
 function build_subdomains_by_facetypes(mesh, indices)
+    build_subdomains_by_facetypes(get_bcube_backend(mesh), mesh, indices)
+end
+
+function build_subdomains_by_facetypes(::AbstractBcubeBackend, mesh, indices)
     _ftypes = faces(mesh)[indices]
     f2c = [connectivities_indices(mesh, :f2c)[i] for i in indices]
     _ftypes = [(_ftypes[i], cells(mesh)[f2c[i]]...) for i in 1:length(_ftypes)]
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
         map(ft -> indices[filter(i -> _ftypes[i] == ft, 1:length(_ftypes))], ftypes)
-    return SubDomain.(nothing, ftypes, indice_by_ftypes)
+    return SubDomain.(1, ftypes, indice_by_ftypes)
 end
 
 """
@@ -77,7 +85,7 @@ Construct sub‑domains for periodic boundaries, grouped by face type (including
 
 # Returns
 A tuple of `SubDomain` objects, each containing:
-- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- a tag to identify groups of `SubDomain` (`tag=1` by default),
 - a tuple `(face_type, cell_type₁, cell_type₂)` describing the periodic face and its two neighboring cells,
 - the list of indices belonging to that tuple.
 """
@@ -92,7 +100,7 @@ function build_subdomains_periodic_by_facetypes(mesh, perio_cache)
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
         map(ft -> indices[filter(i -> all(_ftypes[i] .== ft), 1:length(_ftypes))], ftypes)
-    return SubDomain.(nothing, ftypes, indice_by_ftypes)
+    return SubDomain.(1, ftypes, indice_by_ftypes)
 end
 
 """
@@ -103,6 +111,9 @@ abstract type AbstractDomain{M <: AbstractMesh} end
 
 @inline get_subdomains(domain::AbstractDomain) = domain.subdomains
 @inline get_mesh(domain::AbstractDomain) = domain.mesh
+function get_nelements(domain::AbstractDomain)
+    mapreduce(length ∘ get_indices, +, get_subdomains(domain))
+end
 function indices(domain::AbstractDomain)
     reduce(vcat, map(get_indices, get_subdomains(domain)))
 end
@@ -153,7 +164,7 @@ CellDomain(mesh::AbstractMesh) = CellDomain(parent(mesh))
 CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
 function CellDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
     subdomains = build_subdomains_by_celltypes(mesh, indices)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     CellDomain(mesh, subdomains, tags)
 end
 
@@ -171,7 +182,7 @@ InteriorFaceDomain(mesh::AbstractMesh) = InteriorFaceDomain(parent(mesh))
 InteriorFaceDomain(mesh::Mesh) = InteriorFaceDomain(mesh, inner_faces(mesh))
 function InteriorFaceDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
     subdomains = build_subdomains_by_facetypes(mesh, indices)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     InteriorFaceDomain(mesh, subdomains, tags)
 end
 LazyOperators.pretty_name(domain::InteriorFaceDomain) = "InteriorFaceDomain"
@@ -185,7 +196,7 @@ end
 AllFaceDomain(mesh::AbstractMesh) = AllFaceDomain(mesh, 1:nfaces(mesh))
 function AllFaceDomain(mesh::AbstractMesh, indices)
     subdomains = build_subdomains_by_facetypes(mesh, indices)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     AllFaceDomain(mesh, subdomains, tags)
 end
 LazyOperators.pretty_name(domain::AllFaceDomain) = "AllFaceDomain"
@@ -212,7 +223,7 @@ function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
         _compute_periodicity(mesh, labels_master(bc), labels_slave(bc), transformation(bc))
     labels = unique(vcat(labels_master(bc)..., labels_slave(bc)...))
     subdomains = build_subdomains_periodic_by_facetypes(mesh, cache)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     BoundaryFaceDomain{
         typeof(mesh),
         typeof(bc),
@@ -368,7 +379,7 @@ function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol, Vararg{Symbol}})
     bc = nothing
     _labels = (; zip(labels, ntuple(i -> i, length(labels)))...) # store labels as keys of a namedtuple for make it isbits
     subdomains = build_subdomains_by_facetypes(mesh, bndfaces)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     BoundaryFaceDomain{
         typeof(mesh),
         typeof(bc),
@@ -986,6 +997,11 @@ function _map_element(f, domain::AbstractDomain, backend::AbstractBcubeBackend)
     end
 end
 
-function _map_element(f, domain::AbstractDomain, subdomain, backend::AbstractBcubeBackend)
+function _map_element(
+    f::F,
+    domain::D,
+    subdomain::SD,
+    backend::AbstractBcubeBackend,
+) where {F, D <: AbstractDomain, SD <: SubDomain}
     map(f, SubDomainIterator(domain, subdomain))
 end
