@@ -809,11 +809,17 @@ Base.repeat(a::SVector, ::Val{N}) where {N} = reduce(vcat, ntuple(i -> a, Val(N)
 
 """
     compute(integration::Integration)
+    compute(multi::MultiIntegration)
 
 Compute an integral, independently from a FEM/DG framework (i.e without FESpace)
 
 Return a `SparseVector`. The indices of the domain elements are used to store
 the result of the integration in this sparse vector.
+
+For MultiIntegration, it evaluates the sum of all integrals stored in `multi`, after checking that they
+are defined on the **same mesh instance** and the **same entity kind**
+(`cells` or `faces`). Subdomain overlaps are allowed and left to the user’s
+responsibility. Raises an error otherwise.
 
 # Example
 Compute volume of each cell and each face.
@@ -841,6 +847,7 @@ end
 
 _domain_to_mesh_nelts(domain::AbstractCellDomain) = ncells(get_mesh(domain))
 _domain_to_mesh_nelts(domain::AbstractFaceDomain) = nfaces(get_mesh(domain))
+
 """
     _check_domains_compatibility(multi::MultiIntegration) -> Bool
 
@@ -867,29 +874,12 @@ function _check_domains_compatibility(multi::MultiIntegration{N}) where {N}
     return false
 end
 
-"""
-    compute(multi::MultiIntegration)
-
-Evaluates the sum of all integrals stored in `multi`, after checking that they
-are defined on the **same mesh instance** and the **same entity kind**
-(`cells` or `faces`). Subdomain overlaps are allowed and left to the user’s
-responsibility. Raises an error otherwise.
-"""
 function compute(multi::MultiIntegration{N}) where {N}
-    # Trivial case
-    N == 1 && return compute(multi[Val(1)])
 
     # Compatibility checks (same mesh, same entity kind)
     @assert _check_domains_compatibility(multi) "Cannot sum integrals defined on different meshes or entities (cell/face)."
 
-    # Accumulate
-    acc = compute(multi[Val(1)])
-    for i in 2:N
-        tmp = compute(multi[Val(i)])
-        @assert length(tmp) == length(acc) "Incompatible measures (vector size mismatch)."
-        acc .+= tmp
-    end
-    return acc
+    return mapreduce(compute, +, multi)
 end
 """
     AbstractFaceSidePair{A} <: AbstractLazyWrap{A}

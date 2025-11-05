@@ -462,8 +462,8 @@
     @testset "MultiIntegration (compute) – valid cases" begin
         @testset "Cells: same mesh, f+g+h on Ω" begin
             mesh = line_mesh(6)
-            Ω    = CellDomain(mesh)
-            dΩ   = Measure(Ω, 2)
+            Ω = CellDomain(mesh)
+            dΩ = Measure(Ω, 2)
 
             f = PhysicalFunction(x -> 1.0)
             g = PhysicalFunction(x -> x[1])
