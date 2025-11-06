@@ -459,6 +459,67 @@
         @test sum(Bcube.compute(∫(f)dΩ2)) == 0.5
     end
 
+    @testset "MultiIntegration (compute) – valid cases" begin
+        @testset "Cells: same mesh, f+g+h on Ω" begin
+            mesh = line_mesh(6)
+            Ω = CellDomain(mesh)
+            dΩ = Measure(Ω, 2)
+
+            f = PhysicalFunction(x -> 1.0)
+            g = PhysicalFunction(x -> x[1])
+            h = PhysicalFunction(x -> x[1]^2)
+
+            intf = ∫(f)dΩ
+            intg = ∫(g)dΩ
+            inth = ∫(h)dΩ
+
+            res_f   = compute(intf)
+            res_g   = compute(intg)
+            res_h   = compute(inth)
+            res_sum = compute(intf + intg + inth)
+
+            @test maximum(abs.(res_sum .- (res_f .+ res_g .+ res_h))) < 1e-12
+        end
+
+        @testset "Interior faces: disjoint subdomains, f+g" begin
+            mesh = line_mesh(8)                   # 7 cells → faces intérieures présentes
+            idx  = collect(indices(InteriorFaceDomain(mesh)))
+            @test length(idx) >= 4                # garde-fou
+
+            Γ₁ = InteriorFaceDomain(mesh, idx[1:2])
+            Γ₂ = InteriorFaceDomain(mesh, idx[3:4])
+            dΓ₁ = Measure(Γ₁, 2)
+            dΓ₂ = Measure(Γ₂, 2)
+
+            f = PhysicalFunction(x -> 1.0)
+            g = PhysicalFunction(x -> x[1])
+
+            int₁ = ∫(side⁻(f))dΓ₁
+            int₂ = ∫(side⁻(g))dΓ₂
+
+            res1 = compute(int₁)
+            res2 = compute(int₂)
+            res_sum = compute(int₁ + int₂)
+
+            @test maximum(abs.(res_sum .- (res1 .+ res2))) < 1e-12
+        end
+    end
+    @testset "Invalid multiIntegration (must fail)" begin
+        @testset "Different meshes (must fail)" begin
+            mesh1, mesh2 = line_mesh(4), line_mesh(4)
+            dΩ1 = Measure(CellDomain(mesh1), 2)
+            dΩ2 = Measure(CellDomain(mesh2), 2)
+            f = PhysicalFunction(x -> 1.0)
+            @test_throws AssertionError compute(∫(f)dΩ1 + ∫(f)dΩ2)
+        end
+        @testset "Cells vs faces (must fail)" begin
+            mesh = line_mesh(4)
+            dΩ = Measure(CellDomain(mesh), 2)
+            dΓ = Measure(BoundaryFaceDomain(mesh), 2)
+            f = PhysicalFunction(x -> 1.0)
+            @test_throws AssertionError compute(∫(f)dΩ + ∫(side⁻(f))dΓ)
+        end
+    end
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials
