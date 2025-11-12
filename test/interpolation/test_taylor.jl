@@ -20,6 +20,8 @@
         @test λ(1) ≈ [1.0, 0.5]
         λ = Bcube.shape_functions_vec(fs, Val(1), shape, [0.0])
         @test λ == [1.0, 0.0]
+
+        @test Bcube.idof_by_volume(FunctionSpace(:Taylor, 0), Line()) == SA[1]
     end
 
     @testset "Square" begin
@@ -51,5 +53,7 @@
         @test λ[4]([0.0, 0.0]) == [0.0, 1.0]
         @test λ[5]([0.0, 0.0]) == [0.0, 0.0]
         @test λ[6]([0.0, 0.0]) == [0.0, 0.0]
+
+        @test Bcube.idof_by_volume(FunctionSpace(:Taylor, 0), Square()) == SA[1]
     end
 end
