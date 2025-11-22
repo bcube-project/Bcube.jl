@@ -76,12 +76,10 @@ function convert_to_lagrange_P1(mesh::AbstractMesh, data::MeshData{PointData})
     U = TrialFESpace(fs, mesh)
     dhl = _get_dhl(U)
     node2idof = zeros(Int, nnodes(mesh))
-    @show get_nodes(mesh)
     for cellInfo in DomainIterator(CellDomain(mesh))
         cshape = shape(celltype(cellInfo))
         icell = cellindex(cellInfo)
         c2n = get_nodes_index(cellInfo)
-        @show c2n
         for (ivertex_l, idofs_l) in enumerate(idof_by_vertex(fs, cshape))
             ivertex_g = c2n[ivertex_l]
             idof_g = get_dof(dhl, icell, 1, first(idofs_l)) # there is only one dof per vertex with Lagrange P1
