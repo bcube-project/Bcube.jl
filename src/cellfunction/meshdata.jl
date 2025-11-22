@@ -89,7 +89,7 @@ function convert_to_lagrange_P1(mesh::AbstractMesh, data::MeshData{PointData})
 
     # Filter to eliminate nodes belonging to no cell
     ind = findall(x -> x > 0, node2idof)
-    perm = node2idof[ind]
+    perm = invperm(node2idof[ind])
     vals = get_values(data)[ind]
 
     # Reorder the MeshPointData values to match the dof ordering

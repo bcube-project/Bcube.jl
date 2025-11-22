@@ -78,6 +78,6 @@
         data = MeshPointData([1, 2, 3, 4, 5])
         u = Bcube.convert_to_lagrange_P1(mesh, data)
 
-        @test get_dof_values(u) == [3, 4, 2, 3, 5]
+        @test get_dof_values(u) == [3, 4, 2, 5]
     end
 end
