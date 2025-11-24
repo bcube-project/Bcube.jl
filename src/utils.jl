@@ -200,3 +200,12 @@ end
 end
 @inline tuplemap(f, ::Tuple{}) = ()
 @inline tuplemap(f, ::Tuple{}, ::Tuple{}) = ()
+
+# temporary solution (API needed ?)
+function _solve!(x, A, b, backend::Bcube.AbstractBcubeBackend)
+    __solve!(x, A, b, get_backend(backend))
+end
+function __solve!(x, A, b, backend)
+    x .= A \ b
+    return nothing
+end

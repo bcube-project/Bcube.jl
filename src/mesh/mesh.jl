@@ -155,7 +155,6 @@ function Mesh(
     nodetypes = Node_t[Node_t() for i in 1:length(nodes)]
     entities = (cell = celltypes, node = nodetypes)
 
-    connectivities = Dict{Symbol, MeshConnectivity}()
     c2n = MeshConnectivity(:cell, :node, cell2node)
     connectivities = (c2n = c2n,)
 

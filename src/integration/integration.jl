@@ -178,10 +178,10 @@ struct Integrand{N, F}
     f::F
 end
 Integrand(f::Tuple) = Integrand{length(f), typeof(f)}(f)
-Integrand(f) = Integrand{1, typeof(f)}(f)
-get_function(integrand::Integrand) = integrand.f
+Integrand(f::F) where {F} = Integrand{1, typeof(f)}(f)
+get_function(integrand::T) where {T <: Integrand} = integrand.f
 Base.getindex(integrand::Integrand, i) = get_function(integrand)[i]
-@inline function Base.getindex(integrand::Integrand{N, F}, i) where {N, F <: Tuple}
+function Base.getindex(integrand::Integrand{N, F}, i) where {N, F <: Tuple}
     map(_f -> _f[i], get_function(integrand))
 end
 
@@ -200,8 +200,8 @@ struct Integration{I <: Integrand, M <: Measure}
     integrand::I
     measure::M
 end
-get_integrand(integration::Integration) = integration.integrand
-get_measure(integration::Integration) = integration.measure
+get_integrand(integration::T) where {T <: Integration} = integration.integrand
+get_measure(integration::T) where {T <: Integration} = integration.measure
 Base.getindex(integration::Integration, i) = get_integrand(integration)[i]
 
 """
@@ -211,7 +211,9 @@ Return the Bcube backend associated with the given `Integration` by delegating t
 """
 get_bcube_backend(integration::Integration) = get_bcube_backend(get_measure(integration))
 
-Base.:*(integrand::Integrand, measure::Measure) = Integration(integrand, measure)
+function Base.:*(integrand::I, measure::M) where {I <: Integrand, M <: Measure}
+    Integration(integrand, measure)
+end
 
 """
     *(a::Number, b::Integration)
@@ -277,6 +279,8 @@ end
 function MultiIntegration(a::Integration, b::Vararg{Integration, N}) where {N}
     MultiIntegration((a, b...))
 end
+
+get_measure(integration::MultiIntegration) = map(get_measure, integration.integrations)
 
 Base.getindex(a::MultiIntegration, ::Val{I}) where {I} = a.integrations[I]
 Base.iterate(a::MultiIntegration, i) = iterate(a.integrations, i)

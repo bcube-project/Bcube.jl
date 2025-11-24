@@ -257,9 +257,10 @@ function _minmax_on_face_periodic(
     c2nⱼ = c2n[j, Val(nnodes(ctypeⱼ))]
     c2nⱼ_perio = map(k -> get(bnd_n2n, k, k), c2nⱼ)
 
-    sideᵢ = cell_side(ctypeᵢ, c2nᵢ, bnd_f2n1[faceᵢⱼ])
+    nnodes_f = Val(nnodes(ftype))
+    sideᵢ = cell_side(ctypeᵢ, c2nᵢ, bnd_f2n1[faceᵢⱼ, nnodes_f])
     csᵢ = CellSide(i, sideᵢ, ctypeᵢ, cnodesᵢ, c2nᵢ)
-    sideⱼ = cell_side(ctypeⱼ, c2nⱼ, bnd_f2n2[faceᵢⱼ])
+    sideⱼ = cell_side(ctypeⱼ, c2nⱼ, bnd_f2n2[faceᵢⱼ, nnodes_f])
     csⱼ = CellSide(j, sideⱼ, ctypeⱼ, cnodesⱼ, c2nⱼ_perio)
 
     fp = FaceParametrization()
