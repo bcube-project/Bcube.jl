@@ -852,7 +852,7 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
     n2c, k = inverse_connectivity(c2n)
     inv_k = invperm(k)
     I_nodes_n2o = findall(inode -> any(view(hasCell, n2c[inv_k[inode]])), 1:nnodes(mesh))
-    I_nodes_o2n = zeros(eltype(I_nodes_n2o), 1:nnodes(mesh))
+    I_nodes_o2n = zeros(eltype(I_nodes_n2o), nnodes(mesh))
     I_nodes_o2n[I_nodes_n2o] .= collect(1:length(I_nodes_n2o))
 
     # Build a boolean array indicating if a given node belongs to the new mesh
