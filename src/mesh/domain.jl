@@ -318,13 +318,13 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
         end
     end
 
-    bnd_f2f = Dict{Int, Int}()
+    bnd_f2f = zeros(eltype(bndfaces2), length(f2c))
     for (i, iface) in enumerate(bndfaces2)
         bnd_f2f[iface] = i
     end
 
     # node to node relation
-    bnd_n2n = Dict{Int, Int}()
+    bnd_n2n = zeros(eltype(bndfaces2), length(f2c))
     for (_f2c, _f2n1, _f2n2) in zip(bnd_f2c, bnd_f2n1, bnd_f2n2)
         # distance between face center and adjacent cell center
         Δx = distance(center(get_nodes(mesh, c2n[_f2c[1]])), center(get_nodes(mesh, _f2n1)))
@@ -348,6 +348,10 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
             end
         end
     end
+
+    bnd_f2n1 = Connectivity(bnd_f2n1)
+    bnd_f2n2 = Connectivity(bnd_f2n2)
+    bnd_ftypes = convert_to_vector_of_union(bnd_ftypes)
 
     # Retain only relevant faces
     return (;
@@ -709,6 +713,13 @@ function Base.getindex(iter::SubDomainIterator, i)
     _get_index(iter.domain, iter.subdomain, i)
 end
 
+function Base.getindex(
+    iter::SubDomainIterator{<:D},
+    i,
+) where {D <: BoundaryFaceDomain{<:M, <:PeriodicBCType}} where {M}
+    _get_index(iter.domain, iter.subdomain, i)
+end
+
 function _get_index(domain::D, subdomain, i::Integer) where {D <: AbstractCellDomain}
     mesh = get_mesh(domain)
     ctype = get_elementtype(subdomain)
@@ -786,7 +797,8 @@ function _get_index(
     perio_cache = get_cache(domain)
     perio_trans = transformation(get_bc(domain))
 
-    icell1, icell2 = perio_cache.bnd_f2c[iface, :]
+    icell1 = perio_cache.bnd_f2c[iface, 1]
+    icell2 = perio_cache.bnd_f2c[iface, 2]
 
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
 
@@ -794,20 +806,22 @@ function _get_index(
     _c2n_j = c2n[icell2, nnodes_j]
     cnodes_j = get_nodes(mesh, _c2n_j) # to be removed when function barrier is used
     cnodes_j_perio = map(node -> Node(perio_trans(get_coords(node))), cnodes_j)
+
     # Build c2n for cell j with nodes indices taken from cell i
     # for those that are shared on the periodic BC:
     _c2n_j_perio = map(k -> get(perio_cache.bnd_n2n, k, k), _c2n_j)
     cellinfo2 = CellInfo(icell2, ctype2, cnodes_j_perio, _c2n_j_perio)
 
-    # Face info
-    fnodes = get_nodes(mesh, perio_cache.bnd_f2n1[iface])
+    # # Face info
+    nnodes_f = Val(nnodes(ftype))
+    fnodes = get_nodes(mesh, perio_cache.bnd_f2n1[iface, nnodes_f])
     cside_i = cell_side(
         celltype(cellinfo1),
         get_nodes_index(cellinfo1),
-        perio_cache.bnd_f2n1[iface],
+        perio_cache.bnd_f2n1[iface, nnodes_f],
     )
-    cside_j = cell_side(celltype(cellinfo2), _c2n_j, perio_cache.bnd_f2n2[iface])
-    _f2n = perio_cache.bnd_f2n1[iface]
+    cside_j = cell_side(celltype(cellinfo2), _c2n_j, perio_cache.bnd_f2n2[iface, nnodes_f])
+    _f2n = perio_cache.bnd_f2n1[iface, nnodes_f]
 
     return FaceInfo(
         cellinfo1,
@@ -943,11 +957,15 @@ ensuring that `f` receives the appropriate element information.
 # Returns
 `nothing`.
 """
-function foreach_element(f, domain::AbstractDomain)
+function foreach_element(f::F, domain::AbstractDomain) where {F <: Function}
     _foreach_element(f, domain, get_bcube_backend(domain))
 end
 
-function _foreach_element(f, domain::AbstractDomain, backend::AbstractBcubeBackend)
+function _foreach_element(
+    f::F,
+    domain::AbstractDomain,
+    backend::AbstractBcubeBackend,
+) where {F <: Function}
     for subdomains in DomainIteratorByTags(domain)
         for subdomain in subdomains
             _foreach_element(f, domain, subdomain, backend)
@@ -957,11 +975,11 @@ function _foreach_element(f, domain::AbstractDomain, backend::AbstractBcubeBacke
 end
 
 function _foreach_element(
-    f,
-    domain::AbstractDomain,
-    subdomain,
+    f::F,
+    domain::D,
+    subdomain::SD,
     backend::AbstractBcubeBackend,
-)
+) where {F <: Function, D <: AbstractDomain, SD <: Bcube.SubDomain}
     for elementInfo in SubDomainIterator(domain, subdomain)
         f(elementInfo)
     end
