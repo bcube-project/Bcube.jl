@@ -22,7 +22,7 @@ ForwardDiff = "0.10, 1"
 LinearSolve = "1, 2, 3"
 NearestNeighbors = "0.4"
 StaticArrays = "1.2"
-Symbolics = "5, 6"
+Symbolics = "5, 6, 7"
 julia = "1.8"
 
 [extras]
