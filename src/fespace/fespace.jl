@@ -66,6 +66,9 @@ end
 function get_dofs(feSpace::AbstractFESpace, icell::Int, n::Val{N}) where {N}
     get_dofs(parent(feSpace), icell, n)
 end
+function get_dofs(feSpace::AbstractFESpace, icell::Int, shape::AbstractShape)
+    get_dofs(feSpace, icell, Val(get_ndofs(feSpace, shape)))
+end
 
 """
 Return the dofs indices for the cell `icell`
@@ -447,10 +450,13 @@ This structure provides a global dof numbering for each FESpace.
 Note that the FESpace can be different from each other (one continous,
 one discontinuous; one scalar, one vector...)
 """
-struct MultiFESpace{N, FE <: Tuple{Vararg{AbstractFESpace, N}}} <:
-       AbstractMultiFESpace{N, FE}
+struct MultiFESpace{
+    N,
+    FE <: Tuple{Vararg{AbstractFESpace, N}},
+    Tm <: NTuple{N, AbstractVector{<:Integer}},
+} <: AbstractMultiFESpace{N, FE}
     feSpaces::FE
-    mapping::NTuple{N, Vector{Int}}
+    mapping::Tm
     arrayOfStruct::Bool
 end
 
@@ -473,6 +479,10 @@ function get_ndofs(mfeSpace::AbstractMultiFESpace)
     sum(feSpace -> get_ndofs(feSpace), get_fespace(mfeSpace))
 end
 
+function get_ndofs(mfeSpace::AbstractMultiFESpace, shape::AbstractShape)
+    sum(feSpace -> get_ndofs(feSpace, shape), get_fespace(mfeSpace))
+end
+
 """
     get_dofs(feSpace::MultiFESpace, icell::Int)
 
@@ -485,6 +495,10 @@ Combine `get_dofs` with `get_mapping` if global dofs indices are needed.
 """
 function get_dofs(feSpace::MultiFESpace, icell::Int)
     map(Base.Fix2(get_dofs, icell), get_fespace(feSpace))
+end
+
+function get_dofs(feSpace::MultiFESpace, icell::Int, shape::AbstractShape)
+    map(fe -> get_dofs(fe, icell, shape), get_fespace(feSpace))
 end
 
 function get_shape_functions(feSpace::MultiFESpace, shape::AbstractShape)
@@ -515,7 +529,11 @@ function _MultiFESpace(
         _build_mapping_SoA(feSpaces, ncells)
     end
 
-    return MultiFESpace{N, typeof(feSpaces)}(feSpaces, mapping, arrayOfStruct)
+    return MultiFESpace{N, typeof(feSpaces), typeof(mapping)}(
+        feSpaces,
+        mapping,
+        arrayOfStruct,
+    )
 end
 
 """

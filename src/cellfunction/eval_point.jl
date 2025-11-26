@@ -245,7 +245,7 @@ For a `domain` argument, the point is built from its firt element.
 These utility functions can be used to easily materialize
 a `CellFunction` and get the type of the result for example.
 """
-function get_dummy_element_point(elementInfo::AbstractDomainIndex)
+function get_dummy_element_point(elementInfo::E) where {E <: AbstractDomainIndex}
     x = center(shape(get_element_type(elementInfo)))
     ElementPoint(x, elementInfo, ReferenceDomain())
 end

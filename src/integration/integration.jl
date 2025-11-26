@@ -178,10 +178,10 @@ struct Integrand{N, F}
     f::F
 end
 Integrand(f::Tuple) = Integrand{length(f), typeof(f)}(f)
-Integrand(f) = Integrand{1, typeof(f)}(f)
-get_function(integrand::Integrand) = integrand.f
+Integrand(f::F) where {F} = Integrand{1, typeof(f)}(f)
+get_function(integrand::T) where {T <: Integrand} = integrand.f
 Base.getindex(integrand::Integrand, i) = get_function(integrand)[i]
-@inline function Base.getindex(integrand::Integrand{N, F}, i) where {N, F <: Tuple}
+function Base.getindex(integrand::Integrand{N, F}, i) where {N, F <: Tuple}
     map(_f -> _f[i], get_function(integrand))
 end
 
@@ -200,11 +200,20 @@ struct Integration{I <: Integrand, M <: Measure}
     integrand::I
     measure::M
 end
-get_integrand(integration::Integration) = integration.integrand
-get_measure(integration::Integration) = integration.measure
+get_integrand(integration::T) where {T <: Integration} = integration.integrand
+get_measure(integration::T) where {T <: Integration} = integration.measure
 Base.getindex(integration::Integration, i) = get_integrand(integration)[i]
 
-Base.:*(integrand::Integrand, measure::Measure) = Integration(integrand, measure)
+"""
+    get_bcube_backend(integration::Integration)
+
+Return the Bcube backend associated with the given `Integration` by delegating to its measure.
+"""
+get_bcube_backend(integration::Integration) = get_bcube_backend(get_measure(integration))
+
+function Base.:*(integrand::I, measure::M) where {I <: Integrand, M <: Measure}
+    Integration(integrand, measure)
+end
 
 """
     *(a::Number, b::Integration)
@@ -230,6 +239,13 @@ Soustraction on an `Integration` is treated as a multiplication by "(-1)" :
 Base.:-(a::Integration) = (-1) * a
 Base.:+(a::Integration) = a
 
+"""
+    MultiIntegration{N, I <: Tuple{Vararg{Integration, N}}}
+
+Container for multiple `Integration` objects. Stores a tuple `integrations` of length `N`,
+where each element is an `Integration`. Guarantees that all integrations share the same
+backend.
+"""
 struct MultiIntegration{N, I <: Tuple{Vararg{Integration, N}}}
     integrations::I
 end
@@ -256,15 +272,27 @@ function LazyOperators.show_lazy_operator(
 end
 
 function MultiIntegration(a::NTuple{N, <:Integration}) where {N}
+    backends = map(get_bcube_backend, a)
+    @assert all(b -> b == first(backends), backends) "All integration must share the same Bcube backend"
     MultiIntegration{length(a), typeof(a)}(a)
 end
 function MultiIntegration(a::Integration, b::Vararg{Integration, N}) where {N}
     MultiIntegration((a, b...))
 end
 
+get_measure(integration::MultiIntegration) = map(get_measure, integration.integrations)
+
 Base.getindex(a::MultiIntegration, ::Val{I}) where {I} = a.integrations[I]
 Base.iterate(a::MultiIntegration, i) = iterate(a.integrations, i)
 Base.iterate(a::MultiIntegration) = iterate(a.integrations)
+
+"""
+    get_bcube_backend(a::MultiIntegration)
+
+Return the Bcube backend associated with the given `MultiIntegration` by delegating to the first
+contained `Integration`. All integrations in a `MultiIntegration` are guaranteed to share the same backend.
+"""
+get_bcube_backend(a::MultiIntegration) = get_bcube_backend(first(a))
 
 # rewriting rules to deal with the additions of several `Integration`
 Base.:+(a::Integration, b::Integration) = MultiIntegration(a, b)

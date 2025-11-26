@@ -6,6 +6,13 @@ get_quadrature_type(::AbstractMeasure{D, Q}) where {D, Q} = Q
 get_domain(m::AbstractMeasure) = m.domain
 get_quadrature(m::AbstractMeasure) = m.quadrature
 
+"""
+    get_bcube_backend(m::AbstractMeasure)
+
+Retrieve the Bcube backend associated with the domain of the given measure.
+"""
+get_bcube_backend(m::AbstractMeasure) = get_bcube_backend(get_domain(m))
+
 function LazyOperators.pretty_name(m::AbstractMeasure)
     "Measure(domain = " *
     pretty_name(get_domain(m)) *
