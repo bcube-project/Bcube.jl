@@ -66,4 +66,18 @@
         l = compute(∫(side⁻(PhysicalFunction(x -> 1.0)))∂Ω)
         @test isapprox_arrays(a, l .^ 2 ./ 2; rtol = 1e-15)
     end
+
+    @testset "PointData" begin
+        # Note that the first node doesn't belong to any segment
+        nodes = [Node([1.0]), Node([2.0]), Node([3.0]), Node([4.0]), Node([5.0])]
+        celltypes = [Bar2_t(), Bar2_t(), Bar2_t()]
+        cell2node = Connectivity([2, 2, 2], [3, 4, 2, 3, 4, 5]) # note that the segment are not in natural order (to complexify)
+
+        mesh = Mesh(nodes, celltypes, cell2node)
+
+        data = MeshPointData([1, 2, 3, 4, 5])
+        u = Bcube.convert_to_lagrange_P1(mesh, data)
+
+        @test get_dof_values(u) == [3, 4, 2, 5]
+    end
 end

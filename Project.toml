@@ -1,7 +1,7 @@
 name = "Bcube"
 uuid = "cf06320b-b7f3-4748-8003-81a6b6979792"
-version = "0.3.1"
 authors = ["Ghislain Blanchard, Lokman Bennani and Maxime Bouyges"]
+version = "0.3.2"
 
 [deps]
 FEMQuad = "be8e8821-3f6f-54c2-987c-d2773c3a52cb"
