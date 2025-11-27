@@ -339,7 +339,13 @@ function _build_faces!(c2n::MeshConnectivity, celltypes)
     return _face_types, c2f, f2c, f2n
 end
 
-""" find boundary faces (all faces with only 1 adjacent cell) """
+"""
+    _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc_nodes)
+
+Find boundary faces (all faces with only 1 adjacent cell) from the face-to-node,
+face-to-cell connectivities, and the list of tagged nodes (i.e, list of the nodes
+belonging to each bc).
+"""
 function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc_nodes)
     @assert (bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
     @assert length(indices(f2n)) == length(indices(f2c)) "invalid f2n and/or f2c"
@@ -353,9 +359,13 @@ function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc
     # To ease nodes identification in `bc_nodes`, create,
     # for each bc, a vector of size `nnodes(mesh)` who tells
     # if each nodes belongs to the concerned BC
-    # Since we don't have access to `nnodes(mesh)` here, we compute
-    # using f2n
-    m = maximum(map(maximum, indices(f2n)))
+    # Rq 1: since we don't have access to `nnodes(mesh)` here, we compute
+    # using the functions arguments
+    # Rq 2: for element of order > 1, there might be "inside nodes", not included in "f2n",
+    # so we also check `bc_nodes`
+    max_f2n = maximum(map(maximum, indices(f2n)))
+    max_bc_nodes = maximum(map(maximum, values(bc_nodes)))
+    m = max(max_f2n, max_bc_nodes)
     node2bc = map(values(bc_nodes)) do _bc_nodes
         x = zeros(Bool, m)
         x[_bc_nodes] .= true
@@ -402,6 +412,7 @@ function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc
     return f2bc, bc_faces
 end
 
+""" Note : this function isn't actually used anywhere, see  _build_boundary_faces! instead"""
 function build_boundary_faces!(mesh::Mesh)
     @assert (mesh.bc_names ≠ nothing && mesh.bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
     @assert (mesh.bc_names ≠ nothing && mesh.bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
