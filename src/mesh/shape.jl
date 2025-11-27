@@ -1,4 +1,5 @@
 abstract type AbstractShape{dim} end
+topodim(::AbstractShape{dim}) where {dim} = dim
 
 struct Point <: AbstractShape{0} end
 struct Line <: AbstractShape{1} end
