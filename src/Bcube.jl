@@ -75,6 +75,7 @@ export FunctionSpace, get_degree
 
 include("./function_space/lagrange.jl")
 include("./function_space/taylor.jl")
+include("./function_space/shape_function_generator.jl")
 
 include("./mapping/mapping.jl")
 
