@@ -128,7 +128,7 @@ function FEFunction(
     # Alias
     dhl = Bcube._get_dhl(feSpace)
 
-    foreach_element(CellDomain(mesh)) do cinfo
+    foreach_element(CellDomain(mesh)) do cinfo, _, _
         # Cell infos
         icell = cellindex(cinfo)
         ctype = celltype(cinfo)
