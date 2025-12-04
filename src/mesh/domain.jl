@@ -12,6 +12,7 @@ struct SubDomain{A, E, I}
     tag::A
     elementType::E
     indices::I
+    offset::Int
 end
 get_tag(sdom::SubDomain) = sdom.tag
 get_indices(sdom::SubDomain) = sdom.indices
@@ -41,7 +42,8 @@ function build_subdomains_by_celltypes(::AbstractBcubeBackend, mesh, indices)
     ctypes = tuple(unique(_ctypes)...)
     indice_by_ctypes =
         map(ct -> indices[filter(i -> _ctypes[i] == ct, 1:length(indices))], ctypes)
-    return SubDomain.(1, ctypes, indice_by_ctypes)
+    offsets = cumulative_sum_exclusive(map(length, indice_by_ctypes))
+    return SubDomain.(1, ctypes, indice_by_ctypes, offsets)
 end
 
 """
@@ -70,7 +72,8 @@ function build_subdomains_by_facetypes(::AbstractBcubeBackend, mesh, indices)
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
         map(ft -> indices[filter(i -> _ftypes[i] == ft, 1:length(_ftypes))], ftypes)
-    return SubDomain.(1, ftypes, indice_by_ftypes)
+    offsets = cumulative_sum_exclusive(map(length, indice_by_ftypes))
+    return SubDomain.(1, ftypes, indice_by_ftypes, offsets)
 end
 
 """
@@ -100,7 +103,8 @@ function build_subdomains_periodic_by_facetypes(mesh, perio_cache)
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
         map(ft -> indices[filter(i -> all(_ftypes[i] .== ft), 1:length(_ftypes))], ftypes)
-    return SubDomain.(1, ftypes, indice_by_ftypes)
+    offsets = cumulative_sum_exclusive(map(length, indice_by_ftypes))
+    return SubDomain.(1, ftypes, indice_by_ftypes, offsets)
 end
 
 """
@@ -710,14 +714,8 @@ function Base.iterate(iter::SubDomainIterator, i::Integer = 1)
 end
 
 function Base.getindex(iter::SubDomainIterator, i)
-    _get_index(iter.domain, iter.subdomain, i)
-end
-
-function Base.getindex(
-    iter::SubDomainIterator{<:D},
-    i,
-) where {D <: BoundaryFaceDomain{<:M, <:PeriodicBCType}} where {M}
-    _get_index(iter.domain, iter.subdomain, i)
+    indexDomain = iter.subdomain.offset + i
+    _get_index(iter.domain, iter.subdomain, i), indexDomain, i
 end
 
 function _get_index(domain::D, subdomain, i::Integer) where {D <: AbstractCellDomain}
@@ -950,8 +948,9 @@ For each subdomain the lower‑level `foreach_element` overload is invoked,
 ensuring that `f` receives the appropriate element information.
 
 # Arguments
-- `f`: Callable to be applied to each element. `f` must capture the variables
-  that are modified during the loop.
+- `f(element, indexDomain, indexSubDomain)`: Callable to be applied
+  to each element. `f` must capture the variables that are modified
+  during the loop.
 - `domain::AbstractDomain`: The domain whose elements are processed.
 
 # Returns
@@ -980,8 +979,10 @@ function _foreach_element(
     subdomain::SD,
     backend::AbstractBcubeBackend,
 ) where {F <: Function, D <: AbstractDomain, SD <: Bcube.SubDomain}
-    for elementInfo in SubDomainIterator(domain, subdomain)
-        f(elementInfo)
+    indices = Bcube.get_indices(subdomain)
+    iter_subdomain = Bcube.SubDomainIterator(domain, subdomain)
+    for i in eachindex(indices)
+        f(iter_subdomain[i]...)
     end
     return nothing
 end

@@ -1,11 +1,10 @@
-_offsets_bilinear_contribution(U, V, domain, backend::AbstractBcubeBackend) = nothing
-_get_element_offset(backend::AbstractBcubeBackend, offsets::Nothing, args...) = 0
-function _get_element_offset(
-    backend::AbstractBcubeBackend,
-    offsets::AbstractVector,
-    elementInfo,
-)
-    offsets[get_element_index(elementInfo)]
+function _offsets_bilinear_contribution(U, V, domain, backend::AbstractBcubeBackend)
+    ndofs = zeros(Int, Bcube.get_nelements(domain))
+    foreach_element((e, i, _) -> _nnz_bilinear_by_element!(ndofs, i, e, U, V), domain)
+    offsets = accumulate(+, ndofs)
+    totalDof = last(offsets)
+    offset = vcat(0, offsets[1:(end - 1)])
+    return offset, totalDof
 end
 
 _bilinear_integration_type(a, U, V) = a(_null_operator(U), _null_operator(V))
@@ -26,19 +25,56 @@ end
 
 function allocate_bilinear(
     backend::BcubeBackendCPUSerial,
-    domain::Tuple{Vararg{AbstractDomain}},
+    domains::Tuple{Vararg{AbstractDomain}},
     U,
     V,
     T,
 )
-    # Prepare sparse matrix allocation
-    I = Int[]
-    J = Int[]
-    X = T[]
+    buffersize = sum(domains) do domain
+        ndofs = zeros(Int, Bcube.get_nelements(domain))
+        foreach_element(domain) do elt, i, _
+            _nnz_bilinear_by_element!(ndofs, i, elt, U, V)
+        end
+        sum(ndofs; init = zero(eltype(ndofs)))
+    end
 
-    # Pre-allocate I, J, X
-    n = sum(d -> _count_n_elts(U, V, d), domain)
-    foreach(Base.Fix2(sizehint!, n), (I, J, X))
+    I = ones(Int, buffersize)
+    J = ones(Int, buffersize)
+    X = zeros(T, buffersize)
+    return I, J, X
+end
+
+function _nnz_bilinear_by_element!(ndofs, i, elementInfo, U, V)
+    ndofs[i] = _nnz_bilinear_by_element(elementInfo, U, V)
+end
+
+function _nnz_bilinear_by_element(elementInfo::CellInfo, U, V)
+    nU = Bcube.get_ndofs(U, shape(Bcube.celltype(elementInfo)))
+    nV = Bcube.get_ndofs(V, shape(Bcube.celltype(elementInfo)))
+    return nU * nV
+end
+
+function _nnz_bilinear_by_element(elementInfo::FaceInfo, U, V)
+    cellInfo_n = get_cellinfo_n(elementInfo)
+    cellInfo_p = get_cellinfo_p(elementInfo)
+    nU_n = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_n)))
+    nV_n = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_n)))
+    kdofs = nU_n * nV_n
+
+    # boundary faces are skipped:
+    # if get_element_index(cellInfo_n) ≠ get_element_index(cellInfo_p)
+    nU_p = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_p)))
+    nV_p = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_p)))
+    kdofs += nU_n * nV_p + nU_p * nV_n + nU_p * nV_p
+    # end
+
+    return kdofs
+end
+
+function init_bilinear(backend::BcubeBackendCPUSerial, a, U, V, T)
+    I = zeros(Int, 0)
+    J = zeros(Int, 0)
+    X = zeros(T, 0)
     return I, J, X
 end
 
@@ -69,51 +105,47 @@ julia> assemble_bilinear(a, U, V)
   ⋅     ⋅    0.25   ⋅
   ⋅     ⋅     ⋅    0.25
 ```
+
+# Dev note
+- step 1: dispatch on `Integration`/`MultiIntegration` with `_assemble_bilinear!`
+- step 2: dispatch on `SingleFESpace`/`MultiFESpace` with `__assemble_bilinear!`
 """
 function assemble_bilinear(
     a::Function,
-    U::Union{TrialFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}}},
-    V::Union{TestFESpace, AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}}};
+    U::Union{TrialFESpace, AbstractMultiFESpace{N}},
+    V::Union{TestFESpace, AbstractMultiFESpace{N}};
     T = Float64,
 ) where {N}
     backend = get_bcube_backend(_bilinear_integration_type(a, U, V))
-
     I, J, X = allocate_bilinear(backend, a, U, V, T)
 
     # Compute
-    assemble_bilinear!(I, J, X, a, U, V, backend)
+    offset = assemble_bilinear!(I, J, X, a, U, V)
     nrows = get_ndofs(V)
     ncols = get_ndofs(U)
-    keep = (I .≠ 0)
-    return sparse(I[keep], J[keep], X[keep], nrows, ncols)
+    return sparse(I, J, X, nrows, ncols)
 end
 
-function assemble_bilinear!(I, J, X, a, U, V, backend::AbstractBcubeBackend)
-    return_type_a = _bilinear_integration_type(a, U, V)
-    _assemble_bilinear!(I, J, X, a, U, V, return_type_a, backend)
-    return nothing
+function assemble_bilinear!(
+    I::AbstractVector,
+    J::AbstractVector,
+    X::AbstractVector,
+    a::Function,
+    U::Union{TrialFESpace, AbstractMultiFESpace{N}},
+    V::Union{TestFESpace, AbstractMultiFESpace{N}},
+) where {N}
+    backend = get_bcube_backend(_bilinear_integration_type(a, U, V))
+    integration_type = _bilinear_integration_type(a, U, V)
+    offset = 0
+    offset = _assemble_bilinear!(I, J, X, offset, a, U, V, integration_type, backend)
+    return offset
 end
 
 function _assemble_bilinear!(
     I::AbstractVector,
     J::AbstractVector,
     X::AbstractVector,
-    a::F,
-    U,
-    V,
-    integration::Integration,
-    backend::AbstractBcubeBackend,
-) where {F <: Function}
-    f = get_function ∘ get_integrand ∘ a
-    measure = get_measure(integration)
-    assemble_bilinear!(I, J, X, f, measure, U, V, backend)
-    return nothing
-end
-
-function _assemble_bilinear!(
-    I::AbstractVector,
-    J::AbstractVector,
-    X::AbstractVector,
+    offset::Int,
     a::F,
     U,
     V,
@@ -123,9 +155,27 @@ function _assemble_bilinear!(
     for i in 1:N
         ival = Val(i)
         aᵢ(u, v) = a(u, v)[ival]
-        _assemble_bilinear!(I, J, X, aᵢ, U, V, multiIntegration[ival], backend)
+        integration = multiIntegration[ival]
+        offset = _assemble_bilinear!(I, J, X, offset, aᵢ, U, V, integration, backend)
     end
-    nothing
+    return offset
+end
+
+function _assemble_bilinear!(
+    I::AbstractVector,
+    J::AbstractVector,
+    X::AbstractVector,
+    offset::Int,
+    a::F,
+    U,
+    V,
+    integration::Integration,
+    backend::AbstractBcubeBackend,
+) where {F <: Function}
+    f = get_function ∘ get_integrand ∘ a
+    measure = get_measure(integration)
+    offset = __assemble_bilinear!(I, J, X, offset, f, measure, U, V, backend)
+    return offset
 end
 
 """
@@ -133,10 +183,11 @@ end
 
 In-place version of [`assemble_bilinear`](@ref).
 """
-function assemble_bilinear!(
+function __assemble_bilinear!(
     I,
     J,
     X,
+    offset0::Int,
     f::F,
     measure::Measure,
     U::TrialFESpace,
@@ -147,30 +198,31 @@ function assemble_bilinear!(
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
 
-    offsets = _offsets_bilinear_contribution(U, V, domain, backend)
+    offsets, nDofs = _offsets_bilinear_contribution(U, V, domain, backend)
 
     # Loop over cells
-    foreach_element(domain) do elementInfo
+    foreach_element(domain) do elementInfo, i, _
         λu, λv = blockmap_bilinear_shape_functions(U, V, elementInfo)
         g1 = materialize(f(λu, λv), elementInfo)
         values = integrate_on_ref_element(g1, elementInfo, quadrature)
-        _append_contribution!(X, I, J, offsets, U, V, values, elementInfo, domain, backend)
+        offset = offset0 + offsets[i]
+        _append_contribution!(X, I, J, offset, U, V, values, elementInfo, domain, backend)
     end
 
-    return nothing
+    return offset0 + nDofs
 end
 
-function assemble_bilinear!(
+function __assemble_bilinear!(
     I::AbstractVector,
     J::AbstractVector,
     X::AbstractVector,
+    offset::Int,
     f::F,
     measure::Measure,
     U::AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}},
     V::AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}},
     backend::AbstractBcubeBackend,
 ) where {F <: Function, N}
-    offset = 0
     # Loop over all combinations
     for (j, _U) in enumerate(U)
         for (i, _V) in enumerate(V)
@@ -194,14 +246,14 @@ function assemble_bilinear!(
         end
     end
 
-    return nothing
+    return offset
 end
 
 function assemble_bilinear_by_singleFE!(
     I::AbstractVector,
     J::AbstractVector,
     X::AbstractVector,
-    offset,
+    offset0::Int,
     valN::Val{VN},
     valI::Val{VI},
     valJ::Val{VJ},
@@ -222,26 +274,10 @@ function assemble_bilinear_by_singleFE!(
     end
 
     # Skip computation if there is nothing to compute
-    isa(_f(maywrap(_U), maywrap(_V)), NullOperator) && (return offset)
-
-    # Local indices / values
-    if backend isa BcubeBackendCPUSerial
-        _I = Int[]
-        _J = Int[]
-        n = _count_n_elts(U, V, get_domain(measure))
-        sizehint!.((_I, _J), n)
-        assemble_bilinear!(_I, _J, X, _f, measure, _U, _V, backend)
-        push!(I, get_mapping(V, VI)[_I]...)
-        push!(J, get_mapping(U, VJ)[_J]...)
-    else
-        _I, _J, _X = allocate_bilinear(backend, (get_domain(measure),), _U, _V, eltype(X))
-        assemble_bilinear!(_I, _J, _X, _f, measure, _U, _V, backend)
-        @assert length(_I) == length(_J) == length(_X) "invalid length"
-        I[(offset + 1):(offset + length(_I))] = get_mapping(V, VI)[_I]
-        J[(offset + 1):(offset + length(_J))] = get_mapping(U, VJ)[_J]
-        X[(offset + 1):(offset + length(_X))] = _X
-        offset += length(_I)
-    end
+    isa(_f(maywrap(_U), maywrap(_V)), NullOperator) && (return offset0)
+    offset = __assemble_bilinear!(I, J, X, offset0, _f, measure, _U, _V, backend)
+    I[(offset0 + 1):offset] = get_mapping(V, VI)[I[(offset0 + 1):offset]]
+    J[(offset0 + 1):offset] = get_mapping(U, VJ)[J[(offset0 + 1):offset]]
     return offset
 end
 
@@ -315,7 +351,7 @@ each `Integration` contained in the `MultiIntegration`
 function _assemble_linear!(b, l, V, integration::Integration, backend::AbstractBcubeBackend)
     f(v) = get_function(get_integrand(l(v)))
     measure = get_measure(integration)
-    __assemble_linear!(_may_reshape_b(b, V), f, V, measure, backend)
+    __assemble_linear!(b, f, V, measure, backend)
     return nothing
 end
 
@@ -349,7 +385,7 @@ and the for each item of this Tuple we LazyMapOver the shape functions.
 function __assemble_linear!(b, f, V, measure::Measure, backend::AbstractBcubeBackend)
     quadrature = get_quadrature(measure)
     domain = get_domain(measure)
-    foreach_element(domain) do elementInfo
+    foreach_element(domain) do elementInfo, _, _
         vₑ = blockmap_shape_functions(V, elementInfo)
         fᵥ = materialize(f(vₑ), elementInfo)
         values = integrate_on_ref_element(fᵥ, elementInfo, quadrature)
@@ -362,23 +398,13 @@ _null_operator(::AbstractFESpace) = NullOperator()
 _null_operator(::AbstractMultiFESpace{N}) where {N} = ntuple(i -> NullOperator(), Val(N))
 
 """
-For `AbstractMultiTestFESpace`, it creates a Tuple (of views) of the different
-"destination" in the vector: one for each FESpace
-"""
-_may_reshape_b(b::AbstractVector, V::TestFESpace) = b
-function _may_reshape_b(b::AbstractVector, V::AbstractMultiTestFESpace)
-    #ntuple(i -> view(b, get_mapping(V, i)), Val(get_n_fespace(V)))
-    b
-end
-
-"""
 bilinear case
 """
 function _append_contribution!(
     X,
     I,
     J,
-    offsets,
+    offset,
     U,
     V,
     values,
@@ -392,7 +418,6 @@ function _append_contribution!(
     Udofs = get_dofs(U, icell, nU) # columns correspond to the TrialFunction
     Vdofs = get_dofs(V, icell, nV) # lines correspond to the TestFunction
     unwrapValues = _unwrap_cell_integrate(V, values)
-    offset = _get_element_offset(backend, offsets, elementInfo)
     _append_bilinear!(I, J, X, offset, Vdofs, Udofs, unwrapValues, backend)
     return nothing
 end
@@ -401,7 +426,7 @@ function _append_contribution!(
     X,
     I,
     J,
-    offsets,
+    offset,
     U,
     V,
     values,
@@ -426,47 +451,33 @@ function _append_contribution!(
     col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
     row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
 
+    _offset = offset
     for (k, (row, col)) in enumerate(
         Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
     )
-        offset = _get_element_offset(backend, offsets, elementInfo)
-        _append_bilinear!(I, J, X, offset, row, col, unwrapValues[k], backend)
+        _offset = _append_bilinear!(I, J, X, _offset, row, col, unwrapValues[k], backend)
     end
     return nothing
 end
 
-function _append_bilinear!(I, J, X, offset, row, col, vals, backend::BcubeBackendCPUSerial)
-    _rows, _cols = _cartesian_product(row, col)
-    @assert length(_rows) == length(_cols) == sum(length, vals)
-    append!(I, _rows)
-    append!(J, _cols)
-    append!(X, vals...)
-end
-function _append_bilinear!(
-    I,
-    J,
-    X,
-    offset,
-    row,
-    col,
-    vals::NullOperator,
-    backend::AbstractBcubeBackend,
-)
-    nothing
-end
-
-#fix ambiguity:
-function _append_bilinear!(
-    I,
-    J,
-    X,
-    offset,
-    row,
-    col,
-    vals::NullOperator,
-    ::Bcube.BcubeBackendCPUSerial,
-)
-    nothing
+function _append_bilinear!(I, J, X, offset, row, col, vals, backend::AbstractBcubeBackend)
+    _rows, _cols = Bcube._cartesian_product(row, col)
+    for k in eachindex(_rows)
+        I[offset + k] = _rows[k]
+    end
+    for k in eachindex(_rows)
+        J[offset + k] = _cols[k]
+    end
+    k = 0
+    if !isa(vals, NullOperator)
+        for vi in vals
+            for vij in vi
+                k += 1
+                X[offset + k] += vij
+            end
+        end
+    end
+    return offset + length(_rows)
 end
 
 Base.getindex(::Bcube.LazyOperators.NullOperator, i) = NullOperator()
@@ -601,79 +612,6 @@ function __update_b!(
     backend::BcubeBackendCPUSerial,
 )
     nothing
-end
-
-"""
-    _count_n_elts(
-        U::TrialFESpace,
-        V::TestFESpace,
-        domain::CellDomain{M, IND},
-    ) where {M, IND}
-    function _count_n_elts(
-        U::AbstractMultiFESpace{N, Tu},
-        V::AbstractMultiFESpace{N, Tv},
-        domain::AbstractDomain,
-    ) where {N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}
-    function _count_n_elts(
-        U::TrialFESpace,
-        V::TestFESpace,
-        domain::BoundaryFaceDomain{M, BC, L, C},
-    ) where {M, BC, L, C}
-
-
-Count the (maximum) number of elements in the matrix corresponding to the bilinear assembly of U, V
-on a domain.
-
-# Arguments
-- `U::TrialFESpace` : TrialFESpace associated to the first argument of the bilinear form.
-- `V::TestFESpace` : TestFESpace associated to the second argument of the bilinear form.
-- `domain`::AbstractDomain : domain of integration of the bilinear form.
-
-# Warning
-TO DO: for the moment this function is not really implemented for a BoundaryFaceDomain.
-This requires to be able to distinguish between the usual TrialsFESpace and MultiplierFESpace.
-
-"""
-
-function _count_n_elts(
-    U::TrialFESpace,
-    V::TestFESpace,
-    domain::CellDomain{M, IND},
-) where {M, IND}
-    return sum(
-        icell -> length(get_dofs(U, icell)) * length(get_dofs(V, icell)),
-        indices(domain),
-    )
-end
-
-function _count_n_elts(
-    U::AbstractMultiFESpace{N, Tu},
-    V::AbstractMultiFESpace{N, Tv},
-    domain::AbstractDomain,
-) where {N, Tu <: Tuple{Vararg{TrialFESpace}}, Tv <: Tuple{Vararg{TestFESpace}}}
-    n = 0
-    for _U in U
-        for _V in V
-            n += _count_n_elts(_U, _V, domain)
-        end
-    end
-    return n
-end
-
-# todo
-function _count_n_elts(U::TrialFESpace, V::TestFESpace, domain::AbstractFaceDomain)
-    return 1
-end
-
-function _count_n_elts(U, V, a::Function)
-    integration = a(_null_operator(U), _null_operator(V))
-    _count_n_elts(U, V, integration)
-end
-function _count_n_elts(U, V, integration::Integration)
-    return _count_n_elts(U, V, get_domain(get_measure(integration)))
-end
-function _count_n_elts(U, V, integrations::MultiIntegration)
-    return sum(i -> _count_n_elts(U, V, i), integrations)
 end
 
 maywrap(x) = LazyWrap(x)

@@ -209,3 +209,13 @@ function __solve!(x, A, b, backend)
     x .= A \ b
     return nothing
 end
+
+function cumulative_sum_exclusive(a::AbstractVector)
+    b = accumulate(+, a)
+    return vcat(zero(eltype(b)), b[1:(end - 1)])
+end
+
+function cumulative_sum_exclusive(a::Tuple)
+    b = accumulate(+, a)
+    return (zero(eltype(b)), Base.front(b)...)
+end
