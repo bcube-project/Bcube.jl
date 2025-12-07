@@ -42,7 +42,7 @@ function build_subdomains_by_celltypes(::AbstractBcubeBackend, mesh, indices)
     ctypes = tuple(unique(_ctypes)...)
     indice_by_ctypes =
         map(ct -> indices[filter(i -> _ctypes[i] == ct, 1:length(indices))], ctypes)
-    offsets = cumulative_sum_exclusive(map(length, indice_by_ctypes))
+    offsets = cumsum_exclusive(map(length, indice_by_ctypes))
     return SubDomain.(1, ctypes, indice_by_ctypes, offsets)
 end
 
@@ -72,7 +72,7 @@ function build_subdomains_by_facetypes(::AbstractBcubeBackend, mesh, indices)
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
         map(ft -> indices[filter(i -> _ftypes[i] == ft, 1:length(_ftypes))], ftypes)
-    offsets = cumulative_sum_exclusive(map(length, indice_by_ftypes))
+    offsets = cumsum_exclusive(map(length, indice_by_ftypes))
     return SubDomain.(1, ftypes, indice_by_ftypes, offsets)
 end
 
@@ -103,7 +103,7 @@ function build_subdomains_periodic_by_facetypes(mesh, perio_cache)
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
         map(ft -> indices[filter(i -> all(_ftypes[i] .== ft), 1:length(_ftypes))], ftypes)
-    offsets = cumulative_sum_exclusive(map(length, indice_by_ftypes))
+    offsets = cumsum_exclusive(map(length, indice_by_ftypes))
     return SubDomain.(1, ftypes, indice_by_ftypes, offsets)
 end
 

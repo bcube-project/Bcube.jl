@@ -210,12 +210,18 @@ function __solve!(x, A, b, backend)
     return nothing
 end
 
-function cumulative_sum_exclusive(a::AbstractVector)
-    b = accumulate(+, a)
-    return vcat(zero(eltype(b)), b[1:(end - 1)])
+"""
+    cumsum_exclusive(a::AbstractVector)
+    cumsum_exclusive(a::Tuple)
+
+Return the cumlative sum, excluding the current element.
+"""
+function cumsum_exclusive(a::AbstractVector)
+    b = cumsum(a)[1:(end - 1)]
+    return vcat(zero(eltype(a)), b)
 end
 
-function cumulative_sum_exclusive(a::Tuple)
-    b = accumulate(+, a)
-    return (zero(eltype(b)), Base.front(b)...)
+function cumsum_exclusive(a::Tuple)
+    b = Base.front(cumsum(a))
+    return (zero(eltype(a)), b...)
 end
