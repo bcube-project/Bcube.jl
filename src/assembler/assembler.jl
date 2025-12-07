@@ -61,7 +61,7 @@ function _nnz_bilinear_by_element(elementInfo::FaceInfo, U, V)
     nV_n = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_n)))
     kdofs = nU_n * nV_n
 
-    # boundary faces are skipped:
+    # TODO : boundary faces can be skipped:
     # if get_element_index(cellInfo_n) ≠ get_element_index(cellInfo_p)
     nU_p = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_p)))
     nV_p = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_p)))

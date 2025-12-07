@@ -30,7 +30,6 @@ function PeriodicBCType(
     #`PeriodicBCType` is `isbits`
     _labelMaster = (; zip(map(Symbol, labelMaster), ntuple(identity, N + 1))...)
     _labelSlave = (; zip(map(Symbol, labelSlave), ntuple(identity, N + 1))...)
-    #    labels = (Symbol(labelMaster) = 1, Symbol(labelSlave) = 2)
     PeriodicBCType(transformation, _labelMaster, _labelSlave)
 end
 
