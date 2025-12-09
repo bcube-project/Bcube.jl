@@ -254,7 +254,7 @@ end
 """
     _assemble_bilinear!(I, J, X, offset, a, U, V, integration::Integration, backend)
 
-Internal assembly function that dispatches over a single integration domain.
+Internal assembly function that dispatches over a single integration.
 
 Extracts the function from the integrand and calls `__assemble_bilinear!` with the measure.
 """
