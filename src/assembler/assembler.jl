@@ -694,23 +694,19 @@ _recursive_unwrap(a) = unwrap(a)
 
 """
     _map_idofs(V::AbstractFESpace, idofs::SVector)
+    _map_idofs(V::AbstractMultiFESpace{N}, idofs::Tuple{Vararg{SVector, N}})
 
-Map DoF indices for a single finite element space (identity operation).
+Map DoF indices for a single or multi FESpace.
 
-For single spaces, returns the indices unchanged.
+For single spaces, returns the indices unchanged. For multifespaces, the mapping
+of each FESpace is used.
 """
 _map_idofs(V::AbstractFESpace, idofs::SVector) = idofs
 
-"""
-    _map_idofs(V::AbstractMultiFESpace{N}, idofs::Tuple{Vararg{SVector, N}})
-
-Map DoF indices for a multi-space, applying component-wise mappings.
-
-Uses the space's global DoF mappings to renumber local DoFs to global indices.
-"""
 function _map_idofs(V::AbstractMultiFESpace{N}, idofs::Tuple{Vararg{SVector, N}}) where {N}
     __map_idofs(get_mapping(V), idofs)
 end
+
 """
     __map_idofs(mappings::Tuple{Vararg{AbstractArray, N}}, idofs::Tuple{Vararg{SVector, N}})
 
@@ -751,6 +747,7 @@ function _update_b!(
     unwrapValues = _unwrap_cell_integrate(V, values)
     __update_b!(b, _idofs, unwrapValues, backend)
 end
+
 """
     _unwrap_cell_integrate(::TestFESpace, a)
     _unwrap_cell_integrate(::AbstractMultiTestFESpace, a)
@@ -802,6 +799,7 @@ function _update_b!(
         __update_b!(b, jdofs, values_j, backend)
     end
 end
+
 """
     _unwrap_face_integrate(::Union{TestFESpace, AbstractMultiTestFESpace}, a)
 
@@ -929,6 +927,7 @@ end
 @generated function _get_tuple_var1(n::Val{N}, k::Val{K}, x::X, y::Y) where {N, K, X, Y}
     _get_tuple_var1_impl(N, K)
 end
+
 """
     _get_tuple_var(λ::Tuple, k)
     _get_tuple_var(λ, k)
@@ -985,23 +984,10 @@ The result can be seen as a dense diagonal-like array using tuple.
     _get_all_tuple_var_impl(N)
 end
 
-"""
-    _diag_tuples(n::Val{N}, ::Val{i}, a, b)
-
-Get the i-th diagonal-like tuple from the diag_tuples structure.
-
-Selects the i-th row of the N×N diagonal-like tuple structure.
-"""
 function _diag_tuples(n::Val{N}, ::Val{i}, a, b) where {N, i}
     _diag_tuples(ntuple(k -> a, n), b)[i]
 end
 
-"""
-For N=3 for example:
-    (LazyMapOver((LazyMapOver(V[1]), NullOperator(),  NullOperator())),
-     LazyMapOver((NullOperator(),  LazyMapOver(V[2]), NullOperator())),
-     LazyMapOver((NullOperator(),  NullOperator(),  LazyMapOver(V[3]))))
-"""
 """
     _get_multi_tuple_var(V::Tuple{Vararg{Any, N}})
     _get_multi_tuple_var(a::LazyMapOver)
@@ -1010,6 +996,11 @@ Create block-diagonal tuple structure for multi-space shape functions.
 
 For use in MultiFESpace assembly, where each component space is
 mapped in a diagonal block pattern with NullOperators elsewhere.
+
+For N=3 for example:
+    (LazyMapOver((LazyMapOver(V[1]), NullOperator(),  NullOperator())),
+     LazyMapOver((NullOperator(),  LazyMapOver(V[2]), NullOperator())),
+     LazyMapOver((NullOperator(),  NullOperator(),  LazyMapOver(V[3]))))
 """
 function _get_multi_tuple_var(V::Tuple{Vararg{Any, N}}) where {N}
     map(LazyMapOver, _diag_tuples(map(LazyMapOver, V), NullOperator()))
@@ -1109,6 +1100,14 @@ function _cellpair_blockmap_shape_functions(
 end
 
 """
+    blockmap_bilinear_shape_functions(
+        U::AbstractFESpace,
+        V::AbstractFESpace,
+        cellinfo::AbstractCellInfo,
+    )
+
+Return block-mapped bilinear shape functions for trial and test spaces on a cell.
+
 # Dev notes:
 Return `blockU` and `blockV` to be able to compute
 the local matrix corresponding to the bilinear form :
@@ -1127,15 +1126,6 @@ the lazy-map-over matrices :
     ∀k, blockU[k,j] = λᵤ[j],
         blockV[i,k] = λᵥ[i]
 ```
-"""
-"""
-    blockmap_bilinear_shape_functions(U::AbstractFESpace, V::AbstractFESpace,
-                                      cellinfo::AbstractCellInfo)
-
-Return block-mapped bilinear shape functions for trial and test spaces on a cell.
-
-Creates lazy-wrapped structures suitable for evaluating bilinear forms:
-`A[i,j] = a(λᵤ[j], λᵥ[i])` in block form.
 """
 function blockmap_bilinear_shape_functions(
     U::AbstractFESpace,
@@ -1196,6 +1186,8 @@ function blockmap_bilinear_shape_functions(
 end
 
 """
+    _blockmap_bilinear(a::NTuple{N1}, b::NTuple{N2})
+
 From tuples ``a=(a_1, a_2, …, a_i, …, a_m)`` and ``b=(b_1, b_2, …, b_j, …, b_n)``,
 it builds `A` and `B` which correspond formally to the following two matrices :
 ```math
@@ -1223,14 +1215,6 @@ Both `A` and `B` are stored as a tuple of tuples, wrapped by `LazyMapOver`, wher
 inner tuples correspond to each columns of a matrix.
 This hierarchical structure reduces both inference and compile times by avoiding the use of large tuples.
 """
-"""
-    _blockmap_bilinear(a::NTuple{N1}, b::NTuple{N2})
-
-Create block-diagonal lazy-mapped bilinear structure from tuple pairs.
-
-Returns two LazyMapOver structures `A` and `B` such that `A[i,j] = a[i]`
-and `B[i,j] = b[j]`, forming implicit dense diagonal-like matrices.
-"""
 function _blockmap_bilinear(a::NTuple{N1}, b::NTuple{N2}) where {N1, N2}
     _a = ntuple(j -> begin
         LazyMapOver(ntuple(i -> a[i], Val(N1)))
@@ -1243,8 +1227,9 @@ end
 
 """
     _cartesian_product(a::NTuple{N1}, b::NTuple{N2})
+    _cartesian_product(a::SVector{N1}, b::SVector{N2})
 
-Compute the Cartesian product of two tuples.
+Compute the Cartesian product of two tuples or static vectors.
 
 Returns two tuples where the first contains all combinations from `a` repeated,
 and the second contains all combinations from `b` with proper ordering.
@@ -1253,14 +1238,7 @@ function _cartesian_product(a::NTuple{N1}, b::NTuple{N2}) where {N1, N2}
     _a, _b = _cartesian_product(SVector{N1}(a), SVector{N2}(b))
     Tuple(_a), Tuple(_b)
 end
-"""
-    _cartesian_product(a::SVector{N1}, b::SVector{N2})
 
-Compute the Cartesian product of two static vectors.
-
-Efficiently creates the row and column index patterns for Cartesian product
-using repetition and permutation.
-"""
 function _cartesian_product(a::SVector{N1}, b::SVector{N2}) where {N1, N2}
     # Return `_a` and `__b` defined as :
     # _a = SVector{N1 * N2}(a[i] for i in 1:N1, j in 1:N2)
@@ -1316,18 +1294,11 @@ _domain_to_mesh_nelts(domain::AbstractFaceDomain) = nfaces(get_mesh(domain))
 """
     AbstractFaceSidePair{A} <: AbstractLazyWrap{A}
 
-# Interface:
-* `side_n(a::AbstractFaceSidePair)`
-* `side_p(a::AbstractFaceSidePair)`
-"""
-"""
-    AbstractFaceSidePair{A} <: AbstractLazyWrap{A}
-
 Abstract base type for wrapping shape functions on face pairs (two sides of a face).
 
 # Interface:
-* `side_n(a::AbstractFaceSidePair)` - Extract shape functions from negative side
-* `side_p(a::AbstractFaceSidePair)` - Extract shape functions from positive side
+* `side_n(a::AbstractFaceSidePair)`
+* `side_p(a::AbstractFaceSidePair)`
 """
 abstract type AbstractFaceSidePair{A} <: AbstractLazyWrap{A} end
 LazyOperators.get_args(a::AbstractFaceSidePair) = a.data
@@ -1353,65 +1324,22 @@ Construct a FaceSidePair from two arguments.
 FaceSidePair(a, b) = FaceSidePair((a, b))
 LazyOperators.pretty_name(::FaceSidePair) = "FaceSidePair"
 
-"""
-    side_n(a::FaceSidePair)
-
-Extract shape functions from the negative side of a face.
-
-Returns a Side⁻ wrapped LazyMapOver with the first component and NullOperators for others.
-"""
 side_n(a::FaceSidePair) = Side⁻(LazyMapOver((a.data[1], NullOperator())))
-
-"""
-    side_p(a::FaceSidePair)
-
-Extract shape functions from the positive side of a face.
-
-Returns a Side⁺ wrapped LazyMapOver with the second component and NullOperators for others.
-"""
 side_p(a::FaceSidePair) = Side⁺(LazyMapOver((NullOperator(), a.data[2])))
 
-"""
-    LazyOperators.materialize(a::FaceSidePair, cPoint::CellPoint)
-
-Materialize a FaceSidePair at a cell point.
-
-Evaluates both sides of the pair at the given point and returns a MapOver structure.
-"""
 function LazyOperators.materialize(a::FaceSidePair, cPoint::CellPoint)
     _a = (materialize(a.data[1], cPoint), materialize(a.data[2], cPoint))
     return MapOver(_a)
 end
 
-"""
-    LazyOperators.materialize(a::FaceSidePair, side::Side⁻{Nothing, <:Tuple{FaceInfo}})
-
-Materialize a FaceSidePair on the negative side of a face.
-
-Extracts only the negative side data and materializes it.
-"""
 function LazyOperators.materialize(a::FaceSidePair, side::Side⁻{Nothing, <:Tuple{FaceInfo}})
     return FaceSidePair(materialize(a.data[1], side), NullOperator())
 end
 
-"""
-    LazyOperators.materialize(a::FaceSidePair, side::Side⁺{Nothing, <:Tuple{FaceInfo}})
-
-Materialize a FaceSidePair on the positive side of a face.
-
-Extracts only the positive side data and materializes it.
-"""
 function LazyOperators.materialize(a::FaceSidePair, side::Side⁺{Nothing, <:Tuple{FaceInfo}})
     return FaceSidePair(NullOperator(), materialize(a.data[2], side))
 end
 
-"""
-    LazyOperators.materialize(a::FaceSidePair, side::Side⁻{Nothing, <:Tuple{FacePoint}})
-
-Materialize a FaceSidePair on the negative side at a face point.
-
-Extracts and materializes the negative side data in a MapOver structure.
-"""
 function LazyOperators.materialize(
     a::FaceSidePair,
     side::Side⁻{Nothing, <:Tuple{FacePoint}},
@@ -1419,13 +1347,6 @@ function LazyOperators.materialize(
     return MapOver(materialize(a.data[1], side), NullOperator())
 end
 
-"""
-    LazyOperators.materialize(a::FaceSidePair, side::Side⁺{Nothing, <:Tuple{FacePoint}})
-
-Materialize a FaceSidePair on the positive side at a face point.
-
-Extracts and materializes the positive side data in a MapOver structure.
-"""
 function LazyOperators.materialize(
     a::FaceSidePair,
     side::Side⁺{Nothing, <:Tuple{FacePoint}},
@@ -1433,14 +1354,6 @@ function LazyOperators.materialize(
     return MapOver(NullOperator(), materialize(a.data[2], side))
 end
 
-"""
-    LazyOperators.materialize(a::Gradient{O, <:Tuple{AbstractFaceSidePair}},
-                              point::AbstractSide{Nothing, <:Tuple{FacePoint}}) where {O}
-
-Materialize the gradient of a FaceSidePair at a face point.
-
-Applies the side operator to extract the appropriate side data, then computes the gradient.
-"""
 function LazyOperators.materialize(
     a::Gradient{O, <:Tuple{AbstractFaceSidePair}},
     point::AbstractSide{Nothing, <:Tuple{FacePoint}},
@@ -1467,14 +1380,6 @@ get_args(a::AbstractBilinearFaceSidePair) = a.data
 get_basetype(a::AbstractBilinearFaceSidePair) = get_basetype(typeof(a))
 get_basetype(::Type{<:AbstractBilinearFaceSidePair}) = error("To be defined")
 
-"""
-    LazyOperators.materialize(a::AbstractBilinearFaceSidePair,
-                              point::AbstractSide{Nothing, <:Tuple{FacePoint}})
-
-Materialize a bilinear face side pair at a face point.
-
-Maps the materialize operation over all stored data and returns a MapOver structure.
-"""
 function LazyOperators.materialize(
     a::AbstractBilinearFaceSidePair,
     point::AbstractSide{Nothing, <:Tuple{FacePoint}},
@@ -1483,14 +1388,6 @@ function LazyOperators.materialize(
     return MapOver(args)
 end
 
-"""
-    LazyOperators.materialize(a::Gradient{Nothing, <:Tuple{AbstractBilinearFaceSidePair}},
-                              point::AbstractSide{Nothing, <:Tuple{FacePoint}})
-
-Materialize the gradient of a bilinear face side pair at a face point.
-
-Applies the side operator to extract the appropriate data, then computes the gradient.
-"""
 function LazyOperators.materialize(
     a::Gradient{Nothing, <:Tuple{AbstractBilinearFaceSidePair}},
     point::AbstractSide{Nothing, <:Tuple{FacePoint}},
@@ -1500,14 +1397,6 @@ function LazyOperators.materialize(
     return materialize(∇(args), point)
 end
 
-"""
-    LazyOperators.materialize(a::AbstractBilinearFaceSidePair,
-                              side::AbstractSide{Nothing, <:Tuple{FaceInfo}})
-
-Materialize a bilinear face side pair at a face info.
-
-Maps materialize over all data and wraps in the appropriate concrete type.
-"""
 function LazyOperators.materialize(
     a::AbstractBilinearFaceSidePair,
     side::AbstractSide{Nothing, <:Tuple{FaceInfo}},
@@ -1536,24 +1425,10 @@ BilinearTrialFaceSidePair(a...) = BilinearTrialFaceSidePair(a)
 LazyOperators.pretty_name(::BilinearTrialFaceSidePair) = "BilinearTrialFaceSidePair"
 get_basetype(::Type{<:BilinearTrialFaceSidePair}) = BilinearTrialFaceSidePair
 
-"""
-    side_n(a::BilinearTrialFaceSidePair)
-
-Extract trial functions from the negative side.
-
-Returns shape functions for (nn, pn) combinations.
-"""
 function side_n(a::BilinearTrialFaceSidePair)
     Side⁻(LazyMapOver((a.data[1], a.data[2], NullOperator(), NullOperator())))
 end
 
-"""
-    side_p(a::BilinearTrialFaceSidePair)
-
-Extract trial functions from the positive side.
-
-Returns shape functions for (np, pp) combinations.
-"""
 function side_p(a::BilinearTrialFaceSidePair)
     Side⁺(LazyMapOver((NullOperator(), NullOperator(), a.data[3], a.data[4])))
 end
@@ -1578,24 +1453,10 @@ BilinearTestFaceSidePair(a...) = BilinearTestFaceSidePair(a)
 LazyOperators.pretty_name(::BilinearTestFaceSidePair) = "BilinearTestFaceSidePair"
 get_basetype(::Type{<:BilinearTestFaceSidePair}) = BilinearTestFaceSidePair
 
-"""
-    side_n(a::BilinearTestFaceSidePair)
-
-Extract test functions from the negative side.
-
-Returns shape functions for (nn, np) combinations.
-"""
 function side_n(a::BilinearTestFaceSidePair)
     Side⁻(LazyMapOver((a.data[1], NullOperator(), a.data[3], NullOperator())))
 end
 
-"""
-    side_p(a::BilinearTestFaceSidePair)
-
-Extract test functions from the positive side.
-
-Returns shape functions for (pn, pp) combinations.
-"""
 function side_p(a::BilinearTestFaceSidePair)
     Side⁺(LazyMapOver((NullOperator(), a.data[2], NullOperator(), a.data[4])))
 end
