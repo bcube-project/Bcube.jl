@@ -92,7 +92,7 @@ end
     _nnz_bilinear_by_element!(ndofs, i, elementInfo, U, V)
 
 Compute and store the number of nonzero entries for the bilinear form
-on element `i` by trial space `U` and test space `V`.
+on domain `i` for element `elementInfo` by trial space `U` and test space `V`.
 """
 function _nnz_bilinear_by_element!(ndofs, i, elementInfo, U, V)
     ndofs[i] = _nnz_bilinear_by_element(elementInfo, U, V)
