@@ -276,9 +276,20 @@ function _assemble_bilinear!(
 end
 
 """
-    assemble_bilinear!(I, J, X, f, measure::Measure, U::TrialFESpace, V::TestFESpace, backend::BcubeBackendCPUSerial)
+    __assemble_bilinear!(
+        I,
+        J,
+        X,
+        offset0::Int,
+        f::F,
+        measure::Measure,
+        U::TrialFESpace,
+        V::TestFESpace,
+        backend::AbstractBcubeBackend,
+    ) where {F <: Function}
 
-In-place version of [`assemble_bilinear`](@ref).
+
+Perform assembly of a bilinear form (function `f` integrated on the `measure`).
 """
 function __assemble_bilinear!(
     I,
@@ -310,7 +321,17 @@ function __assemble_bilinear!(
 end
 
 """
-    __assemble_bilinear!(I, J, X, offset, f, measure, U::AbstractMultiFESpace, V::AbstractMultiFESpace, backend)
+    __assemble_bilinear!(
+        I::AbstractVector,
+        J::AbstractVector,
+        X::AbstractVector,
+        offset::Int,
+        f::F,
+        measure::Measure,
+        U::AbstractMultiFESpace{N, <:Tuple{Vararg{TrialFESpace, N}}},
+        V::AbstractMultiFESpace{N, <:Tuple{Vararg{TestFESpace, N}}},
+        backend::AbstractBcubeBackend,
+    ) where {F <: Function, N}
 
 Assemble bilinear form over all combinations of component spaces in MultiFESpaces.
 
@@ -355,12 +376,30 @@ function __assemble_bilinear!(
 end
 
 """
-    assemble_bilinear_by_singleFE!(I, J, X, offset0, valN, valI, valJ, f, measure, U, V, _U, _V, backend)
+    assemble_bilinear_by_singleFE!(
+        I::AbstractVector,
+        J::AbstractVector,
+        X::AbstractVector,
+        offset0::Int,
+        valN::Val{VN},
+        valI::Val{VI},
+        valJ::Val{VJ},
+        f::F,
+        measure::Measure,
+        U,
+        V,
+        _U,
+        _V,
+        backend::AbstractBcubeBackend,
+    ) where {VN, VI, VJ, F <: Function}
 
 Assemble bilinear form for a specific pair of component spaces in a MultiFESpace.
 
 Constructs the appropriate function materialization for the component spaces,
 and performs assembly, then maps the resulting indices back to the global numbering.
+
+`U` is the initial multi TrialFESpace, while `_U` is one of the single TrialFESpace
+composing `U`. The same goes with `V` vs `_V`
 """
 function assemble_bilinear_by_singleFE!(
     I::AbstractVector,
@@ -519,9 +558,6 @@ For single spaces, returns a `NullOperator()`. For multi spaces, returns a tuple
 _null_operator(::AbstractFESpace) = NullOperator()
 _null_operator(::AbstractMultiFESpace{N}) where {N} = ntuple(i -> NullOperator(), Val(N))
 
-"""
-bilinear case
-"""
 """
     _append_contribution!(X, I, J, offset, U, V, values, elementInfo::CellInfo, domain, backend)
 
