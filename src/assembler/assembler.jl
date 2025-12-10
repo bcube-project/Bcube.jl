@@ -61,21 +61,14 @@ function _nnz_bilinear_by_element(elementInfo::FaceInfo, U, V)
     nV_n = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_n)))
     kdofs = nU_n * nV_n
 
-    # TODO : boundary faces can be skipped:
-    # if get_element_index(cellInfo_n) ≠ get_element_index(cellInfo_p)
-    nU_p = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_p)))
-    nV_p = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_p)))
-    kdofs += nU_n * nV_p + nU_p * nV_n + nU_p * nV_p
-    # end
+    # skip boundary faces:
+    if get_element_index(cellInfo_n) ≠ get_element_index(cellInfo_p)
+        nU_p = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_p)))
+        nV_p = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_p)))
+        kdofs += nU_n * nV_p + nU_p * nV_n + nU_p * nV_p
+    end
 
     return kdofs
-end
-
-function init_bilinear(backend::BcubeBackendCPUSerial, a, U, V, T)
-    I = zeros(Int, 0)
-    J = zeros(Int, 0)
-    X = zeros(T, 0)
-    return I, J, X
 end
 
 """
@@ -120,7 +113,7 @@ function assemble_bilinear(
     I, J, X = allocate_bilinear(backend, a, U, V, T)
 
     # Compute
-    offset = assemble_bilinear!(I, J, X, a, U, V)
+    assemble_bilinear!(I, J, X, a, U, V)
     nrows = get_ndofs(V)
     ncols = get_ndofs(U)
     return sparse(I, J, X, nrows, ncols)
@@ -469,15 +462,26 @@ function _append_bilinear!(I, J, X, offset, row, col, vals, backend::AbstractBcu
         J[offset + k] = _cols[k]
     end
     k = 0
-    if !isa(vals, NullOperator)
-        for vi in vals
-            for vij in vi
-                k += 1
-                X[offset + k] += vij
-            end
+    for vi in vals
+        for vij in vi
+            k += 1
+            X[offset + k] += vij
         end
     end
     return offset + length(_rows)
+end
+
+function _append_bilinear!(
+    I,
+    J,
+    X,
+    offset,
+    row,
+    col,
+    vals::NullOperator,
+    backend::AbstractBcubeBackend,
+)
+    return offset
 end
 
 Base.getindex(::Bcube.LazyOperators.NullOperator, i) = NullOperator()
