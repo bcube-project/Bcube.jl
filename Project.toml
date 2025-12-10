@@ -1,7 +1,7 @@
 name = "Bcube"
 uuid = "cf06320b-b7f3-4748-8003-81a6b6979792"
-authors = ["Ghislain Blanchard, Lokman Bennani and Maxime Bouyges"]
 version = "0.3.2"
+authors = ["Ghislain Blanchard, Lokman Bennani and Maxime Bouyges"]
 
 [deps]
 FEMQuad = "be8e8821-3f6f-54c2-987c-d2773c3a52cb"
@@ -22,7 +22,7 @@ ForwardDiff = "0.10, 1"
 LinearSolve = "1, 2, 3"
 NearestNeighbors = "0.4"
 StaticArrays = "1.2"
-Symbolics = "5, 6"
+Symbolics = "5, 6, 7"
 julia = "1.8"
 
 [extras]
