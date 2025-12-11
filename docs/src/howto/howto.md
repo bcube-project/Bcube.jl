@@ -99,7 +99,7 @@ for (domain, legend) in zip((Ω, Γ, Λ), ("Cells in Ω", "Faces in Γ", "Faces 
     println("-----------")
 
     # Loop over the elements (cells of faces) in this domain
-    foreach_element(domain) do element
+    foreach_element(domain) do element, _, _
 
         # index of the cell/face in the mesh
         println("")

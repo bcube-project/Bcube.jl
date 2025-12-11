@@ -29,7 +29,7 @@
         end
 
         nelts_2 = 0
-        foreach_element(Ω) do cInfo
+        foreach_element(Ω) do cInfo, _, _
             nelts_2 += 1
             f_element(cInfo)
         end
@@ -83,7 +83,7 @@
         projection_l2!(u, f, dΩ)
 
         _count_cell = 0
-        foreach_element(Ω) do cInfo
+        foreach_element(Ω) do cInfo, _, _
             _count_cell += 1
             _u = materialize(u, cInfo)
             _f = materialize(f, cInfo)

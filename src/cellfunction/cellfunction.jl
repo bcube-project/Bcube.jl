@@ -604,9 +604,16 @@ function get_return_type_and_codim(f::AbstractLazy, elementInfo::AbstractDomainI
     T = eltype(value)
     return T, N
 end
-function get_return_type_and_codim(f::AbstractLazy, domain::AbstractDomain)
+function get_return_type_and_codim(
+    f::AbstractLazy,
+    domain::AbstractDomain,
+    ::AbstractBcubeBackend,
+)
     get_return_type_and_codim(f, first(DomainIterator(domain)))
 end
+function get_return_type_and_codim(f::AbstractLazy, domain::AbstractDomain)
+    get_return_type_and_codim(f, domain, get_bcube_backend(domain))
+end
 function get_return_type_and_codim(f::AbstractLazy, mesh::AbstractMesh)
-    get_return_type_and_codim(f, CellInfo(mesh, 1))
+    get_return_type_and_codim(f, CellDomain(mesh))
 end

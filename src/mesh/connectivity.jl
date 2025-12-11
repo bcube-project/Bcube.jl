@@ -41,6 +41,10 @@ function Connectivity(
     )
 end
 
+function Connectivity(indices::AbstractVector{<:AbstractVector{T}}) where {T <: Integer}
+    return Connectivity(map(length, indices), reduce(vcat, indices))
+end
+
 function _check_connectivity(minsize, maxsize, offsets, indices)
     if offsets[end] - 1 ≠ length(indices)
         @show offsets[end] - 1, length(indices)

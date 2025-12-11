@@ -122,7 +122,7 @@ get_zone_element_indices(::DefaultMeshMetaData, mesh::AbstractMesh, name) = 1:nc
 `bc_nodes` : <boundary tag> => <boundary nodes tags>
 `bc_faces` : <boundary tag> => <boundary faces tags>
 """
-struct Mesh{topoDim, spaceDim, N, E, C, BCn, BCf, M} <: AbstractMesh{topoDim, spaceDim}
+struct Mesh{topoDim, spaceDim, N, E, C, BCn, BCf, M, Ba} <: AbstractMesh{topoDim, spaceDim}
     nodes::N
     entities::E
     connectivities::C
@@ -131,6 +131,8 @@ struct Mesh{topoDim, spaceDim, N, E, C, BCn, BCf, M} <: AbstractMesh{topoDim, sp
     bc_faces::BCf #Vector{Vector{Int}}
 
     metadata::M
+
+    backend::Ba
 end
 
 function Mesh(
@@ -143,6 +145,7 @@ function Mesh(
     bc_nodes::NamedTuple,
     bc_faces::NamedTuple,
     metadata::AbstractMeshMetaData,
+    backend::AbstractBcubeBackend,
 ) where {T <: Real, spaceDim, E <: AbstractEntityType, C <: AbstractConnectivity}
     @assert topoDim ≤ spaceDim
 
@@ -152,7 +155,6 @@ function Mesh(
     nodetypes = Node_t[Node_t() for i in 1:length(nodes)]
     entities = (cell = celltypes, node = nodetypes)
 
-    connectivities = Dict{Symbol, MeshConnectivity}()
     c2n = MeshConnectivity(:cell, :node, cell2node)
     connectivities = (c2n = c2n,)
 
@@ -178,6 +180,7 @@ function Mesh(
         typeof(bc_nodes),
         typeof(bc_faces),
         typeof(metadata),
+        typeof(backend),
     }(
         nodes,
         entities,
@@ -185,6 +188,7 @@ function Mesh(
         bc_nodes,
         _bc_faces,
         metadata,
+        backend,
     )
 end
 
@@ -198,6 +202,7 @@ function Mesh(
     bc_nodes::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
     bc_faces::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
     metadata::AbstractMeshMetaData = DefaultMeshMetaData(),
+    backend::AbstractBcubeBackend = get_bcube_backend(),
 ) where {E <: AbstractVector{<:AbstractEntityType}, C <: AbstractConnectivity}
     topoDim = topodim(valtype(celltypes))
     if buildboundaryfaces
@@ -221,12 +226,20 @@ function Mesh(
         nt_bc_nodes,
         nt_bc_faces,
         metadata,
+        backend,
     )
 end
 
 Base.parent(mesh::Mesh) = mesh
 
 @inline get_metadata(mesh::Mesh) = mesh.metadata
+
+"""
+    get_bcube_backend(mesh::Mesh)
+
+Return the backend associated with the given mesh.
+"""
+get_bcube_backend(mesh::Mesh) = mesh.backend
 
 @inline get_nodes(mesh::Mesh) = mesh.nodes
 @inline get_nodes(mesh::Mesh, i::SVector) = mesh.nodes[i]

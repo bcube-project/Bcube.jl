@@ -52,9 +52,10 @@ function projection_l2!(u::AbstractSingleFieldFEFunction, f, dΩ::Measure; mass 
         A = mass
     end
     l(v) = ∫(f ⋅ v)dΩ
-    T, = get_return_type_and_codim(f, get_domain(dΩ))
-    b = assemble_linear(l, V; T = T)
-    x = A \ b
+    b = zero(get_dof_values(u))
+    assemble_linear!(b, l, V)
+    x = zero(b)
+    __solve!(x, A, b, get_bcube_backend(dΩ))
     set_dof_values!(u, x)
     return nothing
 end
@@ -134,7 +135,21 @@ function build_mass_matrix(u::AbstractFEFunction, dΩ::AbstractMeasure)
     return build_mass_matrix(U, V, dΩ)
 end
 
-function build_mass_matrix(U, V, dΩ::AbstractMeasure)
+function build_mass_matrix(U, V, dΩ::D) where {D <: AbstractMeasure}
     m(u, v) = ∫(u ⋅ v)dΩ
     return assemble_bilinear(m, U, V)
+end
+
+function build_mass_matrix(
+    U::MultiFESpace,
+    V::MultiFESpace,
+    dΩ::D,
+) where {D <: AbstractMeasure}
+    m(u, v) = ∫(_dot((u...,), (v...,)))dΩ
+    return assemble_bilinear(m, U, V)
+end
+
+_dot(u::Tuple{T1}, v::Tuple{T2}) where {T1, T2} = first(u) ⋅ first(v)
+function _dot(u::Tuple{Vararg{Any, N}}, v::Tuple{Vararg{Any, N}}) where {N}
+    first(u) ⋅ first(v) + _dot(Base.tail(u), Base.tail(v))
 end

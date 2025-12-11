@@ -200,3 +200,28 @@ end
 end
 @inline tuplemap(f, ::Tuple{}) = ()
 @inline tuplemap(f, ::Tuple{}, ::Tuple{}) = ()
+
+# temporary solution (API needed ?)
+function _solve!(x, A, b, backend::Bcube.AbstractBcubeBackend)
+    __solve!(x, A, b, get_backend(backend))
+end
+function __solve!(x, A, b, backend)
+    x .= A \ b
+    return nothing
+end
+
+"""
+    cumsum_exclusive(a::AbstractVector)
+    cumsum_exclusive(a::Tuple)
+
+Return the cumlative sum, excluding the current element.
+"""
+function cumsum_exclusive(a::AbstractVector)
+    b = cumsum(a)[1:(end - 1)]
+    return vcat(zero(eltype(a)), b)
+end
+
+function cumsum_exclusive(a::Tuple)
+    b = Base.front(cumsum(a))
+    return (zero(eltype(a)), b...)
+end

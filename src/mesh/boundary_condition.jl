@@ -10,8 +10,28 @@ struct PeriodicBCType{T <: AbstractAffineTransformation, T2, T3} <: AbstractBCTy
     labels_slave::T3
 end
 @inline transformation(perio::PeriodicBCType) = perio.transformation
-@inline labels_master(perio::PeriodicBCType) = perio.labels_master
-@inline labels_slave(perio::PeriodicBCType) = perio.labels_slave
+@inline labels_master(perio::PeriodicBCType) = keys(perio.labels_master)
+@inline labels_slave(perio::PeriodicBCType) = keys(perio.labels_slave)
+
+function PeriodicBCType(
+    transformation::AbstractAffineTransformation,
+    labelMaster::String,
+    labelSlave::String,
+)
+    PeriodicBCType(transformation, (labelMaster,), (labelSlave,))
+end
+
+function PeriodicBCType(
+    transformation::AbstractAffineTransformation,
+    labelMaster::Tuple{String, Vararg{String, N}},
+    labelSlave::Tuple{String, Vararg{String, N}},
+) where {N}
+    #labels are storeds as keys of a namedtuple to ensure that
+    #`PeriodicBCType` is `isbits`
+    _labelMaster = (; zip(map(Symbol, labelMaster), ntuple(identity, N + 1))...)
+    _labelSlave = (; zip(map(Symbol, labelSlave), ntuple(identity, N + 1))...)
+    PeriodicBCType(transformation, _labelMaster, _labelSlave)
+end
 
 abstract type AbstractBoundaryCondition end
 

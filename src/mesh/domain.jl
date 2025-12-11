@@ -12,6 +12,7 @@ struct SubDomain{A, E, I}
     tag::A
     elementType::E
     indices::I
+    offset::Int
 end
 get_tag(sdom::SubDomain) = sdom.tag
 get_indices(sdom::SubDomain) = sdom.indices
@@ -28,16 +29,21 @@ Construct sub‑domains of a mesh grouped by cell type.
 
 # Returns
 A tuple of `SubDomain` objects, each containing:
-- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- a tag to identify groups of `SubDomain` (`tag=1` by default),
 - the cell type,
 - the list of indices belonging to that type.
 """
 function build_subdomains_by_celltypes(mesh, indices)
+    build_subdomains_by_celltypes(get_bcube_backend(mesh), mesh, indices)
+end
+
+function build_subdomains_by_celltypes(::AbstractBcubeBackend, mesh, indices)
     _ctypes = cells(mesh)[indices]
     ctypes = tuple(unique(_ctypes)...)
     indice_by_ctypes =
         map(ct -> indices[filter(i -> _ctypes[i] == ct, 1:length(indices))], ctypes)
-    return SubDomain.(nothing, ctypes, indice_by_ctypes)
+    offsets = cumsum_exclusive(map(length, indice_by_ctypes))
+    return SubDomain.(1, ctypes, indice_by_ctypes, offsets)
 end
 
 """
@@ -51,18 +57,23 @@ Construct sub‑domains of a mesh grouped by face type (including adjacent cell 
 
 # Returns
 A tuple of `SubDomain` objects, each containing:
-- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- a tag to identify groups of `SubDomain` (`tag=1` by default),
 - a tuple `(face_type, cell_type₁, cell_type₂)` describing the face and its neighboring cells,
 - the list of indices belonging to that tuple.
 """
 function build_subdomains_by_facetypes(mesh, indices)
+    build_subdomains_by_facetypes(get_bcube_backend(mesh), mesh, indices)
+end
+
+function build_subdomains_by_facetypes(::AbstractBcubeBackend, mesh, indices)
     _ftypes = faces(mesh)[indices]
     f2c = [connectivities_indices(mesh, :f2c)[i] for i in indices]
     _ftypes = [(_ftypes[i], cells(mesh)[f2c[i]]...) for i in 1:length(_ftypes)]
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
         map(ft -> indices[filter(i -> _ftypes[i] == ft, 1:length(_ftypes))], ftypes)
-    return SubDomain.(nothing, ftypes, indice_by_ftypes)
+    offsets = cumsum_exclusive(map(length, indice_by_ftypes))
+    return SubDomain.(1, ftypes, indice_by_ftypes, offsets)
 end
 
 """
@@ -77,7 +88,7 @@ Construct sub‑domains for periodic boundaries, grouped by face type (including
 
 # Returns
 A tuple of `SubDomain` objects, each containing:
-- a tag to identify groups of `SubDomain` (`tag=nothing` by default),
+- a tag to identify groups of `SubDomain` (`tag=1` by default),
 - a tuple `(face_type, cell_type₁, cell_type₂)` describing the periodic face and its two neighboring cells,
 - the list of indices belonging to that tuple.
 """
@@ -92,7 +103,8 @@ function build_subdomains_periodic_by_facetypes(mesh, perio_cache)
     ftypes = tuple(unique(_ftypes)...)
     indice_by_ftypes =
         map(ft -> indices[filter(i -> all(_ftypes[i] .== ft), 1:length(_ftypes))], ftypes)
-    return SubDomain.(nothing, ftypes, indice_by_ftypes)
+    offsets = cumsum_exclusive(map(length, indice_by_ftypes))
+    return SubDomain.(1, ftypes, indice_by_ftypes, offsets)
 end
 
 """
@@ -103,6 +115,9 @@ abstract type AbstractDomain{M <: AbstractMesh} end
 
 @inline get_subdomains(domain::AbstractDomain) = domain.subdomains
 @inline get_mesh(domain::AbstractDomain) = domain.mesh
+function get_nelements(domain::AbstractDomain)
+    mapreduce(length ∘ get_indices, +, get_subdomains(domain))
+end
 function indices(domain::AbstractDomain)
     reduce(vcat, map(get_indices, get_subdomains(domain)))
 end
@@ -110,6 +125,15 @@ end
 @inline codimension(d::AbstractDomain) = topodim(get_mesh(d)) - topodim(d)
 LazyOperators.pretty_name(domain::AbstractDomain) = "AbstractDomain"
 get_unique_tags(domains::AbstractDomain) = domains.uniqueTags
+
+"""
+    get_bcube_backend(domain::AbstractDomain)
+
+Return the Bcube backend associated with the mesh underlying the given `AbstractDomain`.
+"""
+function get_bcube_backend(domain::AbstractDomain)
+    get_bcube_backend(get_mesh(domain))
+end
 
 function get_subdomains(domain::AbstractDomain, tag, f = sdom -> get_tag(sdom) == tag)
     filter(f, get_subdomains(domain))
@@ -144,7 +168,7 @@ CellDomain(mesh::AbstractMesh) = CellDomain(parent(mesh))
 CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
 function CellDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
     subdomains = build_subdomains_by_celltypes(mesh, indices)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     CellDomain(mesh, subdomains, tags)
 end
 
@@ -162,7 +186,7 @@ InteriorFaceDomain(mesh::AbstractMesh) = InteriorFaceDomain(parent(mesh))
 InteriorFaceDomain(mesh::Mesh) = InteriorFaceDomain(mesh, inner_faces(mesh))
 function InteriorFaceDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
     subdomains = build_subdomains_by_facetypes(mesh, indices)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     InteriorFaceDomain(mesh, subdomains, tags)
 end
 LazyOperators.pretty_name(domain::InteriorFaceDomain) = "InteriorFaceDomain"
@@ -176,7 +200,7 @@ end
 AllFaceDomain(mesh::AbstractMesh) = AllFaceDomain(mesh, 1:nfaces(mesh))
 function AllFaceDomain(mesh::AbstractMesh, indices)
     subdomains = build_subdomains_by_facetypes(mesh, indices)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     AllFaceDomain(mesh, subdomains, tags)
 end
 LazyOperators.pretty_name(domain::AllFaceDomain) = "AllFaceDomain"
@@ -203,7 +227,7 @@ function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
         _compute_periodicity(mesh, labels_master(bc), labels_slave(bc), transformation(bc))
     labels = unique(vcat(labels_master(bc)..., labels_slave(bc)...))
     subdomains = build_subdomains_periodic_by_facetypes(mesh, cache)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     BoundaryFaceDomain{
         typeof(mesh),
         typeof(bc),
@@ -298,13 +322,13 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
         end
     end
 
-    bnd_f2f = Dict{Int, Int}()
+    bnd_f2f = zeros(eltype(bndfaces2), length(f2c))
     for (i, iface) in enumerate(bndfaces2)
         bnd_f2f[iface] = i
     end
 
     # node to node relation
-    bnd_n2n = Dict{Int, Int}()
+    bnd_n2n = zeros(eltype(bndfaces2), length(f2c))
     for (_f2c, _f2n1, _f2n2) in zip(bnd_f2c, bnd_f2n1, bnd_f2n2)
         # distance between face center and adjacent cell center
         Δx = distance(center(get_nodes(mesh, c2n[_f2c[1]])), center(get_nodes(mesh, _f2n1)))
@@ -328,6 +352,10 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
             end
         end
     end
+
+    bnd_f2n1 = Connectivity(bnd_f2n1)
+    bnd_f2n2 = Connectivity(bnd_f2n2)
+    bnd_ftypes = convert_to_vector_of_union(bnd_ftypes)
 
     # Retain only relevant faces
     return (;
@@ -359,7 +387,7 @@ function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol, Vararg{Symbol}})
     bc = nothing
     _labels = (; zip(labels, ntuple(i -> i, length(labels)))...) # store labels as keys of a namedtuple for make it isbits
     subdomains = build_subdomains_by_facetypes(mesh, bndfaces)
-    tags = unique(map(get_tag, subdomains))
+    tags = tuple(unique(map(get_tag, subdomains))...)
     BoundaryFaceDomain{
         typeof(mesh),
         typeof(bc),
@@ -686,7 +714,8 @@ function Base.iterate(iter::SubDomainIterator, i::Integer = 1)
 end
 
 function Base.getindex(iter::SubDomainIterator, i)
-    _get_index(iter.domain, iter.subdomain, i)
+    indexDomain = iter.subdomain.offset + i
+    _get_index(iter.domain, iter.subdomain, i), indexDomain, i
 end
 
 function _get_index(domain::D, subdomain, i::Integer) where {D <: AbstractCellDomain}
@@ -766,7 +795,8 @@ function _get_index(
     perio_cache = get_cache(domain)
     perio_trans = transformation(get_bc(domain))
 
-    icell1, icell2 = perio_cache.bnd_f2c[iface, :]
+    icell1 = perio_cache.bnd_f2c[iface, 1]
+    icell2 = perio_cache.bnd_f2c[iface, 2]
 
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
 
@@ -774,20 +804,22 @@ function _get_index(
     _c2n_j = c2n[icell2, nnodes_j]
     cnodes_j = get_nodes(mesh, _c2n_j) # to be removed when function barrier is used
     cnodes_j_perio = map(node -> Node(perio_trans(get_coords(node))), cnodes_j)
+
     # Build c2n for cell j with nodes indices taken from cell i
     # for those that are shared on the periodic BC:
     _c2n_j_perio = map(k -> get(perio_cache.bnd_n2n, k, k), _c2n_j)
     cellinfo2 = CellInfo(icell2, ctype2, cnodes_j_perio, _c2n_j_perio)
 
-    # Face info
-    fnodes = get_nodes(mesh, perio_cache.bnd_f2n1[iface])
+    # # Face info
+    nnodes_f = Val(nnodes(ftype))
+    fnodes = get_nodes(mesh, perio_cache.bnd_f2n1[iface, nnodes_f])
     cside_i = cell_side(
         celltype(cellinfo1),
         get_nodes_index(cellinfo1),
-        perio_cache.bnd_f2n1[iface],
+        perio_cache.bnd_f2n1[iface, nnodes_f],
     )
-    cside_j = cell_side(celltype(cellinfo2), _c2n_j, perio_cache.bnd_f2n2[iface])
-    _f2n = perio_cache.bnd_f2n1[iface]
+    cside_j = cell_side(celltype(cellinfo2), _c2n_j, perio_cache.bnd_f2n2[iface, nnodes_f])
+    _f2n = perio_cache.bnd_f2n1[iface, nnodes_f]
 
     return FaceInfo(
         cellinfo1,
@@ -907,81 +939,88 @@ function domain_to_mesh(domain::CellDomain, clipped_bnd_name = "CLIPPED_BND")
 end
 
 """
-    foreach_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial = get_bcube_backend())
+    foreach_element(f, domain::AbstractDomain)
 
 Apply the in-place function `f` to every element of `domain`.
 
-The iteration proceeds over all `subdomains`, grouped by their tags, using the
-CPU‑serial backend (default obtained via `get_bcube_backend()`).
+The iteration proceeds over all `subdomains`, grouped by their tags.
 For each subdomain the lower‑level `foreach_element` overload is invoked,
 ensuring that `f` receives the appropriate element information.
 
 # Arguments
-- `f`: Callable to be applied to each element. `f` must capture the variables
-  that are modified during the loop.
+- `f(element, indexDomain, indexSubDomain)`: Callable to be applied
+  to each element. `f` must capture the variables that are modified
+  during the loop.
 - `domain::AbstractDomain`: The domain whose elements are processed.
-- `backend::BcubeBackendCPUSerial`: Backend handling the iteration (default:
-  `get_bcube_backend()`).
 
 # Returns
 `nothing`.
 """
-function foreach_element(
-    f,
+function foreach_element(f::F, domain::AbstractDomain) where {F <: Function}
+    _foreach_element(f, domain, get_bcube_backend(domain))
+end
+
+function _foreach_element(
+    f::F,
     domain::AbstractDomain,
-    backend::BcubeBackendCPUSerial = get_bcube_backend(),
-)
+    backend::AbstractBcubeBackend,
+) where {F <: Function}
     for subdomains in DomainIteratorByTags(domain)
         for subdomain in subdomains
-            foreach_element(f, domain, subdomain, backend)
+            _foreach_element(f, domain, subdomain, backend)
         end
     end
     return nothing
 end
 
-function foreach_element(
-    f,
-    domain::AbstractDomain,
-    subdomain,
-    backend::BcubeBackendCPUSerial,
-)
-    for elementInfo in SubDomainIterator(domain, subdomain)
-        f(elementInfo)
+function _foreach_element(
+    f::F,
+    domain::D,
+    subdomain::SD,
+    backend::AbstractBcubeBackend,
+) where {F <: Function, D <: AbstractDomain, SD <: Bcube.SubDomain}
+    indices = Bcube.get_indices(subdomain)
+    iter_subdomain = Bcube.SubDomainIterator(domain, subdomain)
+    for i in eachindex(indices)
+        f(iter_subdomain[i]...)
     end
     return nothing
 end
 
 """
-    map_element(f, domain::AbstractDomain, backend::BcubeBackendCPUSerial = get_bcube_backend())
+    map_element(f, domain::AbstractDomain)
 
-Apply the out-of-place function `f` to each element of `domain` using the CPU‑serial backend
-(default obtained via `get_bcube_backend()`) and return an array whose size is equal to the
-number of elements of `domain`.
+Apply the out-of-place function `f` to each element of `domain` and return an array
+whose size is equal to the number of elements of `domain`.
 
-The iteration proceeds over all `subdomains`, grouped by their tags, using the default backend.
+The iteration proceeds over all `subdomains`, grouped by their tags, using the backend of the domain.
 For each subdomain, the lower‑level `map_element` overload is invoked, ensuring that
 `f` receives the appropriate element information.
 
 # Arguments
 - `f`: Callable to be applied to each element.
 - `domain::AbstractDomain`: The domain whose elements are processed.
-- `backend::BcubeBackendCPUSerial`: Backend handling the iteration (default: `get_bcube_backend()`).
 
 # Returns
 An array containing the results of applying `f` to each element, with length equal to the number of elements in `domain`.
 """
-function map_element(
-    f,
-    domain::AbstractDomain,
-    backend::BcubeBackendCPUSerial = get_bcube_backend(),
-)
+function map_element(f, domain::AbstractDomain)
+    _map_element(f, domain, get_bcube_backend(domain))
+end
+
+function _map_element(f, domain::AbstractDomain, backend::AbstractBcubeBackend)
     mapreduce(vcat, DomainIteratorByTags(domain)) do subdomains
         mapreduce(vcat, subdomains) do subdomain
-            map_element(f, domain, subdomain, backend)
+            _map_element(f, domain, subdomain, backend)
         end
     end
 end
 
-function map_element(f, domain::AbstractDomain, subdomain, backend::BcubeBackendCPUSerial)
+function _map_element(
+    f::F,
+    domain::D,
+    subdomain::SD,
+    backend::AbstractBcubeBackend,
+) where {F, D <: AbstractDomain, SD <: SubDomain}
     map(f, SubDomainIterator(domain, subdomain))
 end

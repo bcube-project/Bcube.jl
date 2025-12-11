@@ -24,7 +24,7 @@
         funcs = [PhysicalFunction(x -> x), PhysicalFunction(x -> 2x)]
         cellArray = MeshCellData(array)
         cellFuncs = MeshCellData(funcs)
-        foreach_element(CellDomain(mesh)) do cInfo
+        foreach_element(CellDomain(mesh)) do cInfo, _, _
             i = cellindex(cInfo)
             cPointRef = CellPoint([0.0], cInfo, ReferenceDomain())
             cPointPhy = change_domain(cPointRef, PhysicalDomain())
