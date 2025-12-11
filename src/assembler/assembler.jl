@@ -818,7 +818,7 @@ Maps over each component space, updating its DoFs with the corresponding values.
 function __update_b!(
     b::AbstractVector{T},
     idofs::Tuple{Vararg{Union{Tuple, SVector}, N}},
-    intvals::Tuple{Vararg{Tuple, N}},
+    intvals::Tuple{Vararg{Any, N}},
     backend::AbstractBcubeBackend,
 ) where {N, T}
     f(x2, x3) = __update_b!(b, x2, x3, backend)
