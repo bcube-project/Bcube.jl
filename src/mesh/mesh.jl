@@ -339,24 +339,46 @@ function _build_faces!(c2n::MeshConnectivity, celltypes)
     return _face_types, c2f, f2c, f2n
 end
 
+"""
+    _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc_nodes)
+
+Find boundary faces (all faces with only 1 adjacent cell) from the face-to-node,
+face-to-cell connectivities, and the list of tagged nodes (i.e, list of the nodes
+belonging to each bc).
+"""
 function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc_nodes)
     @assert (bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
     @assert length(indices(f2n)) == length(indices(f2c)) "invalid f2n and/or f2c"
     @assert length(indices(f2n)) ≠ 0 "invalid f2n and/or f2c"
 
-    # find boundary faces (all faces with only 1 adjacent cell)
-
+    # Allocate
     f2bc_numindices = zeros(Int, length(indices(f2n)))
     f2bc_indices = Vector{Int}()
     sizehint!(f2bc_indices, length(f2bc_numindices))
+
+    # To ease nodes identification in `bc_nodes`, create,
+    # for each bc, a vector of size `nnodes(mesh)` who tells
+    # if each nodes belongs to the concerned BC
+    # Rq 1: since we don't have access to `nnodes(mesh)` here, we compute
+    # using the functions arguments
+    # Rq 2: for element of order > 1, there might be "inside nodes", not included in "f2n",
+    # so we also check `bc_nodes`
+    max_f2n = maximum(map(maximum, indices(f2n)))
+    max_bc_nodes = maximum(map(maximum, values(bc_nodes)))
+    m = max(max_f2n, max_bc_nodes)
+    node2bc = map(values(bc_nodes)) do _bc_nodes
+        x = zeros(Bool, m)
+        x[_bc_nodes] .= true
+        x
+    end
 
     f2c = indices(f2c)
     for (iface, f2n) in enumerate(indices(f2n))
         if length(f2c[iface]) == 1
             # Search for associated BC (if any)
             # Rq: there might not be any BC, for instance if the face if a ghost-cell face
-            for (tag, nodes) in enumerate(bc_nodes)
-                if f2n ⊆ nodes
+            for (tag, nodes) in enumerate(node2bc)
+                if all(view(nodes, f2n))
                     push!(f2bc_indices, tag)
                     f2bc_numindices[iface] = 1
                     break
@@ -390,6 +412,7 @@ function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc
     return f2bc, bc_faces
 end
 
+""" Note : this function isn't actually used anywhere, see  _build_boundary_faces! instead"""
 function build_boundary_faces!(mesh::Mesh)
     @assert (mesh.bc_names ≠ nothing && mesh.bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
     @assert (mesh.bc_names ≠ nothing && mesh.bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
