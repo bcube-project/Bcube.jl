@@ -834,11 +834,11 @@ Update linear form vector with integrated values for a single component.
 Maps over the tuple of values and recursively calls `__update_b!`.
 """
 function __update_b!(
-    b::AbstractVector{T},
+    b::AbstractVector{T1},
     idofs::AbstractVector,
-    intvals::Tuple{NTuple{N, T}},
+    intvals::Tuple{NTuple{N, T2}},
     backend::AbstractBcubeBackend,
-) where {T, N}
+) where {T1 <: Number, T2 <: Number, N}
     __update_b!(b, idofs, first(intvals), backend)
     nothing
 end
@@ -851,11 +851,11 @@ Actually update the linear form vector entries for CPU serial backend.
 Adds the integrated values to the corresponding DoF entries in the result vector.
 """
 function __update_b!(
-    b::AbstractVector{T},
+    b::AbstractVector{T1},
     dofs::AbstractVector{<:Integer},
-    vals::NTuple{N, T},
-    backend::BcubeBackendCPUSerial,
-) where {N, T}
+    vals::NTuple{N, T2},
+    ::BcubeBackendCPUSerial,
+) where {T1 <: Number, T2 <: Number, N}
     for (i, val) in zip(dofs, vals)
         b[i] += val
     end
