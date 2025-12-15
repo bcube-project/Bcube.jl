@@ -192,7 +192,7 @@ function SingleFESpace(
     # Convert String -> Symbols and ensure that every input boundary name is known in the mesh
     dirichletBndSymbols = Symbol.(dirichletBndNames)
     for name in dirichletBndSymbols
-        @assert Symbol(name) ∈ boundary_names(mesh) "Error with the Dirichlet condition on '$name' : this is not a boundary name. Boundary names are : $bndNames"
+        @assert Symbol(name) ∈ boundary_names(mesh) "Error with the Dirichlet condition on '$name' : this is not a boundary name. Boundary names are : $(boundary_names(mesh))"
     end
 
     return SingleFESpace{size, typeof(fSpace), typeof(dhl), typeof(dirichletBndSymbols)}(
