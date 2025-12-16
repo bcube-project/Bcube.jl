@@ -205,6 +205,21 @@ function idof_by_face_with_bounds(::AbstractFunctionSpace, ::AbstractShape)
     )
 end
 
+# Generic rule for `AbstractShape` of topology dimension less than `3`, `idof_by_face` alias `idof_by_edge`
+const AbstractShape_1_2 = Union{AbstractShape{1}, AbstractShape{2}}
+function idof_by_face(
+    fs::FunctionSpace{type, degree},
+    shape::AbstractShape_1_2,
+) where {type, degree}
+    idof_by_edge(fs, shape)
+end
+function idof_by_face_with_bounds(
+    fs::FunctionSpace{type, degree},
+    shape::AbstractShape_1_2,
+) where {type, degree}
+    idof_by_edge_with_bounds(fs, shape)
+end
+
 """
     idof_by_edge(::AbstractFunctionSpace, ::AbstractShape)
 
@@ -246,6 +261,27 @@ for simple examples.
 """
 function idof_by_vertex(::AbstractFunctionSpace, ::AbstractShape)
     error("Function 'idof_by_vertex' is not defined")
+end
+
+"""
+    idof_by_volume(::AbstractFunctionSpace, ::AbstractShape)
+
+Return the local indices of the dofs lying inside the element, that is to say
+not on a vertex, an edge or a face. This is for instance the centered dof of
+`Square` with a `FunctionSpace{:Lagrange, 2}`.
+
+# Implementation
+This is simply the (ensemble) difference between all the element dofs and the
+ones returned by `idof_by_face_with_bounds`.
+"""
+@generated idof_by_volume(fs::AbstractFunctionSpace, shape::AbstractShape) =
+    _idof_by_volume(fs(), shape())
+
+function _idof_by_volume(fs, shape)
+    idofs = ones(Bool, get_ndofs(fs, shape))
+    idofs_face = idof_by_face_with_bounds(fs, shape)
+    foreach(indices -> idofs[indices] .= false, idofs_face)
+    return :(SA[$(findall(idofs)...)])
 end
 
 """
