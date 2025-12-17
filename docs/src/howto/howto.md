@@ -273,3 +273,23 @@ export_markdown("results.md", results)
 ```
 
 This will create the markdown file `results.md` with the results.
+
+
+## Build the documentation
+
+To build the documentation, activate the `Bcube.jl/docs/Project.toml` environment, and simply include the `make.jl` file:
+```julia
+pkg> activate docs
+pkg> dev . # if you are at the root of the Bcube.jl folder
+include("docs/make.jl")
+```
+This will create the documentation website in the `Bcube.jl/docs/build` directory.
+
+!!! tip
+    You case use [`LiveServer.jl`](https://github.com/JuliaDocs/LiveServer.jl) to automatically refresh the browser when the source files change. To do so, simply do (in an additional julia REPL):
+    ```julia
+    pkg> activate --temp
+    pkg> add LiveServer
+    using LiveServer
+    serve(dir="docs/build") # now browse http://localhost:8000/
+    ```

@@ -1,4 +1,4 @@
-# Geometry and mesh
+# [Geometry and mesh](@id geometry-and-mesh)
 
 A `Mesh` is a set basically of nodes (`Node`), a set of entities (the mesh elements) and a list of connectivies that link the entities between themselves and with the nodes.
 
