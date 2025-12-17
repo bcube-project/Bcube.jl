@@ -417,6 +417,7 @@ function hexa_mesh(
     order = 1,
     bnd_names = ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"),
 )
+    @assert (nx > 1 && ny > 1 && nz > 1) "Number of vertices must be greater than one, in every direction"
     @assert order == 1 "Not implemented for order = $order"
 
     lx = xmax - xmin
