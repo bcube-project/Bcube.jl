@@ -342,14 +342,18 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
     for (_f2c, _f2n1, _f2n2) in zip(bnd_f2c, bnd_f2n1, bnd_f2n2)
         # distance between face center and adjacent cell center
         Δx = distance(center(get_nodes(mesh, c2n[_f2c[1]])), center(get_nodes(mesh, _f2n1)))
-        isfind = false
+
         for i in _f2n1
+            isfind = false
             Mᵢ = get_nodes(mesh, i)
+            dmin = Inf
             for j in _f2n2
                 Mⱼ = get_nodes(mesh, j)
                 # compute image point
                 Mⱼ_bis = Node(A(get_coords(Mⱼ)))
-                if isapprox(Mᵢ, Mⱼ_bis; atol = tol * Δx)
+                d = norm(get_coords(Mᵢ) .- get_coords(Mⱼ_bis))
+                dmin = min(dmin, d)
+                if d ≤ tol * Δx
                     bnd_n2n[i] = j
                     bnd_n2n[j] = i
                     # Stop looking for face in relation
@@ -357,8 +361,10 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
                     break
                 end
             end
-            if isfind === false
-                error("Node i=", i, " not found (2)")
+            if !isfind
+                error(
+                    "Could not find a correspondance for Node i=$i with coords $(Mᵢ).\nClosest correspondance found with d=$(dmin) > tol * Δx where tol=$tol and Δx=$(Δx).\nYou can try to set a different tolerance or to rescale the mesh.\nTol needed for closest point mentionned: $(dmin/Δx).",
+                )
             end
         end
     end
@@ -817,7 +823,8 @@ function _get_index(
 
     # Build c2n for cell j with nodes indices taken from cell i
     # for those that are shared on the periodic BC:
-    _c2n_j_perio = map(k -> get(perio_cache.bnd_n2n, k, k), _c2n_j)
+    _c2n_j_perio =
+        map(k -> (perio_cache.bnd_n2n[k] == 0) ? k : perio_cache.bnd_n2n[k], _c2n_j)
     cellinfo2 = CellInfo(icell2, ctype2, cnodes_j_perio, _c2n_j_perio)
 
     # # Face info
