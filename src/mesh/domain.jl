@@ -222,9 +222,14 @@ LazyOperators.pretty_name(domain::BoundaryFaceDomain) = "BoundaryFaceDomain"
 
 indices(d::BoundaryFaceDomain) = get_cache(d)
 
-function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
-    cache =
-        _compute_periodicity(mesh, labels_master(bc), labels_slave(bc), transformation(bc))
+function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType; tol = 1e-9)
+    cache = _compute_periodicity(
+        mesh,
+        labels_master(bc),
+        labels_slave(bc),
+        transformation(bc),
+        tol,
+    )
     labels = unique(vcat(labels_master(bc)..., labels_slave(bc)...))
     subdomains = build_subdomains_periodic_by_facetypes(mesh, cache)
     tags = tuple(unique(map(get_tag, subdomains))...)
@@ -292,6 +297,7 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
         # compute a characteristic length :
         Δxᵢ = distance(center(get_nodes(mesh, c2n[icell])), Mᵢ)
         isfind = false
+        dmin = Inf
 
         for (j, jface) in enumerate(bndfaces1)
             jcell = f2c[jface][1]
@@ -303,7 +309,9 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
             Mⱼ_bis = Node(A(get_coords(Mⱼ)))
 
             # Centers must be identical
-            if isapprox(Mᵢ, Mⱼ_bis; atol = tol * Δxᵢ)
+            d = norm(get_coords(Mᵢ) .- get_coords(Mⱼ_bis))
+            dmin = min(dmin, d)
+            if d ≤ tol * Δxᵢ
                 bnd_f2n1[i] = f2n[iface]
                 bnd_f2n2[i] = f2n[jface]
 
@@ -318,7 +326,9 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
             end
         end
         if isfind === false
-            error("Face i=", i, " ", iface, " not found")
+            error(
+                "Could not find a correspondance for face i=$i, iface=$iface, with center $(Mᵢ).\nClosest correspondance found with d=$(dmin) > tol * Δxᵢ where tol=$tol and Δxᵢ=$(Δxᵢ).\nYou can try to set a different tolerance or to rescale the mesh.\nTol needed for closest point mentionned: $(dmin/Δxᵢ).",
+            )
         end
     end
 
