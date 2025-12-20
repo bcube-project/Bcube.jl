@@ -987,9 +987,9 @@ function domain_to_mesh(domain::AbstractFaceDomain)
     bc_names = Dict{Int, String}()
     bc_nodes = Dict{Int, Vector{Int}}()
 
-    for (tag, bnd_name) in boundary_names(mesh)
+    for (tag, bnd_name) in enumerate(boundary_names(mesh))
         # If the boundary is already part of the domain, we skip it
-        (bnd_name ∈ domain.labels) && continue
+        (bnd_name ∈ keys(domain.labels)) && continue
 
         _bc_nodes = Int[]
         sizehint!(_bc_nodes, length(loc2glo))
@@ -1004,7 +1004,7 @@ function domain_to_mesh(domain::AbstractFaceDomain)
         end
 
         if length(_bc_nodes) > 0
-            bc_names[tag] = bnd_name
+            bc_names[tag] = string(bnd_name)
             bc_nodes[tag] = _bc_nodes
         end
     end
