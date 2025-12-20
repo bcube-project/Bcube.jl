@@ -222,13 +222,13 @@ LazyOperators.pretty_name(domain::BoundaryFaceDomain) = "BoundaryFaceDomain"
 
 indices(d::BoundaryFaceDomain) = get_cache(d)
 
-function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType; tol = 1e-9)
+function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
     cache = _compute_periodicity(
         mesh,
         labels_master(bc),
         labels_slave(bc),
         transformation(bc),
-        tol,
+        get_tolerance(tol),
     )
     labels = unique(vcat(labels_master(bc)..., labels_slave(bc)...))
     subdomains = build_subdomains_periodic_by_facetypes(mesh, cache)
