@@ -17,11 +17,11 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
 FEMQuad = "0.3"
-FastGaussQuadrature = "0.4, 0.5, 1.0"
-ForwardDiff = "0.10, 1"
+FastGaussQuadrature = "0.4.2, 0.5, 1"
+ForwardDiff = "0.10.19, 1"
 LinearSolve = "1, 2, 3"
-NearestNeighbors = "0.4"
-StaticArrays = "1.2"
+NearestNeighbors = "0.4.8"
+StaticArrays = "1.4.6"
 Symbolics = "5, 6"
 julia = "1.8"
 
