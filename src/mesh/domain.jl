@@ -228,7 +228,7 @@ function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
         labels_master(bc),
         labels_slave(bc),
         transformation(bc),
-        get_tolerance(tol),
+        get_tolerance(bc),
     )
     labels = unique(vcat(labels_master(bc)..., labels_slave(bc)...))
     subdomains = build_subdomains_periodic_by_facetypes(mesh, cache)
