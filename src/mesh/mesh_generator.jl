@@ -103,17 +103,20 @@ julia> mesh = line_mesh(5)
 """
 function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"))
     @assert n > 1 "Number of vertices must be greater than 1 (received: $n)"
-    l = xmax - xmin # line length
+    l = norm(xmax - xmin) # line length
     nelts = n - 1 # Number of cells
+    S = length(xmin)
+    @assert length(xmax) == S "`xmin` and `xmax` must have the same length"
 
     # Linear elements
     if (order == 1)
-        Δx = l / (n - 1)
+        Δx = (xmax - xmin) / (n - 1)
+        T = eltype(Δx)
 
         # Nodes
-        nodes = Vector{Node{1, Float64}}(undef, n)
+        nodes = Vector{Node{S, T}}(undef, n)
         for i in 1:n
-            nodes[i] = Node(SA[xmin + (i - 1) * Δx])
+            nodes[i] = Node(xmin + (i - 1) * Δx)
         end
 
         # Cell type is constant
@@ -143,15 +146,16 @@ function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"
 
         # Quadratic elements
     elseif (order == 2)
-        Δx = l / 2 / (n - 1)
+        Δx = (xmax - xmin) / 2 / (n - 1)
+        T = eltype(Δx)
 
         # Cell type is constant
         celltypes = [Bar3_t() for ielt in 1:nelts]
 
         # Nodes + Cell -> nodes connectivity
-        nodes = Array{Node{1, Float64}}(undef, 2 * n - 1)
+        nodes = Array{Node{S, T}}(undef, 2 * n - 1)
         cell2node = zeros(Int, 3 * nelts)
-        nodes[1] = Node([xmin]) # First node
+        nodes[1] = Node(xmin) # First node
         i = 1 # init counter
         for ielt in 1:nelts
             # two new nodes : middle one and then right boundary
