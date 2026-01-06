@@ -21,7 +21,7 @@ jobs:
         julia-version: [1]
         os: [ubuntu-latest]
         package:
-          - {user: bcube-project, repo: BcubeTutorials.jl, rev: 0.2}
+          - {user: bcube-project, repo: BcubeTutorials.jl}
 
     steps:
       - uses: actions/checkout@v6
@@ -34,7 +34,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
-          path: downstream
+          path: downstreamwith
+          lfs: "true"
       - name: Load this and run the downstream tests
         shell: julia --color=yes --project=downstream {0}
         run: |
