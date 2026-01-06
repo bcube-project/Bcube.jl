@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
-          path: downstreamwith
+          path: downstream
           lfs: "true"
       - name: Load this and run the downstream tests
         shell: julia --color=yes --project=downstream {0}
