@@ -41,6 +41,9 @@ Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 8-hexa.
 # `::Hexa27_t`
 Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 27-hexa.
 
+# `::Tetra4_t`
+Map the reference 4-nodes Tetrahedron [0,1] x [0,1] x [0,1] on the 4-tetra.
+
 # `::Penta6_t`
 Map the reference 6-nodes prism [0,1] x [0,1] x [-1,1] on the 6-penta (prism).
 
@@ -701,18 +704,41 @@ function mapping(::Hexa27_t, cnodes, ξηζ)
     )
 end
 
-"""
-    mapping(nodes, ::Tetra4_t, ξ)
+#---------------- Tetra4
 
-Map the reference 4-nodes Tetraahedron [0,1] x [0,1] x [0,1] on the local triangle.
+function mapping(::Tetra4_t, cnodes, ξηζ)
+    return (1 - ξηζ[1] - ξηζ[2] - ξηζ[3]) .* cnodes[1].x +
+           ξηζ[1] .* cnodes[2].x +
+           ξηζ[2] .* cnodes[3].x +
+           ξηζ[3] .* cnodes[4].x
+end
 
-```
-"""
-function mapping(::Tetra4_t, cnodes, ξ)
-    return (1 - ξ[1] - ξ[2] - ξ[3]) .* cnodes[1].x +
-           ξ[1] .* cnodes[2].x +
-           ξ[2] .* cnodes[3].x +
-           ξ[3] .* cnodes[4].x
+function mapping_inv(::Tetra4_t, cnodes, x)
+    # Alias
+    A = cnodes[1].x
+    B = cnodes[2].x
+    C = cnodes[3].x
+    D = cnodes[4].x
+    # a1, a2, a3 = cnodes[1].x
+    # b1, b2, b3 = cnodes[2].x
+    # c1, c2, c3 = cnodes[3].x
+    # d1, d2, d3 = cnodes[4].x
+
+    denom =
+        (-A[1] + B[1]) *
+        ((-A[2] + C[2]) * (-A[3] + D[3]) - (-A[2] + D[2]) * (-A[3] + C[3])) +
+        (A[1] - C[1]) *
+        (-(-A[2] + D[2]) * (-A[3] + B[3]) + (-A[2] + B[2]) * (-A[3] + D[3])) +
+        (-A[1] + D[1]) *
+        (-(-A[2] + C[2]) * (-A[3] + B[3]) + (-A[2] + B[2]) * (-A[3] + C[3]))
+    Mat =
+        @SMatrix[
+            ((-A[2] + C[2]) * (-A[3] + D[3])-(-A[2] + D[2]) * (-A[3] + C[3])) ((-A[1] + D[1]) * (-A[3] + C[3])-(-A[1] + C[1]) * (-A[3] + D[3])) (-(-A[1] + D[1]) * (-A[2] + C[2])+(-A[1] + C[1]) * (-A[2] + D[2]))
+            ((-A[2] + D[2]) * (-A[3] + B[3])-(-A[2] + B[2]) * (-A[3] + D[3])) (-(-A[1] + D[1]) * (-A[3] + B[3])+(-A[1] + B[1]) * (-A[3] + D[3])) (-(-A[1] + B[1]) * (-A[2] + D[2])+(-A[1] + D[1]) * (-A[2] + B[2]))
+            (-(-A[2] + C[2]) * (-A[3] + B[3])+(-A[2] + B[2]) * (-A[3] + C[3])) ((-A[1] + C[1]) * (-A[3] + B[3])-(-A[1] + B[1]) * (-A[3] + C[3])) (-(-A[1] + C[1]) * (-A[2] + B[2])+(-A[1] + B[1]) * (-A[2] + C[2]))
+        ] ./ denom
+
+    return Mat * x
 end
 
 #---------------- Penta6
