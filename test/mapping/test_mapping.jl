@@ -303,6 +303,48 @@
         @test isapprox_arrays(F([1.0, 1.0, 0.0]), [2.0, 2.0, 1.0])
         @test isapprox_arrays(F([-1.0, 1.0, 0.0]), [1.0, 2.0, 1.0])
         @test isapprox_arrays(F([0.0, 0.0, 1.0]), [1.5, 1.5, 3.0])
+
+        # Tetra4
+        @testset "tetra4" begin
+            function test_mapping_inv_tetra(cnodes)
+                ctype = Bcube.Tetra4_t()
+                cshape = Bcube.Tetra()
+
+                # All vertex must be mapped on their corresponding ref vertex
+                for (n, ξηζ) in zip(cnodes, get_coords(cshape))
+                    @test all(abs.(Bcube.mapping_inv(ctype, cnodes, n.x) - ξηζ) .< 1e-15)
+                end
+                # Center must stay the center
+                @test all(
+                    abs.(
+                        Bcube.mapping_inv(ctype, cnodes, Bcube.center(ctype, cnodes)) -
+                        Bcube.center(cshape)
+                    ) .< 1e-15,
+                )
+            end
+
+            cnodes = (
+                Node([0.0, 0.0, 0.0]),
+                Node([1.0, 0.0, 0.0]),
+                Node([0.0, 1.0, 0.0]),
+                Node([0.0, 0.0, 1.0]),
+            )
+            test_mapping_inv_tetra(cnodes)
+
+            # Translate
+            cnodes = map(n -> Node(n.x + [2.0, -3.0, 7.0]), cnodes)
+            @show cnodes
+            test_mapping_inv_tetra(cnodes)
+
+            # Random
+            cnodes = (
+                Node([4.30468, 4.72917, 1.43255]),
+                Node([5.32734, 6.14463, 2.15847]),
+                Node([7.92359, 6.70335, 4.44187]),
+                Node([0.165131, 5.84658, 9.81018]),
+            )
+            test_mapping_inv_tetra(cnodes)
+        end
     end
 
     @testset "basic mesh" begin
