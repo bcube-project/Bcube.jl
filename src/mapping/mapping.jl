@@ -41,6 +41,9 @@ Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 8-hexa.
 # `::Hexa27_t`
 Map the reference 8-nodes cube [-1,1] x [-1,1] x [-1,1] on the 27-hexa.
 
+# `::Tetra4_t`
+Map the reference 4-nodes Tetrahedron [0,1] x [0,1] x [0,1] on the 4-tetra.
+
 # `::Penta6_t`
 Map the reference 6-nodes prism [0,1] x [0,1] x [-1,1] on the 6-penta (prism).
 
@@ -701,18 +704,35 @@ function mapping(::Hexa27_t, cnodes, ξηζ)
     )
 end
 
-"""
-    mapping(nodes, ::Tetra4_t, ξ)
+#---------------- Tetra4
 
-Map the reference 4-nodes Tetraahedron [0,1] x [0,1] x [0,1] on the local triangle.
+function mapping(::Tetra4_t, cnodes, ξηζ)
+    return (1 - ξηζ[1] - ξηζ[2] - ξηζ[3]) .* cnodes[1].x +
+           ξηζ[1] .* cnodes[2].x +
+           ξηζ[2] .* cnodes[3].x +
+           ξηζ[3] .* cnodes[4].x
+end
 
-```
-"""
-function mapping(::Tetra4_t, cnodes, ξ)
-    return (1 - ξ[1] - ξ[2] - ξ[3]) .* cnodes[1].x +
-           ξ[1] .* cnodes[2].x +
-           ξ[2] .* cnodes[3].x +
-           ξ[3] .* cnodes[4].x
+function mapping_inv(::Tetra4_t, cnodes, x)
+    # Alias
+    A = cnodes[1].x
+    A1, A2, A3 = cnodes[1].x
+    B1, B2, B3 = cnodes[2].x
+    C1, C2, C3 = cnodes[3].x
+    D1, D2, D3 = cnodes[4].x
+
+    denom =
+        (-A1 + B1) * ((-A2 + C2) * (-A3 + D3) - (-A2 + D2) * (-A3 + C3)) +
+        (A1 - C1) * (-(-A2 + D2) * (-A3 + B3) + (-A2 + B2) * (-A3 + D3)) +
+        (-A1 + D1) * (-(-A2 + C2) * (-A3 + B3) + (-A2 + B2) * (-A3 + C3))
+    Mat =
+        @SMatrix[
+            ((-A2 + C2) * (-A3 + D3)-(-A2 + D2) * (-A3 + C3)) ((-A1 + D1) * (-A3 + C3)-(-A1 + C1) * (-A3 + D3)) (-(-A1 + D1) * (-A2 + C2)+(-A1 + C1) * (-A2 + D2))
+            ((-A2 + D2) * (-A3 + B3)-(-A2 + B2) * (-A3 + D3)) (-(-A1 + D1) * (-A3 + B3)+(-A1 + B1) * (-A3 + D3)) (-(-A1 + B1) * (-A2 + D2)+(-A1 + D1) * (-A2 + B2))
+            (-(-A2 + C2) * (-A3 + B3)+(-A2 + B2) * (-A3 + C3)) ((-A1 + C1) * (-A3 + B3)-(-A1 + B1) * (-A3 + C3)) (-(-A1 + C1) * (-A2 + B2)+(-A1 + B1) * (-A2 + C2))
+        ] ./ denom
+
+    return Mat * (x - A)
 end
 
 #---------------- Penta6
