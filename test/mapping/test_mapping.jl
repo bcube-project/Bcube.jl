@@ -318,7 +318,7 @@
                 @test all(
                     abs.(
                         Bcube.mapping_inv(ctype, cnodes, Bcube.center(ctype, cnodes)) -
-                        Bcube.center(cshape)
+                        Bcube.center(cshape),
                     ) .< 1e-15,
                 )
             end
