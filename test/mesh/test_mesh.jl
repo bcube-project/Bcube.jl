@@ -98,4 +98,14 @@
     @test Set(c2c[7]) == Set([4, 8, 5])
     @test Set(c2c[8]) == Set([5, 6, 9, 7, 4])
     @test Set(c2c[9]) == Set([6, 5, 8])
+
+    # Reading a mesh containing a bc without nodes
+    # (for instance, a mesh that has been partitioned by gmsh)
+    nodes = [Bcube.Node([0.0]), Bcube.Node([1.0])]
+    celltypes = [Bcube.Bar2_t()]
+    cell2node = Bcube.Connectivity([2], [1, 2])
+    bc_names = Dict(1 => "xmin", 2 => "xmax", 3 => "EMPTY_BC")
+    bc_nodes = Dict(1 => [1], 2 => [2])
+    mesh = Bcube.Mesh(nodes, celltypes, cell2node; bc_names = bc_names, bc_nodes = bc_nodes)
+    @test Bcube.boundary_nodes(mesh, :EMPTY_BC) == Int64[]
 end

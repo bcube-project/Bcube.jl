@@ -377,7 +377,7 @@ function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc
     # Rq 2: for element of order > 1, there might be "inside nodes", not included in "f2n",
     # so we also check `bc_nodes`
     max_f2n = maximum(map(maximum, indices(f2n)))
-    max_bc_nodes = maximum(map(maximum, values(bc_nodes)))
+    max_bc_nodes = maximum(map(x -> maximum(x; init = 0), values(bc_nodes))) # `init=0`` to deal with bcs without nodes
     m = max(max_f2n, max_bc_nodes)
     node2bc = map(values(bc_nodes)) do _bc_nodes
         x = zeros(Bool, m)
