@@ -719,10 +719,6 @@ function mapping_inv(::Tetra4_t, cnodes, x)
     B = cnodes[2].x
     C = cnodes[3].x
     D = cnodes[4].x
-    # a1, a2, a3 = cnodes[1].x
-    # b1, b2, b3 = cnodes[2].x
-    # c1, c2, c3 = cnodes[3].x
-    # d1, d2, d3 = cnodes[4].x
 
     denom =
         (-A[1] + B[1]) *
@@ -738,7 +734,7 @@ function mapping_inv(::Tetra4_t, cnodes, x)
             (-(-A[2] + C[2]) * (-A[3] + B[3])+(-A[2] + B[2]) * (-A[3] + C[3])) ((-A[1] + C[1]) * (-A[3] + B[3])-(-A[1] + B[1]) * (-A[3] + C[3])) (-(-A[1] + C[1]) * (-A[2] + B[2])+(-A[1] + B[1]) * (-A[2] + C[2]))
         ] ./ denom
 
-    return Mat * x
+    return Mat * (x - A)
 end
 
 #---------------- Penta6
