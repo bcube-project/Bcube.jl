@@ -224,12 +224,28 @@ function rectangle_mesh(
     ymin = 0.0,
     ymax = 1.0,
     order = 1,
+    A::T = nothing,
+    B::T = nothing,
+    C::T = nothing,
+    D::T = nothing,
     bnd_names = ("xmin", "xmax", "ymin", "ymax"),
-)
+) where {T <: Union{Nothing, AbstractVector}}
     @assert (nx > 1 && ny > 1) "`nx` and `ny`, the number of nodes, must be greater than 1 (nx=$nx, ny=$ny)"
 
+    if (A == B == C == D == nothing)
+        _A = SA[xmin, ymin]
+        _B = SA[xmax, ymin]
+        _C = SA[xmax, ymax]
+        _D = SA[xmin, ymax]
+    else
+        _A = A
+        _B = B
+        _C = C
+        _D = D
+    end
+
     if (type == :quad)
-        return _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, Val(order), bnd_names)
+        return _rectangle_quad_mesh(nx, ny, _A, _B, _C, _D, Val(order), bnd_names)
     else
         throw(
             ArgumentError("`type` must be :quad (but feel free to implement other types)"),
@@ -237,8 +253,18 @@ function rectangle_mesh(
     end
 end
 
-function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_names)
+function _rectangle_quad_mesh(
+    nx,
+    ny,
+    A::T,
+    B::T,
+    C::T,
+    D::T,
+    ::Val{1},
+    bnd_names,
+) where {T <: AbstractVector}
     # Notes
+    # D           C
     # 6-----8-----9
     # |     |     |
     # |  3  |  4  |
@@ -248,12 +274,9 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_name
     # |  1  |  2  |
     # |     |     |
     # 1-----2-----3
+    # A           B
 
-    lx = xmax - xmin
-    ly = ymax - ymin
     nelts = (nx - 1) * (ny - 1)
-    Δx = lx / (nx - 1)
-    Δy = ly / (ny - 1)
 
     # Prepare boundary nodes
     tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
@@ -261,10 +284,16 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_name
 
     # Nodes
     iglob = 1
-    nodes = Array{Node{2, Float64}}(undef, nx * ny)
+    nodes = Array{Node{length(A), Float64}}(undef, nx * ny)
     for iy in 1:ny
         for ix in 1:nx
-            nodes[(iy - 1) * nx + ix] = Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy])
+            #compute node coodinates by bilinear interpolation in (A,B,C,D)
+            a = (ix - 1) / (nx - 1)
+            b = (iy - 1) / (ny - 1)
+            x1 = (1 - a) * A + a * B
+            x2 = (1 - a) * D + a * C
+            coor = (1 - b) * x1 + b * x2
+            nodes[(iy - 1) * nx + ix] = Node(coor)
 
             # Boundary conditions
             (ix == 1) && push!(tag2nodes[1], iglob)
@@ -305,8 +334,18 @@ end
 
 # Remark : with a rectangle domain of quadratic elements, we can then apply a mapping on
 # this rectangle domain to obtain a curved mesh...
-function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_names)
+function _rectangle_quad_mesh(
+    nx,
+    ny,
+    A::T,
+    B::T,
+    C::T,
+    D::T,
+    ::Val{2},
+    bnd_names,
+) where {T <: AbstractVector}
     # Notes
+    # D           C
     # 07----08----09
     # |           |
     # |           |
@@ -314,6 +353,7 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     # |           |
     # |           |
     # 01----02----03
+    # A           B
     #
     # 11----12----13----14----15
     # |           |           |
@@ -323,12 +363,8 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     # |           |           |
     # 01----02----03----04----05
 
-    lx = xmax - xmin
-    ly = ymax - ymin
     nelts = (nx - 1) * (ny - 1)
     nnodes = nx * ny + (nx - 1) * ny + (ny - 1) * nx + nelts
-    Δx = lx / (nx - 1) / 2
-    Δy = ly / (ny - 1) / 2
 
     # Prepare boundary nodes
     tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
@@ -336,12 +372,17 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
 
     # Nodes
     # we override some nodes multiple times, but it is easier this way
-    nodes = Array{Node{2, Float64}}(undef, nnodes)
+    nodes = Array{Node{length(A), Float64}}(undef, nnodes)
     iglob = 1
     for iy in 1:(ny + (ny - 1))
         for ix in 1:(nx + (nx - 1))
-            nodes[(iy - 1) * (nx + (nx - 1)) + ix] =
-                Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy])
+            #compute node coodinates by bilinear interpolation in (A,B,C,D)
+            a = 0.5 * (ix - 1) / (nx - 1)
+            b = 0.5 * (iy - 1) / (ny - 1)
+            x1 = (1 - a) * A + a * B
+            x2 = (1 - a) * D + a * C
+            coor = (1 - b) * x1 + b * x2
+            nodes[(iy - 1) * (nx + (nx - 1)) + ix] = Node(coor)
 
             # Boundary conditions
             (ix == 1) && push!(tag2nodes[1], iglob)
