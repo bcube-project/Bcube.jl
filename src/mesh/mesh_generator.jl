@@ -103,7 +103,7 @@ julia> mesh = line_mesh(5)
 """
 function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"))
     @assert n > 1 "Number of vertices must be greater than 1 (received: $n)"
-    l = norm(xmax - xmin) # line length
+    l = norm(norm(xmax - xmin)) # line length
     nelts = n - 1 # Number of cells
     S = length(xmin)
     @assert length(xmax) == S "`xmin` and `xmax` must have the same length"
