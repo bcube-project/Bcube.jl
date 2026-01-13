@@ -3,19 +3,19 @@
     mapping(ctype::AbstractEntityType, cnodes, ξ)
     mapping(cshape::AbstractShape, cnodes, ξ)
 
-Map the reference shape on the local shape.
+Map the reference shape on the physical shape.
 
 # Implementation
 This function must be implemented for all shape.
 
 # `::Bar2_t`
-Map the reference 2-nodes bar [-1,1] on the local bar:
+Map the reference 2-nodes bar [-1,1] on the physical bar:
 ```math
 F(\\xi) = \\dfrac{x_r - x_l}{2} \\xi + \\dfrac{x_r + x_l}{2}
 ```
 
 # `::Tri3_t`
-Map the reference 3-nodes Triangle [0,1] x [0,1] on the local triangle.
+Map the reference 3-nodes Triangle [0,1] x [0,1] on the physical triangle.
 ```math
 F(\\xi, \\eta) = (1 - \\xi - \\eta) M_1 + \\xi M_2 + \\eta M_3
 ```
@@ -26,13 +26,13 @@ Map the reference 4-nodes square [-1,1] x [-1,1] on the 4-quadrilateral.
 # `::Tri6_t`
 Map the reference 6-nodes triangle [0,1] x [0,1] on the P2 curved-triangle.
 `` F(\\xi) = \\sum \\lambda_i(\\xi) x_i ``
-where ``\\lambda_i`` are the Lagrange P2 shape functions and ``x_i`` are the local
+where ``\\lambda_i`` are the Lagrange P2 shape functions and ``x_i`` are the physical
 curved-triangle vertices' coordinates.
 
 # `::Quad9_t`
 Map the reference 4-nodes square [-1,1] x [-1,1] on the P2 curved-quadrilateral.
 `` F(\\xi) = \\sum \\lambda_i(\\xi) x_i ``
-where ``\\lambda_i`` are the Lagrange P2 shape functions and ``x_i`` are the local
+where ``\\lambda_i`` are the Lagrange P2 shape functions and ``x_i`` are the physical
 curved-quadrilateral vertices' coordinates.
 
 # `::Hexa8_t`
@@ -60,17 +60,18 @@ mapping(type_or_shape, cnodes) = ξ -> mapping(type_or_shape, cnodes, ξ)
 """
     mapping_inv(::AbstractEntityType, cnodes, x)
 
-Map the local shape on the reference shape.
+Map the physical shape on the reference shape.
 
 # Implementation
-This function does not have to be implemented for all shape.
+The default version relies on an iterative Newton algorithm. The initial guess
+is the center of the element.
 
 # `::Bar2_t`
-Map the local bar on the reference 2-nodes bar [-1,1]:
+Map the physical bar on the reference 2-nodes bar [-1,1]:
 ``F^{-1}(x) = \\dfrac{2x - x_r - x_l}{x_r - x_l}``
 
 # `::Tri3_t`
-Map the local triangle on the reference 3-nodes Triangle [0,1] x [0,1].
+Map the physical triangle on the reference 3-nodes Triangle [0,1] x [0,1].
 
 TODO: check this formulae with SYMPY
 
@@ -112,8 +113,34 @@ with
 where
 `` \\Delta = (x_1 - x_2)(y_3 - y_2) - (x_3 - x_2)(y_1 - y_2)``
 """
-function mapping_inv(::AbstractEntityType, cnodes, x)
-    error("Function 'mapping_inv' is not defined")
+function mapping_inv(ctype::AbstractEntityType, cnodes, x)
+    nmax = 20 # max number of iterations
+    s = shape(ctype)
+    tol_ξ = measure(s)^(1 / topodim(s)) * 1e-6
+
+    # init with center
+    ξ_k = center(s)
+    x_k = center(ctype, cnodes)
+
+    # Compute tol. Scale with minimum distance between the center and the elements nodes
+    tol_x = 1e-3 * minimum(node -> norm(get_coords(node) .- x_k), cnodes)
+
+    # Loop
+    i = 1
+    while i ≤ nmax
+        dξ = mapping_jacobian_inv(ctype, cnodes, ξ_k) * (x - x_k)
+        ξ_k += dξ
+        x_k = mapping(ctype, cnodes, ξ_k)
+        (norm(dξ) < tol_ξ) && break
+        (norm(x - x_k) < tol_x) && break
+    end
+
+    # Checks
+    @assert i ≤ nmax "Reached max number of iterations"
+    @assert is_point_in_shape(s, ξ_k) "Solution point is outside the element"
+    @assert (norm(x - x_k) < tol_x) "Tolerance on physical coordinate not reached"
+
+    return ξ_k
 end
 mapping_inv(ctype::AbstractEntityType, cnodes) = x -> mapping_inv(ctype, cnodes, x)
 
@@ -126,15 +153,15 @@ Jacobian matrix of the mapping : ``\\dfrac{\\partial F_i}{\\partial \\xi_j}``.
 Default version using ForwardDiff, but can be specified for each shape.
 
 # `::Bar2_t`
-Mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
+Mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the physical bar.
 ``\\dfrac{\\partial F}{\\partial \\xi} = \\dfrac{x_r - x_l}{2}``
 
 # `::Bar3_t`
-Mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
+Mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the physical bar.
 ``\\dfrac{\\partial F}{\\partial \\xi} = \\frac{1}{2} \\left( (2\\xi - 1) M_1 + (2\\xi + 1)M_2 - 4 \\xi M_3\\right)
 
 # `::Tri3_t`
-Mapping's jacobian matrix for the reference 3-nodes Triangle [0,1] x [0,1] to the local
+Mapping's jacobian matrix for the reference 3-nodes Triangle [0,1] x [0,1] to the physical
 triangle mapping.
 ```math
 \\dfrac{\\partial F_i}{\\partial \\xi_j} =
@@ -167,19 +194,19 @@ evaluated in the reference element.
 Default version using ForwardDiff, but can be specified for each shape.
 
 # `::Bar2_t`
-Inverse of mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
+Inverse of mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the physical bar.
 ```math
 \\dfrac{\\partial F}{\\partial \\xi}^{-1} = \\dfrac{2}{x_r - x_l}
 ```
 
 # `::Bar3_t`
-Inverse of mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the local bar.
+Inverse of mapping's jacobian matrix for the reference 2-nodes bar [-1, 1] to the physical bar.
 ```math
 \\dfrac{\\partial F}{\\partial \\xi}^{-1} = \\frac{2}{(2\\xi - 1) M_1 + (2\\xi + 1)M_2 - 4 \\xi M_3}
 ```
 
 # `::Tri3_t`
-Inverse of mapping's jacobian matrix for the reference 3-nodes Triangle [0,1] x [0,1] to the local
+Inverse of mapping's jacobian matrix for the reference 3-nodes Triangle [0,1] x [0,1] to the physical
 triangle mapping.
 ```math
 \\dfrac{\\partial F_i}{\\partial \\xi_j}^{-1} =
@@ -210,13 +237,13 @@ inverse mapping, F^-1, is not always defined.
 Default version using LinearAlgebra to inverse the matrix, but can be specified for each shape (if it exists).
 
 # `::Bar2_t`
-Mapping's jacobian matrix for the local bar to the reference 2-nodes bar [-1, 1].
+Mapping's jacobian matrix for the physical bar to the reference 2-nodes bar [-1, 1].
 ```math
 \\dfrac{\\partial F^{-1}}{\\partial x} = \\dfrac{2}{x_r - x_l}
 ```
 
 # `::Tri3_t`
-Mapping's jacobian matrix for the local triangle to the reference 3-nodes
+Mapping's jacobian matrix for the physical triangle to the reference 3-nodes
 Triangle [0,1] x [0,1] mapping.
 
 -----
@@ -253,12 +280,12 @@ Finally, the surfacic cell (quad in 3D) needs a special treatment, see [`mapping
 
 # `::Bar2_t`
 Absolute value of the determinant of the mapping Jacobian matrix for the
-reference 2-nodes bar [-1,1] to the local bar mapping.
+reference 2-nodes bar [-1,1] to the physical bar mapping.
 ``|det(J(\\xi))| = \\dfrac{|x_r - x_l|}{2}``
 
 # `::Tri3_t`
 Absolute value of the determinant of the mapping Jacobian matrix for the
-the reference 3-nodes Triangle [0,1] x [0,1] to the local triangle mapping.
+the reference 3-nodes Triangle [0,1] x [0,1] to the physical triangle mapping.
 
 ``|J| = |(x_2 - x_1) (y_3 - y_1) - (x_3 - x_1) (y_2 - y_1)|``
 """
@@ -704,35 +731,18 @@ function mapping(::Hexa27_t, cnodes, ξηζ)
     )
 end
 
-#---------------- Tetra4
+"""
+    mapping(nodes, ::Tetra4_t, ξ)
 
-function mapping(::Tetra4_t, cnodes, ξηζ)
-    return (1 - ξηζ[1] - ξηζ[2] - ξηζ[3]) .* cnodes[1].x +
-           ξηζ[1] .* cnodes[2].x +
-           ξηζ[2] .* cnodes[3].x +
-           ξηζ[3] .* cnodes[4].x
-end
+Map the reference 4-nodes Tetraahedron [0,1] x [0,1] x [0,1] on the physical triangle.
 
-function mapping_inv(::Tetra4_t, cnodes, x)
-    # Alias
-    A = cnodes[1].x
-    A1, A2, A3 = cnodes[1].x
-    B1, B2, B3 = cnodes[2].x
-    C1, C2, C3 = cnodes[3].x
-    D1, D2, D3 = cnodes[4].x
-
-    denom =
-        (-A1 + B1) * ((-A2 + C2) * (-A3 + D3) - (-A2 + D2) * (-A3 + C3)) +
-        (A1 - C1) * (-(-A2 + D2) * (-A3 + B3) + (-A2 + B2) * (-A3 + D3)) +
-        (-A1 + D1) * (-(-A2 + C2) * (-A3 + B3) + (-A2 + B2) * (-A3 + C3))
-    Mat =
-        @SMatrix[
-            ((-A2 + C2) * (-A3 + D3)-(-A2 + D2) * (-A3 + C3)) ((-A1 + D1) * (-A3 + C3)-(-A1 + C1) * (-A3 + D3)) (-(-A1 + D1) * (-A2 + C2)+(-A1 + C1) * (-A2 + D2))
-            ((-A2 + D2) * (-A3 + B3)-(-A2 + B2) * (-A3 + D3)) (-(-A1 + D1) * (-A3 + B3)+(-A1 + B1) * (-A3 + D3)) (-(-A1 + B1) * (-A2 + D2)+(-A1 + D1) * (-A2 + B2))
-            (-(-A2 + C2) * (-A3 + B3)+(-A2 + B2) * (-A3 + C3)) ((-A1 + C1) * (-A3 + B3)-(-A1 + B1) * (-A3 + C3)) (-(-A1 + C1) * (-A2 + B2)+(-A1 + B1) * (-A2 + C2))
-        ] ./ denom
-
-    return Mat * (x - A)
+```
+"""
+function mapping(::Tetra4_t, cnodes, ξ)
+    return (1 - ξ[1] - ξ[2] - ξ[3]) .* cnodes[1].x +
+           ξ[1] .* cnodes[2].x +
+           ξ[2] .* cnodes[3].x +
+           ξ[3] .* cnodes[4].x
 end
 
 #---------------- Penta6
