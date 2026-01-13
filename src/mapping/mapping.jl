@@ -143,17 +143,25 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
 
         (norm(dξ) < tol_ξ) && break
         (norm(x - x_k) < tol_x) && break
+
+        i += 1
     end
 
     # Checks
-    @assert i ≤ nmax "Reached max number of iterations"
+    (i ≤ nmax) || throw(DomainError(x, "Reached max number of iterations"))
     if !is_point_in_shape(s, ξ_k)
         # Check if it's not one of the shape vertices (with numerical diffusion)
         val, ind = findmin(ξ -> norm(ξ - ξ_k), get_coords(s))
-        @assert val < 1e-10 "Solution point is outside the element : ξ = $(ξ_k), dmin = $(val)"
+        (val < 1e-10) || throw(
+            DomainError(
+                x,
+                "Solution point is outside the element : ξ = $(ξ_k), dmin = $(val)",
+            ),
+        )
         ξ_k = get_coords(s)[ind]
     end
-    @assert (norm(x - x_k) < tol_x) "Tolerance on physical coordinate not reached"
+    (norm(x - x_k) < tol_x) ||
+        throw(DomainError(x, "Tolerance on physical coordinate not reached"))
 
     return ξ_k
 end
