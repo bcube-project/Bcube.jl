@@ -118,6 +118,11 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
     s = shape(ctype)
     tol_ξ = measure(s)^(1 / topodim(s)) * 1e-6
 
+    # get min and max of the shape node coordinates to correct Newton
+    iterator_ξ = eachrow(hcat(get_coords(s)...))
+    m = map(minimum, iterator_ξ)
+    M = map(maximum, iterator_ξ)
+
     # init with center
     ξ_k = center(s)
     x_k = center(ctype, cnodes)
@@ -130,14 +135,24 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
     while i ≤ nmax
         dξ = mapping_jacobian_inv(ctype, cnodes, ξ_k) * (x - x_k)
         ξ_k += dξ
+
+        # ensure that ξ_k doesn't "accidentally" cross the boundaries
+        ξ_k = min.(max.(ξ_k, m), M)
+
         x_k = mapping(ctype, cnodes, ξ_k)
+
         (norm(dξ) < tol_ξ) && break
         (norm(x - x_k) < tol_x) && break
     end
 
     # Checks
     @assert i ≤ nmax "Reached max number of iterations"
-    @assert is_point_in_shape(s, ξ_k) "Solution point is outside the element"
+    if !is_point_in_shape(s, ξ_k)
+        # Check if it's not one of the shape vertices (with numerical diffusion)
+        val, ind = findmin(ξ -> norm(ξ - ξ_k), get_coords(s))
+        @assert val < 1e-10 "Solution point is outside the element : ξ = $(ξ_k), dmin = $(val)"
+        ξ_k = get_coords(s)[ind]
+    end
     @assert (norm(x - x_k) < tol_x) "Tolerance on physical coordinate not reached"
 
     return ξ_k
