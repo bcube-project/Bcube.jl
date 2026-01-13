@@ -104,16 +104,24 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
     # Loop
     i = 1
     while i ≤ nmax
-        dξ = mapping_jacobian_inv(ctype, cnodes, ξ_k) * (x - x_k)
+        # we avoid the use of `mapping_jacobian_inv` as the jacobian matrix can be non-square
+        # for surface element in R^3 and, in this case, the inverse matrix is not strictly defined
+        x_k = mapping(ctype, cnodes, ξ_k)
+
+        dx = x - x_k
+        (norm(dx) < tol_x) && break
+
+        J = mapping_jacobian(ctype, cnodes, ξ_k)
+
+        # solve in the least-square sense since J can be
+        # a rectangular matrix for surfacic element in R^3
+        dξ = (J' * J) \ (J' * dx)
         ξ_k += dξ
 
         # ensure that ξ_k doesn't "accidentally" cross the boundaries
         ξ_k = min.(max.(ξ_k, m), M)
 
-        x_k = mapping(ctype, cnodes, ξ_k)
-
         (norm(dξ) < tol_ξ) && break
-        (norm(x - x_k) < tol_x) && break
 
         i += 1
     end
