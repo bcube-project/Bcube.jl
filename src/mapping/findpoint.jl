@@ -27,7 +27,7 @@ cpoint = find_cell_point(pf, x) # build a `CellPoint` corresponding to x
 
 u = FEFunction(TrialFESpace(FunctionSpace(:Lagrange, 1), mesh))
 interpolate_at_point(pf, x, u) # interpolate u on x
-````
+```
 """
 function PointFinder(
     mesh::AbstractMesh;
