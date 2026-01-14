@@ -89,11 +89,6 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
     s = shape(ctype)
     tol_ξ = measure(s)^(1 / topodim(s)) * 1e-6
 
-    # get min and max of the shape node coordinates to correct Newton
-    iterator_ξ = eachrow(hcat(get_coords(s)...))
-    m = map(minimum, iterator_ξ)
-    M = map(maximum, iterator_ξ)
-
     # init with center
     ξ_k = center(s)
     x_k = center(ctype, cnodes)
@@ -118,9 +113,6 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
         dξ = (J' * J) \ (J' * dx)
         ξ_k += dξ
 
-        # ensure that ξ_k doesn't "accidentally" cross the boundaries
-        ξ_k = min.(max.(ξ_k, m), M)
-
         (norm(dξ) < tol_ξ) && break
 
         i += 1
@@ -128,17 +120,6 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
 
     # Checks
     (i ≤ nmax) || throw(DomainError(x, "Reached max number of iterations"))
-    if !is_point_in_shape(s, ξ_k)
-        # Check if it's not one of the shape vertices (with numerical diffusion)
-        val, ind = findmin(ξ -> norm(ξ - ξ_k), get_coords(s))
-        (val < 1e-10) || throw(
-            DomainError(
-                x,
-                "Solution point is outside the element : ξ = $(ξ_k), dmin = $(val)",
-            ),
-        )
-        ξ_k = get_coords(s)[ind]
-    end
     (norm(x - x_k) < tol_x) ||
         throw(DomainError(x, "Tolerance on physical coordinate not reached"))
 
@@ -715,18 +696,35 @@ function mapping(::Hexa27_t, cnodes, ξηζ)
     )
 end
 
-"""
-    mapping(nodes, ::Tetra4_t, ξ)
+#---------------- Tetra4
 
-Map the reference 4-nodes Tetraahedron [0,1] x [0,1] x [0,1] on the physical triangle.
+function mapping(::Tetra4_t, cnodes, ξηζ)
+    return (1 - ξηζ[1] - ξηζ[2] - ξηζ[3]) .* cnodes[1].x +
+           ξηζ[1] .* cnodes[2].x +
+           ξηζ[2] .* cnodes[3].x +
+           ξηζ[3] .* cnodes[4].x
+end
 
-```
-"""
-function mapping(::Tetra4_t, cnodes, ξ)
-    return (1 - ξ[1] - ξ[2] - ξ[3]) .* cnodes[1].x +
-           ξ[1] .* cnodes[2].x +
-           ξ[2] .* cnodes[3].x +
-           ξ[3] .* cnodes[4].x
+function mapping_inv(::Tetra4_t, cnodes, x)
+    # Alias
+    A = cnodes[1].x
+    A1, A2, A3 = cnodes[1].x
+    B1, B2, B3 = cnodes[2].x
+    C1, C2, C3 = cnodes[3].x
+    D1, D2, D3 = cnodes[4].x
+
+    denom =
+        (-A1 + B1) * ((-A2 + C2) * (-A3 + D3) - (-A2 + D2) * (-A3 + C3)) +
+        (A1 - C1) * (-(-A2 + D2) * (-A3 + B3) + (-A2 + B2) * (-A3 + D3)) +
+        (-A1 + D1) * (-(-A2 + C2) * (-A3 + B3) + (-A2 + B2) * (-A3 + C3))
+    Mat =
+        @SMatrix[
+            ((-A2 + C2) * (-A3 + D3)-(-A2 + D2) * (-A3 + C3)) ((-A1 + D1) * (-A3 + C3)-(-A1 + C1) * (-A3 + D3)) (-(-A1 + D1) * (-A2 + C2)+(-A1 + C1) * (-A2 + D2))
+            ((-A2 + D2) * (-A3 + B3)-(-A2 + B2) * (-A3 + D3)) (-(-A1 + D1) * (-A3 + B3)+(-A1 + B1) * (-A3 + D3)) (-(-A1 + B1) * (-A2 + D2)+(-A1 + D1) * (-A2 + B2))
+            (-(-A2 + C2) * (-A3 + B3)+(-A2 + B2) * (-A3 + C3)) ((-A1 + C1) * (-A3 + B3)-(-A1 + B1) * (-A3 + C3)) (-(-A1 + C1) * (-A2 + B2)+(-A1 + B1) * (-A2 + C2))
+        ] ./ denom
+
+    return Mat * (x - A)
 end
 
 #---------------- Penta6
