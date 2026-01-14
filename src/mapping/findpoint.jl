@@ -27,7 +27,7 @@ cpoint = find_cell_point(pf, x) # build a `CellPoint` corresponding to x
 
 u = FEFunction(TrialFESpace(FunctionSpace(:Lagrange, 1), mesh))
 interpolate_at_point(pf, x, u) # interpolate u on x
-````
+```
 """
 function PointFinder(
     mesh::AbstractMesh;
@@ -78,7 +78,23 @@ function interpolate_at_point(
     return materialize(uᵢ, cpoint)
 end
 
+"""
+    is_point_in_cell(cinfo, cpoint)
+
+Indicate if `cpoint` lies inside the cell `cinfo`.
+
+# Dev notes
+This function triggers a call to `mapping_inv`. But `mapping_inv` may throw a `DomainError`
+if the algorithm fails (bad convergence, ...).
+Hence if a `DomainError` is catched during the evaluation of `change_domain`, it is assumed
+that the point is outside the cell. If it's an other error type, an error is thrown.
+"""
 function is_point_in_cell(cinfo, cpoint)
-    cpoint_ref = change_domain(cpoint, ReferenceDomain())
-    is_point_in_shape(shape(celltype(cinfo)), get_coords(cpoint_ref))
+    try
+        cpoint_ref = change_domain(cpoint, ReferenceDomain())
+        return is_point_in_shape(shape(celltype(cinfo)), get_coords(cpoint_ref))
+    catch err
+        @assert err isa DomainError
+    end
+    return false
 end
