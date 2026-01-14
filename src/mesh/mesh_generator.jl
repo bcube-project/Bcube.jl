@@ -224,28 +224,23 @@ function rectangle_mesh(
     ymin = 0.0,
     ymax = 1.0,
     order = 1,
-    A::T = nothing,
-    B::T = nothing,
-    C::T = nothing,
-    D::T = nothing,
+    P00::T = nothing,
+    P10::T = nothing,
+    P11::T = nothing,
+    P01::T = nothing,
     bnd_names = ("xmin", "xmax", "ymin", "ymax"),
 ) where {T <: Union{Nothing, AbstractVector}}
     @assert (nx > 1 && ny > 1) "`nx` and `ny`, the number of nodes, must be greater than 1 (nx=$nx, ny=$ny)"
 
-    if (A == B == C == D == nothing)
-        _A = SA[xmin, ymin]
-        _B = SA[xmax, ymin]
-        _C = SA[xmax, ymax]
-        _D = SA[xmin, ymax]
-    else
-        _A = A
-        _B = B
-        _C = C
-        _D = D
+    if (P00 == P10 == P11 == P01 == nothing)
+        P00 = SA[xmin, ymin]
+        P10 = SA[xmax, ymin]
+        P11 = SA[xmax, ymax]
+        P01 = SA[xmin, ymax]
     end
 
     if (type == :quad)
-        return _rectangle_quad_mesh(nx, ny, _A, _B, _C, _D, Val(order), bnd_names)
+        return _rectangle_quad_mesh(nx, ny, P00, P10, P11, P01, Val(order), bnd_names)
     else
         throw(
             ArgumentError("`type` must be :quad (but feel free to implement other types)"),
@@ -256,15 +251,15 @@ end
 function _rectangle_quad_mesh(
     nx,
     ny,
-    A::T,
-    B::T,
-    C::T,
-    D::T,
+    P00::T,
+    P10::T,
+    P11::T,
+    P01::T,
     ::Val{1},
     bnd_names,
 ) where {T <: AbstractVector}
     # Notes
-    # D           C
+    # P01         P11
     # 6-----8-----9
     # |     |     |
     # |  3  |  4  |
@@ -274,7 +269,7 @@ function _rectangle_quad_mesh(
     # |  1  |  2  |
     # |     |     |
     # 1-----2-----3
-    # A           B
+    # P00        P10
 
     nelts = (nx - 1) * (ny - 1)
 
@@ -284,15 +279,17 @@ function _rectangle_quad_mesh(
 
     # Nodes
     iglob = 1
-    nodes = Array{Node{length(A), Float64}}(undef, nx * ny)
+    nodes = Array{Node{length(P00), Float64}}(undef, nx * ny)
     for iy in 1:ny
         for ix in 1:nx
-            #compute node coodinates by bilinear interpolation in (A,B,C,D)
-            a = (ix - 1) / (nx - 1)
-            b = (iy - 1) / (ny - 1)
-            x1 = (1 - a) * A + a * B
-            x2 = (1 - a) * D + a * C
-            coor = (1 - b) * x1 + b * x2
+            #compute node coodinates by bilinear interpolation in (P00,P10,P11,P01)
+            u = (ix - 1) / (nx - 1)
+            v = (iy - 1) / (ny - 1)
+            coor =
+                (1 - u) * (1 - v) * P00 +
+                u * (1 - v) * P10 +
+                (1 - u) * v * P01 +
+                u * v * P11
             nodes[(iy - 1) * nx + ix] = Node(coor)
 
             # Boundary conditions
@@ -337,10 +334,10 @@ end
 function _rectangle_quad_mesh(
     nx,
     ny,
-    A::T,
-    B::T,
-    C::T,
-    D::T,
+    P00::T,
+    P10::T,
+    P11::T,
+    P01::T,
     ::Val{2},
     bnd_names,
 ) where {T <: AbstractVector}
@@ -372,16 +369,18 @@ function _rectangle_quad_mesh(
 
     # Nodes
     # we override some nodes multiple times, but it is easier this way
-    nodes = Array{Node{length(A), Float64}}(undef, nnodes)
+    nodes = Array{Node{length(P00), Float64}}(undef, nnodes)
     iglob = 1
     for iy in 1:(ny + (ny - 1))
         for ix in 1:(nx + (nx - 1))
             #compute node coodinates by bilinear interpolation in (A,B,C,D)
-            a = 0.5 * (ix - 1) / (nx - 1)
-            b = 0.5 * (iy - 1) / (ny - 1)
-            x1 = (1 - a) * A + a * B
-            x2 = (1 - a) * D + a * C
-            coor = (1 - b) * x1 + b * x2
+            u = 0.5 * (ix - 1) / (nx - 1)
+            v = 0.5 * (iy - 1) / (ny - 1)
+            coor =
+                (1 - u) * (1 - v) * P00 +
+                u * (1 - v) * P10 +
+                (1 - u) * v * P01 +
+                u * v * P11
             nodes[(iy - 1) * (nx + (nx - 1)) + ix] = Node(coor)
 
             # Boundary conditions
