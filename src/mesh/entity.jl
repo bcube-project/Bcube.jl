@@ -508,6 +508,7 @@ struct Node{spaceDim, T}
     x::SVector{spaceDim, T}
 end
 Node(x::Vector{T}) where {T} = Node{length(x), T}(SVector{length(x), T}(x))
+Node(x::Number) = Node(SA[x])
 @inline get_coords(n::Node) = n.x
 get_coords(n::Node, i) = get_coords(n)[i]
 get_coords(n::Node, i::Tuple{T, Vararg{T}}) where {T} = map(j -> get_coords(n, j), i)

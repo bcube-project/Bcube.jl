@@ -333,7 +333,7 @@
 
             # Translate
             cnodes = map(n -> Node(n.x + [2.0, -3.0, 7.0]), cnodes)
-            @show cnodes
+
             test_mapping_inv_tetra(cnodes)
 
             # Random

@@ -103,17 +103,20 @@ julia> mesh = line_mesh(5)
 """
 function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"))
     @assert n > 1 "Number of vertices must be greater than 1 (received: $n)"
-    l = xmax - xmin # line length
+    l = norm(xmax - xmin) # line length
     nelts = n - 1 # Number of cells
+    S = length(xmin)
+    @assert length(xmax) == S "`xmin` and `xmax` must have the same length"
 
     # Linear elements
     if (order == 1)
-        Δx = l / (n - 1)
+        Δx = (xmax - xmin) / (n - 1)
+        T = eltype(Δx)
 
         # Nodes
-        nodes = Vector{Node{1, Float64}}(undef, n)
+        nodes = Vector{Node{S, T}}(undef, n)
         for i in 1:n
-            nodes[i] = Node(SA[xmin + (i - 1) * Δx])
+            nodes[i] = Node(xmin + (i - 1) * Δx)
         end
 
         # Cell type is constant
@@ -143,15 +146,16 @@ function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"
 
         # Quadratic elements
     elseif (order == 2)
-        Δx = l / 2 / (n - 1)
+        Δx = (xmax - xmin) / 2 / (n - 1)
+        T = eltype(Δx)
 
         # Cell type is constant
         celltypes = [Bar3_t() for ielt in 1:nelts]
 
         # Nodes + Cell -> nodes connectivity
-        nodes = Array{Node{1, Float64}}(undef, 2 * n - 1)
+        nodes = Array{Node{S, T}}(undef, 2 * n - 1)
         cell2node = zeros(Int, 3 * nelts)
-        nodes[1] = Node([xmin]) # First node
+        nodes[1] = Node(xmin) # First node
         i = 1 # init counter
         for ielt in 1:nelts
             # two new nodes : middle one and then right boundary
@@ -220,12 +224,23 @@ function rectangle_mesh(
     ymin = 0.0,
     ymax = 1.0,
     order = 1,
+    P00::T = nothing,
+    P10::T = nothing,
+    P11::T = nothing,
+    P01::T = nothing,
     bnd_names = ("xmin", "xmax", "ymin", "ymax"),
-)
+) where {T <: Union{Nothing, AbstractVector}}
     @assert (nx > 1 && ny > 1) "`nx` and `ny`, the number of nodes, must be greater than 1 (nx=$nx, ny=$ny)"
 
+    if (P00 == P10 == P11 == P01 == nothing)
+        P00 = SA[xmin, ymin]
+        P10 = SA[xmax, ymin]
+        P11 = SA[xmax, ymax]
+        P01 = SA[xmin, ymax]
+    end
+
     if (type == :quad)
-        return _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, Val(order), bnd_names)
+        return _rectangle_quad_mesh(nx, ny, P00, P10, P11, P01, Val(order), bnd_names)
     else
         throw(
             ArgumentError("`type` must be :quad (but feel free to implement other types)"),
@@ -233,8 +248,18 @@ function rectangle_mesh(
     end
 end
 
-function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_names)
+function _rectangle_quad_mesh(
+    nx,
+    ny,
+    P00::T,
+    P10::T,
+    P11::T,
+    P01::T,
+    ::Val{1},
+    bnd_names,
+) where {T <: AbstractVector}
     # Notes
+    # P01         P11
     # 6-----8-----9
     # |     |     |
     # |  3  |  4  |
@@ -244,12 +269,9 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_name
     # |  1  |  2  |
     # |     |     |
     # 1-----2-----3
+    # P00        P10
 
-    lx = xmax - xmin
-    ly = ymax - ymin
     nelts = (nx - 1) * (ny - 1)
-    Δx = lx / (nx - 1)
-    Δy = ly / (ny - 1)
 
     # Prepare boundary nodes
     tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
@@ -257,10 +279,18 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{1}, bnd_name
 
     # Nodes
     iglob = 1
-    nodes = Array{Node{2, Float64}}(undef, nx * ny)
+    nodes = Array{Node{length(P00), Float64}}(undef, nx * ny)
     for iy in 1:ny
         for ix in 1:nx
-            nodes[(iy - 1) * nx + ix] = Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy])
+            #compute node coodinates by bilinear interpolation in (P00,P10,P11,P01)
+            u = (ix - 1) / (nx - 1)
+            v = (iy - 1) / (ny - 1)
+            coor =
+                (1 - u) * (1 - v) * P00 +
+                u * (1 - v) * P10 +
+                (1 - u) * v * P01 +
+                u * v * P11
+            nodes[(iy - 1) * nx + ix] = Node(coor)
 
             # Boundary conditions
             (ix == 1) && push!(tag2nodes[1], iglob)
@@ -301,8 +331,18 @@ end
 
 # Remark : with a rectangle domain of quadratic elements, we can then apply a mapping on
 # this rectangle domain to obtain a curved mesh...
-function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_names)
+function _rectangle_quad_mesh(
+    nx,
+    ny,
+    P00::T,
+    P10::T,
+    P11::T,
+    P01::T,
+    ::Val{2},
+    bnd_names,
+) where {T <: AbstractVector}
     # Notes
+    # D           C
     # 07----08----09
     # |           |
     # |           |
@@ -310,6 +350,7 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     # |           |
     # |           |
     # 01----02----03
+    # A           B
     #
     # 11----12----13----14----15
     # |           |           |
@@ -319,12 +360,8 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
     # |           |           |
     # 01----02----03----04----05
 
-    lx = xmax - xmin
-    ly = ymax - ymin
     nelts = (nx - 1) * (ny - 1)
     nnodes = nx * ny + (nx - 1) * ny + (ny - 1) * nx + nelts
-    Δx = lx / (nx - 1) / 2
-    Δy = ly / (ny - 1) / 2
 
     # Prepare boundary nodes
     tag2name = Dict(tag => name for (tag, name) in enumerate(bnd_names))
@@ -332,12 +369,19 @@ function _rectangle_quad_mesh(nx, ny, xmin, xmax, ymin, ymax, ::Val{2}, bnd_name
 
     # Nodes
     # we override some nodes multiple times, but it is easier this way
-    nodes = Array{Node{2, Float64}}(undef, nnodes)
+    nodes = Array{Node{length(P00), Float64}}(undef, nnodes)
     iglob = 1
     for iy in 1:(ny + (ny - 1))
         for ix in 1:(nx + (nx - 1))
-            nodes[(iy - 1) * (nx + (nx - 1)) + ix] =
-                Node([xmin + (ix - 1) * Δx, ymin + (iy - 1) * Δy])
+            #compute node coodinates by bilinear interpolation in (A,B,C,D)
+            u = 0.5 * (ix - 1) / (nx - 1)
+            v = 0.5 * (iy - 1) / (ny - 1)
+            coor =
+                (1 - u) * (1 - v) * P00 +
+                u * (1 - v) * P10 +
+                (1 - u) * v * P01 +
+                u * v * P11
+            nodes[(iy - 1) * (nx + (nx - 1)) + ix] = Node(coor)
 
             # Boundary conditions
             (ix == 1) && push!(tag2nodes[1], iglob)
