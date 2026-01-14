@@ -84,18 +84,17 @@ end
 Indicate if `cpoint` lies inside the cell `cinfo`.
 
 # Dev notes
-This function triggers a call to `mapping_inv`. But `mapping_inv` is undefined
-for points outside the cell, and a `DomainError` is thrown when the situation occurs.
-Hence if a `DomainError` is catched during the evaluation of `change_domain`, it only means
+This function triggers a call to `mapping_inv`. But `mapping_inv` may throw a `DomainError`
+if the algorithm fails (bad convergence, ...).
+Hence if a `DomainError` is catched during the evaluation of `change_domain`, it is assumed
 that the point is outside the cell. If it's an other error type, an error is thrown.
 """
 function is_point_in_cell(cinfo, cpoint)
-    result = false
     try
         cpoint_ref = change_domain(cpoint, ReferenceDomain())
-        result = is_point_in_shape(shape(celltype(cinfo)), get_coords(cpoint_ref))
+        return is_point_in_shape(shape(celltype(cinfo)), get_coords(cpoint_ref))
     catch err
         @assert err isa DomainError
     end
-    return result
+    return false
 end
