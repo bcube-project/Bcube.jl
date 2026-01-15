@@ -784,8 +784,9 @@ function _update_b!(
     idofs = _map_idofs(V, idofs)
 
     __update_b!(b, idofs, values_i, backend)
-    if (domain isa InteriorFaceDomain) ||
-       (domain isa BoundaryFaceDomain{<:AbstractMesh, <:PeriodicBCType})
+
+    # Does the face has a second side?
+    if has_opposite_side(elementInfo)
         values_j = map(identity, map(identity, map(last, unwrapValues)))
         jdofs = get_dofs(
             V,

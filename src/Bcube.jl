@@ -61,6 +61,7 @@ export basic_mesh,
 include("./mesh/domain.jl")
 export AbstractDomain,
     CellDomain,
+    AllFaceDomain,
     InteriorFaceDomain,
     BoundaryFaceDomain,
     get_mesh,
