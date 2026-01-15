@@ -520,6 +520,38 @@
             @test_throws AssertionError compute(∫(f)dΩ + ∫(side⁻(f))dΓ)
         end
     end
+
+    @testset "Conservativity" begin
+        for mesh in (line_mesh(5), rectangle_mesh(6, 8))
+            f = 1.0 .* collect(1:spacedim(mesh))
+            fs = FunctionSpace(:Lagrange, 0)
+            U = TrialFESpace(fs, mesh)
+            V = TestFESpace(U)
+
+            # AllFaceDomain
+            Γ_all = Bcube.AllFaceDomain(mesh)
+            dΓ_all = Measure(Γ_all, 2)
+            nΓ_all = get_face_normals(dΓ_all)
+            l_all(v) = ∫(f ⋅ side_n(nΓ_all) * jump(v))dΓ_all
+            y_all = assemble_linear(l_all, V)
+            @show all(y_all .< eps())
+
+            # InteriorFaceDomain
+            Γ_int = InteriorFaceDomain(mesh)
+            dΓ_int = Measure(Γ_int, 2)
+            nΓ_int = get_face_normals(dΓ_int)
+            c2f_all = Bcube.connectivities_indices(mesh, :c2f)
+            f2c_all = Bcube.connectivities_indices(mesh, :f2c)
+            cell2interior = map(c2f_all) do c2f
+                all(iface -> length(f2c_all[iface]) > 1, c2f)
+            end
+            interior_cells = findall(cell2interior)
+            l_int(v) = ∫(f ⋅ side_n(nΓ_int) * jump(v))dΓ_int
+            y_int = assemble_linear(l_int, V)
+            @show all(y_int[interior_cells] .< eps())
+        end
+    end
+
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials

@@ -96,7 +96,7 @@
             )
         end
 
-        @testset "FaceDomain" begin
+        @testset "InteriorFaceDomain" begin
             mesh = read_mesh(
                 joinpath(
                     @__DIR__,
@@ -111,6 +111,8 @@
             @test length(subdomains) == 3
             @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) ==
                   length(inner_faces(mesh))
+            @test all(Bcube.map_element(Bcube.has_opposite_side, Γ))
+
             # subdomain #1
             @test Bcube.get_elementtype(subdomains[1]) ==
                   (Bcube.Bar2_t(), Bcube.Tri3_t(), Bcube.Tri3_t())
@@ -157,6 +159,9 @@
                 PeriodicBCType(Translation(SA[0.0, 2l]), ("South",), ("North",))
             Γ_perio_x = BoundaryFaceDomain(mesh, periodicBCType_x)
             Γ_perio_y = BoundaryFaceDomain(mesh, periodicBCType_y)
+            for Γ in (Γ_perio_x, Γ_perio_y)
+                @test all(Bcube.map_element(Bcube.has_opposite_side, Γ))
+            end
 
             subdomains = Bcube.get_subdomains(Γ_perio_x)
             @test length(subdomains) == 2
@@ -221,6 +226,9 @@
             Γe = BoundaryFaceDomain(mesh, "East")
             Γn = BoundaryFaceDomain(mesh, "North")
             Γw = BoundaryFaceDomain(mesh, "West")
+            for Γ in (Γs, Γe, Γn, Γw)
+                @test !any(Bcube.map_element(Bcube.has_opposite_side, Γ))
+            end
 
             subdomains = Bcube.get_subdomains(Γs)
             @test length(subdomains) == 1
