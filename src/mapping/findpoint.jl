@@ -73,7 +73,13 @@ function interpolate_at_point(
     u::Vararg{AbstractLazy, N},
 ) where {N}
     cpoint = find_cell_point(pf, x)
-    ismissing(cpoint) && (return missing)
+    if ismissing(cpoint)
+        if N > 1
+            return ntuple(i -> missing, Val(N))
+        else
+            return missing
+        end
+    end
     uᵢ = materialize(u, get_cellinfo(cpoint))
     return materialize(uᵢ, cpoint)
 end
@@ -97,4 +103,29 @@ function is_point_in_cell(cinfo, cpoint)
         @assert err isa DomainError
     end
     return false
+end
+
+function find_cell_point(bvh::BVHNode, domain::AbstractDomain, x)
+    domIter = DomainIterator(domain)
+    icell = find_bcell(bvh, domIter, x)
+    isnothing(icell) && (return missing)
+    CellPoint(x, domIter[icell], Bcube.PhysicalDomain())
+end
+
+function interpolate_at_point(
+    bvh::BVHNode,
+    domain::AbstractDomain,
+    x::AbstractArray{<:Number},
+    u::Vararg{AbstractLazy, N},
+) where {N}
+    cpoint = find_cell_point(bvh, domain, x)
+    if ismissing(cpoint)
+        if N > 1
+            return ntuple(i -> missing, Val(N))
+        else
+            return missing
+        end
+    end
+    uᵢ = materialize(u, get_cellinfo(cpoint))
+    return materialize(uᵢ, cpoint)
 end

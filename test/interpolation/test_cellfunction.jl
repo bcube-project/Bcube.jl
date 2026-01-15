@@ -300,7 +300,8 @@ end
     )
     Uspace = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh; size = 2)
     Vspace = TestFESpace(Uspace)
-    dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
+    Ω = CellDomain(mesh)
+    dΩ = Measure(Ω, 2 * degree + 1)
     u = FEFunction(Uspace)
     f1((x, y)) = SA[x + 4y + 1, 7x * x + 2y * x + 2y * y + 3y + 12]
     projection_l2!(u, PhysicalFunction(f1), dΩ)
@@ -322,4 +323,13 @@ end
     up_multiinputs = [Bcube.interpolate_at_point(pf_closest, x, u, 7 * u) for x in xp]
     @test all(f1.(xp) .≈ getindex.(up_multiinputs, 1))
     @test all((7 * f1.(xp)) .≈ getindex.(up_multiinputs, 2))
+
+    bvh = Bcube.build_bvh(Ω)
+    up_bvh = [Bcube.interpolate_at_point(bvh, Ω, x, u) for x in xp]
+    @test all(f1.(xp[1:(end - 1)]) .≈ up_bvh[1:(end - 1)])
+    @test ismissing(up_bvh[end])
+
+    up_bvh_multiinputs = [Bcube.interpolate_at_point(bvh, Ω, x, u, 7 * u) for x in xp]
+    @test all(f1.(xp[1:(end - 1)]) .≈ getindex.(up_bvh_multiinputs, 1)[1:(end - 1)])
+    @test all(ismissing, last(up_bvh_multiinputs))
 end

@@ -68,6 +68,8 @@ export AbstractDomain,
     get_face_normals,
     get_cell_normals
 
+include("./mesh/bvh.jl")
+
 include("./quadrature/quadrature.jl")
 export QuadratureLobatto, QuadratureLegendre, QuadratureUniform, Quadrature, QuadratureRule
 
