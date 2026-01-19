@@ -1,7 +1,7 @@
 abstract type AbstractQuadratureType end
-struct QuadratureLegendre <: AbstractQuadratureType end
-struct QuadratureLobatto <: AbstractQuadratureType end
-struct QuadratureUniform <: AbstractQuadratureType end
+struct QuadratureLegendre{T} <: AbstractQuadratureType end
+struct QuadratureLobatto{T} <: AbstractQuadratureType end
+struct QuadratureUniform{T} <: AbstractQuadratureType end
 
 """
     AbstractQuadrature{T,D}
@@ -24,7 +24,7 @@ function Quadrature(qt::AbstractQuadratureType, ::Val{D}) where {D}
     @assert D isa Integer && D ≥ 0 "'D' must be a positive Integer"
     Quadrature{typeof(qt), D}()
 end
-Quadrature(d::Val{D}) where {D} = Quadrature(QuadratureLegendre(), d)
+Quadrature(d::Val{D}) where {D} = Quadrature(QuadratureLegendre{Float64}(), d)
 
 Quadrature(qt::AbstractQuadratureType, d::Integer) = Quadrature(qt, Val(d))
 Quadrature(d::Integer) = Quadrature(Val(d))
@@ -195,28 +195,28 @@ end
 
 # Line quadratures
 """
-    _gausslegendre1D(::Val{N}) where N
-    _gausslobatto1D(::Val{N}) where N
+    _gausslegendre1D(::Val{N}, ::Type{T}) where {N, T}
+    _gausslobatto1D(::Val{N}, ::Type{T}) where {N, T}
 
 Return `N`-point Gauss quadrature weights and nodes on the domain [-1:1].
 """
-@generated function _gausslegendre1D(::Val{N}) where {N}
+@generated function _gausslegendre1D(::Val{N}, ::Type{T}) where {N, T}
     x, w = FastGaussQuadrature.gausslegendre(N)
-    w0 = SVector{length(w), eltype(w)}(w)
-    x0 = SVector{length(x), eltype(x)}(x)
+    w0 = SVector{length(w), T}(w)
+    x0 = SVector{length(x), T}(x)
     return :($w0, $x0)
 end
 
-@generated function _gausslobatto1D(::Val{N}) where {N}
+@generated function _gausslobatto1D(::Val{N}, ::Type{T}) where {N, T}
     x, w = FastGaussQuadrature.gausslobatto(N)
-    w0 = SVector{length(w), eltype(w)}(w)
-    x0 = SVector{length(x), eltype(x)}(x)
+    w0 = SVector{length(w), T}(w)
+    x0 = SVector{length(x), T}(x)
     return :($w0, $x0)
 end
 
-@generated function _uniformpoints(::Val{N}) where {N}
-    xmin = -1.0
-    xmax = 1.0
+@generated function _uniformpoints(::Val{N}, ::Type{T}) where {N, T}
+    xmin = -T(1.0)
+    xmax = T(1.0)
     if N == 1
         x0 = SA[(xmin + xmax) / 2]
     else
@@ -226,9 +226,9 @@ end
     return :($w0, $x0)
 end
 
-_quadrature_rule(n::Val{N}, ::QuadratureLegendre) where {N} = _gausslegendre1D(n)
-_quadrature_rule(n::Val{N}, ::QuadratureLobatto) where {N} = _gausslobatto1D(n)
-_quadrature_rule(n::Val{N}, ::QuadratureUniform) where {N} = _uniformpoints(n)
+_quadrature_rule(n::Val{N}, ::QuadratureLegendre{T}) where {N, T} = _gausslegendre1D(n, T)
+_quadrature_rule(n::Val{N}, ::QuadratureLobatto{T}) where {N, T} = _gausslobatto1D(n, T)
+_quadrature_rule(n::Val{N}, ::QuadratureUniform{T}) where {N, T} = _uniformpoints(n, T)
 
 """
 Gauss-Legendre formula with ``n`` nodes has degree of exactness ``2n-1``.

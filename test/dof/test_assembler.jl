@@ -552,6 +552,38 @@
         end
     end
 
+    @testset "Arbitrary precision" begin
+        # to be moved elsewhere? This is a bit "transverse". We could split it in
+        # multiple places but we would duplicate a lot of code
+        T_float = Float32
+        mesh = one_cell_mesh(:line)
+        Ω = CellDomain(mesh)
+        dΩ = Measure(Ω, 1)
+
+        fs = FunctionSpace(:Lagrange, 1)
+        U = TrialFESpace(fs, mesh, Dict("xmin" => T_float(0.0)))
+        V = TestFESpace(U)
+
+        # Check FEFunction
+        u = FEFunction(U, T_float)
+        @test eltype(get_dof_values(u)) == T_float
+
+        # Check bilinear assembly
+        a(u, v) = ∫(u * v)dΩ
+        M = assemble_bilinear(a, U, V; T = T_float)
+        @test eltype(M) == T_float
+
+        # Check linear assembly (without FEFunction)
+        b(v) = ∫(v)dΩ
+        B = assemble_linear(b, V; T = T_float)
+        @test eltype(B) == T_float
+
+        # Check linear assembly (with FEFunction)
+        c(v) = ∫(u * v)dΩ
+        C = assemble_linear(c, V; T = T_float)
+        @test eltype(C) == T_float
+    end
+
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials

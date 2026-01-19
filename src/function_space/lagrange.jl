@@ -11,9 +11,9 @@ Lagrange() = Lagrange(:Uniform) # default Lagrange constructor when `type` is no
 FunctionSpace(::Val{:Lagrange}, degree::Integer) = FunctionSpace(Lagrange(), degree)
 
 lagrange_quadrature_type(::Lagrange{T}) where {T} = error("No quadrature type is associated with Lagrange type $T")
-lagrange_quadrature_type(::Lagrange{:Uniform})    = QuadratureUniform()
-lagrange_quadrature_type(::Lagrange{:Legendre})   = QuadratureLegendre()
-lagrange_quadrature_type(::Lagrange{:Lobatto})    = QuadratureLobatto()
+lagrange_quadrature_type(::Lagrange{:Uniform})    = QuadratureUniform{Float64}()
+lagrange_quadrature_type(::Lagrange{:Legendre})   = QuadratureLegendre{Float64}()
+lagrange_quadrature_type(::Lagrange{:Lobatto})    = QuadratureLobatto{Float64}()
 
 function lagrange_quadrature_type(fs::FunctionSpace{<:Lagrange})
     lagrange_quadrature_type(get_type(fs)())
