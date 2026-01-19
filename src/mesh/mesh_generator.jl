@@ -44,9 +44,10 @@ function one_cell_mesh(
     zmin = -1,
     zmax = 1.0,
     order = 1,
+    T_int = DInt,
 )
     if (type == :line || type == :bar)
-        return one_line_mesh(Val(order), xmin, xmax)
+        return one_line_mesh(Val(order), xmin, xmax, T_int)
     elseif (type == :quad || type == :square)
         return one_quad_mesh(Val(order), xmin, xmax, ymin, ymax)
     elseif (type == :tri || type == :triangle)
@@ -549,25 +550,25 @@ function hexa_mesh(
     )
 end
 
-function one_line_mesh(::Val{1}, xmin, xmax)
+function one_line_mesh(::Val{1}, xmin, xmax, T_int)
     nodes = [Node([xmin]), Node([xmax])]
     celltypes = [Bar2_t()]
-    cell2node = Connectivity([2], [1, 2])
-    bc_names, bc_nodes = one_line_bnd()
+    cell2node = Connectivity(T_int[2], T_int[1, 2])
+    bc_names, bc_nodes = one_line_bnd(; T_int)
     return Mesh(nodes, celltypes, cell2node; bc_names = bc_names, bc_nodes = bc_nodes)
 end
 
-function one_line_mesh(::Val{2}, xmin, xmax)
+function one_line_mesh(::Val{2}, xmin, xmax, T_int)
     nodes = [Node([xmin]), Node([xmax]), Node([(xmin + xmax) / 2])]
     celltypes = [Bar3_t()]
-    cell2node = Connectivity([3], [1, 2, 3])
-    bc_names, bc_nodes = one_line_bnd()
+    cell2node = Connectivity(T_int[3], T_int[1, 2, 3])
+    bc_names, bc_nodes = one_line_bnd(; T_int)
     return Mesh(nodes, celltypes, cell2node; bc_names, bc_nodes)
 end
 
-function one_line_bnd(ileft = 1, iright = 2, names = ("xmin", "xmax"))
-    bc_names = Dict(1 => names[1], 2 => names[2])
-    bc_nodes = Dict(1 => [ileft], 2 => [iright])
+function one_line_bnd(ileft = 1, iright = 2, names = ("xmin", "xmax"); T_int = DInt)
+    bc_names = Dict(T_int(1) => names[1], T_int(2) => names[2])
+    bc_nodes = Dict(T_int(1) => T_int[ileft], T_int(2) => T_int[iright])
     return bc_names, bc_nodes
 end
 

@@ -2,7 +2,7 @@
 The `DofHandler` handles the degree of freedom numbering. To each degree of freedom
 is associated a unique integer.
 """
-struct DofHandler{A, B}
+struct DofHandler{A, B, C}
     # N : number of components
 
     # Naturally, `iglob` would be a (ndofs, ncell) array. Since
@@ -26,7 +26,7 @@ struct DofHandler{A, B}
     ndofs::B
 
     # Total number of unique DoFs
-    ndofs_tot::Int
+    ndofs_tot::C
 end
 
 """
@@ -43,15 +43,17 @@ function DofHandler(
     # Get cell types
     celltypes = cells(mesh)
 
+    T_int = get_integer_type(mesh)
+
     # Allocate
     # `offset` indicates, for each cell, the "position" of the dofs of the cell in the `iglob` vector
     #  `_ndofs` indicates the number of dofs of each cell
-    offset = zeros(Int, ncells(mesh), ncomponents)
-    _ndofs = zeros(Int, ncells(mesh), ncomponents)
+    offset = zeros(T_int, ncells(mesh), ncomponents)
+    _ndofs = zeros(T_int, ncells(mesh), ncomponents)
 
     # First we assume a "discontinuous" type
     ndofs_tot = sum(cell -> ncomponents * get_ndofs(fSpace, shape(cell)), cells(mesh))
-    iglob = collect(1:ndofs_tot)
+    iglob = collect(T_int, 1:ndofs_tot)
     curr = 0 # Current offset value. Init to obtain '0' as the first element of `offset`
     next = 0 # Next offset value
     for icell in 1:ncells(mesh)
@@ -152,7 +154,12 @@ function DofHandler(
     # Create a cell number remapping to ensure a dense numbering
     densify!(iglob)
     ndofs_tot = length(unique(iglob))
-    return DofHandler{typeof(iglob), typeof(offset)}(iglob, offset, _ndofs, ndofs_tot)
+    return DofHandler{typeof(iglob), typeof(offset), T_int}(
+        iglob,
+        offset,
+        _ndofs,
+        ndofs_tot,
+    )
 end
 
 @inline get_offset(dhl::DofHandler) = dhl.offset
@@ -415,7 +422,7 @@ Count maximum number of dofs per cell, all components mixed
 max_ndofs(dhl::DofHandler) = maximum(dhl.ndofs)
 
 """
-    get_ndofs(dhl, icell, kvar::Int)
+    get_ndofs(dhl, icell, kvar::I) where {I <: Integer}
 
 Number of dofs for a given variable in a given cell.
 
@@ -426,10 +433,11 @@ dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
 @show get_ndofs(dhl, 1, 1)
 ```
 """
-@inline get_ndofs(dhl::DofHandler, icell, kvar::Int) = dhl.ndofs[icell, kvar]
+@inline get_ndofs(dhl::DofHandler, icell, kvar::I) where {I <: Integer} =
+    dhl.ndofs[icell, kvar]
 
 """
-    get_ndofs(dhl, icell, icomp::Vector{Int})
+    get_ndofs(dhl, icell, icomp::AbstractVector{I}) where I <: Integer
 
 Number of dofs for a given set of components in a given cell.
 
@@ -441,10 +449,14 @@ dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1); size = 2))
 @show get_ndofs(dhl, 1, [1, 2])
 ```
 """
-@inline function get_ndofs(dhl::DofHandler, icell, icomp::AbstractVector{Int})
+@inline function get_ndofs(
+    dhl::DofHandler,
+    icell,
+    icomp::AbstractVector{I},
+) where {I <: Integer}
     sum(dhl.ndofs[icell, icomp])
 end
-@inline function get_ndofs(dhl::DofHandler, icell, icomp::UnitRange{Int})
+@inline function get_ndofs(dhl::DofHandler, icell, icomp::UnitRange{I}) where {I <: Integer}
     sum(view(dhl.ndofs, icell:icell, icomp))
 end
 
@@ -479,7 +491,7 @@ dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
 get_ndofs(dhl::DofHandler) = dhl.ndofs_tot
 
 """
-    get_dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
+    get_dof(dhl::DofHandler, icell, icomp::I, idof::I) where {I <: Integer}
 
 Global index of the `idof` local degree of freedom of component `icomp` in cell `icell`.
 
@@ -490,12 +502,12 @@ dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
 @show get_dof(dhl, 1, 1, 1)
 ```
 """
-function get_dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
+function get_dof(dhl::DofHandler, icell, icomp::I, idof::I) where {I <: Integer}
     dhl.iglob[dhl.offset[icell, icomp] + idof]
 end
 
 """
-    get_dof(dhl::DofHandler, icell, icomp::Int)
+    get_dof(dhl::DofHandler, icell, icomp::I) where {I <: Integer}
 
 Global indices of all the dofs of a given component in a given cell
 
@@ -506,7 +518,7 @@ dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
 @show get_dof(dhl, 1, 1)
 ```
 """
-function get_dof(dhl::DofHandler, icell, icomp::Int)
+function get_dof(dhl::DofHandler, icell, icomp::I) where {I <: Integer}
     view(dhl.iglob, dhl.offset[icell, icomp] .+ (1:get_ndofs(dhl, icell, icomp)))
 end
 function get_dof(dhl::DofHandler, icell)
@@ -522,7 +534,7 @@ function get_dof(dhl::DofHandler, icell::UnitRange)
         (1:(dhl.offset[last(icell), 1] + get_ndofs(dhl, last(icell)))),
     )
 end
-function get_dof(dhl::DofHandler, icell, icomp::Int, ::Val{N}) where {N}
+function get_dof(dhl::DofHandler, icell, icomp::I, ::Val{N}) where {I <: Integer, N}
     @assert N == get_ndofs(dhl, icell, icomp) "error N ≠ ndofs"
     dhl.iglob[dhl.offset[icell, icomp] .+ SVector{N}(1:N)]
 end

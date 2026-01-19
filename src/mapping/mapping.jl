@@ -354,7 +354,7 @@ function mapping_det_jacobian(ctype::AbstractEntityType{1}, cnodes, ξ)
 end
 
 function mapping(::Bar2_t, cnodes, ξ)
-    (cnodes[2].x - cnodes[1].x) / 2.0 .* ξ + (cnodes[2].x + cnodes[1].x) / 2.0
+    (cnodes[2].x - cnodes[1].x) / 2 .* ξ + (cnodes[2].x + cnodes[1].x) / 2
 end
 
 function mapping_inv(::Bar2_t, cnodes, x)
@@ -363,16 +363,16 @@ end
 
 function mapping_jacobian(::Bar2_t, cnodes, ξ)
     axes(cnodes) == (Base.OneTo(2),) || error("Invalid number of nodes")
-    @inbounds (cnodes[2].x .- cnodes[1].x) ./ 2.0
+    @inbounds (cnodes[2].x .- cnodes[1].x) ./ 2
 end
 
 function mapping_jacobian_inv(::Bar2_t, cnodes, ξ)
-    @SMatrix[2.0 / (cnodes[2].x[1] .- cnodes[1].x[1])]
+    @SMatrix[2 / (cnodes[2].x[1] .- cnodes[1].x[1])]
 end
 
-mapping_inv_jacobian(::Bar2_t, cnodes, x) = 2.0 / (cnodes[2].x[1] - cnodes[1].x[1])
+mapping_inv_jacobian(::Bar2_t, cnodes, x) = 2 / (cnodes[2].x[1] - cnodes[1].x[1])
 
-mapping_det_jacobian(::Bar2_t, cnodes, ξ) = norm(cnodes[2].x - cnodes[1].x) / 2.0
+mapping_det_jacobian(::Bar2_t, cnodes, ξ) = norm(cnodes[2].x - cnodes[1].x) / 2
 
 function mapping(::Bar3_t, cnodes, ξ)
     ξ .* (ξ .- 1) / 2 .* cnodes[1].x .+ ξ .* (ξ .+ 1) / 2 .* cnodes[2].x .+
@@ -385,7 +385,7 @@ function mapping_jacobian(::Bar3_t, cnodes, ξ)
 end
 
 function mapping_jacobian_inv(::Bar3_t, cnodes, ξ)
-    2.0 /
+    2 /
     (cnodes[1].x .* (2 .* ξ .- 1) + cnodes[2].x .* (2 .* ξ .+ 1) - cnodes[3].x .* 4 .* ξ)
 end
 
@@ -514,7 +514,7 @@ function mapping_det_jacobian(::Quad4_t, cnodes::AbstractArray{<:Node{2, T}}, ξ
         ((1 - η) * (y2 - y1) + (1 + η) * (y3 - y4)) +
         ((1 - η) * (x2 - x1) + (1 + η) * (x3 - x4)) *
         ((1 - ξ) * (y4 - y1) + (1 + ξ) * (y3 - y2)),
-    ) / 16.0
+    ) / 16
 end
 
 #---------------- TRIANGLE P2
@@ -666,32 +666,32 @@ function mapping(::Hexa27_t, cnodes, ξηζ)
     η = ξηζ[2]
     ζ = ξηζ[3]
     return (
-        ξ * η * ζ * (ξ - 1) * (η - 1) * (ζ - 1) / 8.0 .* cnodes[1].x +
-        ξ * η * ζ * (ξ + 1) * (η - 1) * (ζ - 1) / 8.0 .* cnodes[2].x +
-        ξ * η * ζ * (ξ + 1) * (η + 1) * (ζ - 1) / 8.0 .* cnodes[3].x +
-        ξ * η * ζ * (ξ - 1) * (η + 1) * (ζ - 1) / 8.0 .* cnodes[4].x +
-        ξ * η * ζ * (ξ - 1) * (η - 1) * (ζ + 1) / 8.0 .* cnodes[5].x +
-        ξ * η * ζ * (ξ + 1) * (η - 1) * (ζ + 1) / 8.0 .* cnodes[6].x +
-        ξ * η * ζ * (ξ + 1) * (η + 1) * (ζ + 1) / 8.0 .* cnodes[7].x +
-        ξ * η * ζ * (ξ - 1) * (η + 1) * (ζ + 1) / 8.0 .* cnodes[8].x +
-        -η * ζ * (ξ^2 - 1) * (η - 1) * (ζ - 1) / 4.0 .* cnodes[9].x +
-        -ξ * ζ * (ξ + 1) * (η^2 - 1) * (ζ - 1) / 4.0 .* cnodes[10].x +
-        -η * ζ * (ξ^2 - 1) * (η + 1) * (ζ - 1) / 4.0 .* cnodes[11].x +
-        -ξ * ζ * (ξ - 1) * (η^2 - 1) * (ζ - 1) / 4.0 .* cnodes[12].x +
-        -ξ * η * (ξ - 1) * (η - 1) * (ζ^2 - 1) / 4.0 .* cnodes[13].x +
-        -ξ * η * (ξ + 1) * (η - 1) * (ζ^2 - 1) / 4.0 .* cnodes[14].x +
-        -ξ * η * (ξ + 1) * (η + 1) * (ζ^2 - 1) / 4.0 .* cnodes[15].x +
-        -ξ * η * (ξ - 1) * (η + 1) * (ζ^2 - 1) / 4.0 .* cnodes[16].x +
-        -η * ζ * (ξ^2 - 1) * (η - 1) * (ζ + 1) / 4.0 .* cnodes[17].x +
-        -ξ * ζ * (ξ + 1) * (η^2 - 1) * (ζ + 1) / 4.0 .* cnodes[18].x +
-        -η * ζ * (ξ^2 - 1) * (η + 1) * (ζ + 1) / 4.0 .* cnodes[19].x +
-        -ξ * ζ * (ξ - 1) * (η^2 - 1) * (ζ + 1) / 4.0 .* cnodes[20].x +
-        ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ - 1) / 2.0 .* cnodes[21].x +
-        η * (ξ^2 - 1) * (η - 1) * (ζ^2 - 1) / 2.0 .* cnodes[22].x +
-        ξ * (ξ + 1) * (η^2 - 1) * (ζ^2 - 1) / 2.0 .* cnodes[23].x +
-        η * (ξ^2 - 1) * (η + 1) * (ζ^2 - 1) / 2.0 .* cnodes[24].x +
-        ξ * (ξ - 1) * (η^2 - 1) * (ζ^2 - 1) / 2.0 .* cnodes[25].x +
-        ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ + 1) / 2.0 .* cnodes[26].x +
+        ξ * η * ζ * (ξ - 1) * (η - 1) * (ζ - 1) / 8 .* cnodes[1].x +
+        ξ * η * ζ * (ξ + 1) * (η - 1) * (ζ - 1) / 8 .* cnodes[2].x +
+        ξ * η * ζ * (ξ + 1) * (η + 1) * (ζ - 1) / 8 .* cnodes[3].x +
+        ξ * η * ζ * (ξ - 1) * (η + 1) * (ζ - 1) / 8 .* cnodes[4].x +
+        ξ * η * ζ * (ξ - 1) * (η - 1) * (ζ + 1) / 8 .* cnodes[5].x +
+        ξ * η * ζ * (ξ + 1) * (η - 1) * (ζ + 1) / 8 .* cnodes[6].x +
+        ξ * η * ζ * (ξ + 1) * (η + 1) * (ζ + 1) / 8 .* cnodes[7].x +
+        ξ * η * ζ * (ξ - 1) * (η + 1) * (ζ + 1) / 8 .* cnodes[8].x +
+        -η * ζ * (ξ^2 - 1) * (η - 1) * (ζ - 1) / 4 .* cnodes[9].x +
+        -ξ * ζ * (ξ + 1) * (η^2 - 1) * (ζ - 1) / 4 .* cnodes[10].x +
+        -η * ζ * (ξ^2 - 1) * (η + 1) * (ζ - 1) / 4 .* cnodes[11].x +
+        -ξ * ζ * (ξ - 1) * (η^2 - 1) * (ζ - 1) / 4 .* cnodes[12].x +
+        -ξ * η * (ξ - 1) * (η - 1) * (ζ^2 - 1) / 4 .* cnodes[13].x +
+        -ξ * η * (ξ + 1) * (η - 1) * (ζ^2 - 1) / 4 .* cnodes[14].x +
+        -ξ * η * (ξ + 1) * (η + 1) * (ζ^2 - 1) / 4 .* cnodes[15].x +
+        -ξ * η * (ξ - 1) * (η + 1) * (ζ^2 - 1) / 4 .* cnodes[16].x +
+        -η * ζ * (ξ^2 - 1) * (η - 1) * (ζ + 1) / 4 .* cnodes[17].x +
+        -ξ * ζ * (ξ + 1) * (η^2 - 1) * (ζ + 1) / 4 .* cnodes[18].x +
+        -η * ζ * (ξ^2 - 1) * (η + 1) * (ζ + 1) / 4 .* cnodes[19].x +
+        -ξ * ζ * (ξ - 1) * (η^2 - 1) * (ζ + 1) / 4 .* cnodes[20].x +
+        ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ - 1) / 2 .* cnodes[21].x +
+        η * (ξ^2 - 1) * (η - 1) * (ζ^2 - 1) / 2 .* cnodes[22].x +
+        ξ * (ξ + 1) * (η^2 - 1) * (ζ^2 - 1) / 2 .* cnodes[23].x +
+        η * (ξ^2 - 1) * (η + 1) * (ζ^2 - 1) / 2 .* cnodes[24].x +
+        ξ * (ξ - 1) * (η^2 - 1) * (ζ^2 - 1) / 2 .* cnodes[25].x +
+        ζ * (ξ^2 - 1) * (η^2 - 1) * (ζ + 1) / 2 .* cnodes[26].x +
         -(ξ^2 - 1) * (η^2 - 1) * (ζ^2 - 1) .* cnodes[27].x
     )
 end
@@ -741,7 +741,7 @@ function mapping(::Penta6_t, cnodes, ξηζ)
         (1 - ξ - η) * (1 + ζ) .* cnodes[4].x +
         ξ * (1 + ζ) .* cnodes[5].x +
         η * (1 + ζ) .* cnodes[6].x
-    ) ./ 2.0
+    ) ./ 2
 end
 
 function mapping_jacobian(::Penta6_t, cnodes, ξηζ)
@@ -758,7 +758,7 @@ function mapping_jacobian(::Penta6_t, cnodes, ξηζ)
         (1 - ζ) * (M2 - M1) + (1 + ζ) * (M5 - M4),
         (1 - ζ) * (M3 - M1) + (1 + ζ) * (M6 - M4),
         (1 - ξ - η) * (M4 - M1) + ξ * (M5 - M2) + η * (M6 - M3),
-    ) ./ 2.0
+    ) ./ 2
 end
 
 #---------------- Pyra5

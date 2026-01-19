@@ -53,6 +53,9 @@ function get_cell_shape_functions(feSpace::AbstractFESpace, shape::AbstractShape
 end
 
 """
+    get_ndofs(feSpace::AbstractFESpace)
+    get_ndofs(feSpace::AbstractFESpace, shape::AbstractShape)
+
 Return the total number of dofs of the FESpace, taking into account the
 continuous/discontinuous type of the space. If the FESpace contains itself
 several FESpace (see MultiFESpace), the sum of all dofs is returned.
@@ -63,19 +66,31 @@ function get_ndofs(feSpace::AbstractFESpace, shape::AbstractShape)
     get_ndofs(get_function_space(feSpace), shape) * get_ncomponents(feSpace)
 end
 
-function get_dofs(feSpace::AbstractFESpace, icell::Int, n::Val{N}) where {N}
-    get_dofs(parent(feSpace), icell, n)
-end
-function get_dofs(feSpace::AbstractFESpace, icell::Int, shape::AbstractShape)
-    get_dofs(feSpace, icell, Val(get_ndofs(feSpace, shape)))
-end
-
 """
+    get_dofs(feSpace::AbstractFESpace, icell::I) where {I <: Integer}
+    get_dofs(feSpace::AbstractFESpace, icell::I, n::Val{N}) where {I <: Integer, N}
+    get_dofs(
+        feSpace::AbstractFESpace,
+        icell::I,
+        shape::AbstractShape,
+    ) where {I <: Integer}
+
 Return the dofs indices for the cell `icell`
 
 Result is an array of integers.
 """
-get_dofs(feSpace::AbstractFESpace, icell::Int) = get_dofs(parent(feSpace), icell)
+get_dofs(feSpace::AbstractFESpace, icell::I) where {I <: Integer} =
+    get_dofs(parent(feSpace), icell)
+function get_dofs(feSpace::AbstractFESpace, icell::I, n::Val{N}) where {I <: Integer, N}
+    get_dofs(parent(feSpace), icell, n)
+end
+function get_dofs(
+    feSpace::AbstractFESpace,
+    icell::I,
+    shape::AbstractShape,
+) where {I <: Integer}
+    get_dofs(feSpace, icell, Val(get_ndofs(feSpace, shape)))
+end
 
 is_continuous(feSpace::AbstractFESpace) = is_continuous(parent(feSpace))
 is_discontinuous(feSpace::AbstractFESpace) = !is_continuous(feSpace)
@@ -84,6 +99,8 @@ _get_dof_handler(feSpace::AbstractFESpace) = _get_dof_handler(parent(feSpace))
 _get_dhl(feSpace::AbstractFESpace) = _get_dof_handler(feSpace)
 
 """
+    get_dirichlet_boundary_tags(feSpace::AbstractFESpace)
+
 Return the boundary tags where a Dirichlet condition applies
 """
 function get_dirichlet_boundary_tags(feSpace::AbstractFESpace)

@@ -42,7 +42,8 @@ function build_subdomains_by_celltypes(::AbstractBcubeBackend, mesh, indices)
     ctypes = tuple(unique(_ctypes)...)
     indice_by_ctypes =
         map(ct -> indices[filter(i -> _ctypes[i] == ct, 1:length(indices))], ctypes)
-    offsets = cumsum_exclusive(map(length, indice_by_ctypes))
+    T_int = get_integer_type(mesh)
+    offsets = T_int.(cumsum_exclusive(map(length, indice_by_ctypes)))
     return SubDomain.(1, ctypes, indice_by_ctypes, offsets)
 end
 
@@ -165,9 +166,14 @@ end
 @inline topodim(d::CellDomain) = topodim(get_mesh(d))
 
 CellDomain(mesh::AbstractMesh) = CellDomain(parent(mesh))
-CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
+function CellDomain(mesh::Mesh)
+    I = get_integer_type(mesh)
+    CellDomain(mesh, I(1):I(ncells(mesh)))
+end
 function CellDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
     subdomains = build_subdomains_by_celltypes(mesh, indices)
+    @show typeof(map(get_tag, subdomains))
+    @show typeof(unique(map(get_tag, subdomains)))
     tags = tuple(unique(map(get_tag, subdomains))...)
     CellDomain(mesh, subdomains, tags)
 end
