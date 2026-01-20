@@ -112,15 +112,15 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
         dξ = (J' * J) \ (J' * dx)
         ξ_k += dξ
 
-        (norm(dx .+ eps()) < tol_x) && break
-        (norm(dξ .+ eps()) < tol_ξ) && break
+        (sum(abs2, dx) < tol_x^2) && break
+        (sum(abs2, dξ) < tol_ξ^2) && break
 
         i += 1
     end
 
     # Checks
     (i ≤ nmax) || throw(DomainError(x, "Reached max number of iterations"))
-    (norm(x - x_k .+ eps()) < tol_x) ||
+    (sum(abs2, x - x_k) < tol_x^2) ||
         throw(DomainError(x, "Tolerance on physical coordinate not reached"))
 
     return ξ_k
