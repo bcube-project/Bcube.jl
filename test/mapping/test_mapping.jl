@@ -122,6 +122,10 @@
         @test isapprox_arrays(mapping_inv(ctype, cnodes, x2), SA[1.0, -1.0]; rtol = tol)
         @test isapprox_arrays(mapping_inv(ctype, cnodes, x3), SA[1.0, 1.0]; rtol = tol)
         @test isapprox_arrays(mapping_inv(ctype, cnodes, x4), SA[-1.0, 1.0]; rtol = tol)
+        J = ForwardDiff.jacobian(y -> Bcube.mapping_inv(ctype, cnodes, y), x1)
+        Δ = (xmin - xmax) * (ymax - ymin)
+        @test J[1, 1] ≈ -2 * (ymax - ymin) / Δ
+        @test J[2, 2] ≈ 2 * (xmin - xmax) / Δ
 
         θ = π / 5
         s = 3
