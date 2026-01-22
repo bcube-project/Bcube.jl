@@ -90,7 +90,7 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
     tol_ξ = measure(s)^(1 / topodim(s)) * 1e-6
 
     # init with center
-    ξ_k = center(s)
+    ξ_k = center(s) .* one(eltype(x))
     x_k = center(ctype, cnodes)
 
     # Compute tol. Scale with minimum distance between the center and the elements nodes
@@ -104,7 +104,6 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
         x_k = mapping(ctype, cnodes, ξ_k)
 
         dx = x - x_k
-        (norm(dx) < tol_x) && break
 
         J = mapping_jacobian(ctype, cnodes, ξ_k)
 
@@ -113,14 +112,15 @@ function mapping_inv(ctype::AbstractEntityType, cnodes, x)
         dξ = (J' * J) \ (J' * dx)
         ξ_k += dξ
 
-        (norm(dξ) < tol_ξ) && break
+        (sum(abs2, dx) < tol_x^2) && break
+        (sum(abs2, dξ) < tol_ξ^2) && break
 
         i += 1
     end
 
     # Checks
     (i ≤ nmax) || throw(DomainError(x, "Reached max number of iterations"))
-    (norm(x - x_k) < tol_x) ||
+    (sum(abs2, x - x_k) < tol_x^2) ||
         throw(DomainError(x, "Tolerance on physical coordinate not reached"))
 
     return ξ_k
