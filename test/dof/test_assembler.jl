@@ -273,7 +273,7 @@
         mesh = line_mesh(4)
         dΓ = Measure(BoundaryFaceDomain(mesh), 2)
         U = TrialFESpace(FunctionSpace(:Lagrange, 0), mesh)
-        V = TestFESpace(V)
+        V = TestFESpace(U)
         a2(u, v) = ∫(side_n(u) * (side_n(v) + side_p(v)))dΓ
         A = assemble_bilinear(a2, U, V)
         @test A == sparse([1, 3], [1, 3], [1.0, 1.0])
@@ -283,12 +283,11 @@
         # "right" face and "left" face
         mesh = line_mesh(4)
         dΓ = Measure(AllFaceDomain(mesh), 2)
-        nΓ = get_face_normals(dΓ)
         U = TrialFESpace(FunctionSpace(:Lagrange, 0), mesh)
-        V = TestFESpace(TrialFESpace(FunctionSpace(:Lagrange, 0), mesh))
+        V = TestFESpace(U)
         a3(u, v) = ∫(side_n(u) * side_n(v) + side_p(u) * side_p(v))dΓ
         A = assemble_bilinear(a3, U, V)
-        @test A == sparse([1, 2, 3], [1, 2, 3], [1.0, 1.0, 1.0])
+        @test A == sparse([1, 2, 3], [1, 2, 3], [2.0, 2.0, 2.0])
     end
 
     @testset "Poisson DG" begin
