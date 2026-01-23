@@ -181,10 +181,11 @@
         dΩ = Measure(CellDomain(mesh), 3)
 
         # bi-linear form
-        a((u_p, u_xy, u_z), (v_p, v_xy, v_z)) = ∫(u_xy ⋅ v_xy + u_p ⋅ v_z + ∇(u_p) ⋅ v_xy)dΩ
+        a1((u_p, u_xy, u_z), (v_p, v_xy, v_z)) =
+            ∫(u_xy ⋅ v_xy + u_p ⋅ v_z + ∇(u_p) ⋅ v_xy)dΩ
 
         # Compute integrals
-        A = assemble_bilinear(a, U, V)
+        A = assemble_bilinear(a1, U, V)
 
         # Test a few values...
         @test A[12, 1] ≈ 1.0 / 6.0
@@ -199,10 +200,10 @@
         V = TestFESpace(FunctionSpace(:Lagrange, 2), mesh)
 
         dΩ = Measure(CellDomain(mesh), 2)
-        a(u, v) = ∫(∇(u) ⋅ v)dΩ
+        a1(u, v) = ∫(∇(u) ⋅ v)dΩ
         l(v) = ∫(v)dΩ
 
-        A = assemble_bilinear(a, U, V)
+        A = assemble_bilinear(a1, U, V)
         b = assemble_linear(l, V)
 
         @test all((A[1, 1], A[1, 2]) .≈ (-1.0 / 6.0, 1.0 / 6.0))
@@ -247,6 +248,47 @@
         @test all(
             assemble_linear(v -> ∫(u * v)dΩ, V) .≈ (97.0 / 120.0, 4.0 / 5.0, 107.0 / 120.0),
         )
+    end
+
+    @testset "Bilinear face" begin
+        # With a unique P0 cell, the result of the bilinear and linear assembly results
+        # on the two boundary faces must be equal
+        mesh = one_cell_mesh(:line)
+        dΓ = Measure(BoundaryFaceDomain(mesh), 1)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 0), mesh)
+        V = TestFESpace(U)
+        a1(u, v) = ∫(side_n(u) * side_n(v))dΓ
+        A = assemble_bilinear(a1, U, V)
+        b = assemble_linear(v -> a1(PhysicalFunction(x -> 1.0), v), V)
+        @test b[1] == A[1, 1]
+
+        # Three P0 cells, we integrate over the two boundary faces.
+        # 1) The dofs of cell at the left receives "1." from dof "1"
+        # (just the integral of "1" over the face), and "0." from the
+        # other dofs since they don't "share" the left face.
+        # 2) At the center cell, no boundary face in contact so "0." for
+        # every dofs
+        # 3) At the right cell, same than for 1) except here it's the dof "3"
+        # that is in relation with the right face.
+        mesh = line_mesh(4)
+        dΓ = Measure(BoundaryFaceDomain(mesh), 2)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 0), mesh)
+        V = TestFESpace(V)
+        a2(u, v) = ∫(side_n(u) * (side_n(v) + side_p(v)))dΓ
+        A = assemble_bilinear(a2, U, V)
+        @test A == sparse([1, 3], [1, 3], [1.0, 1.0])
+
+        # Three P0 cells, we integrate over the all faces. Since each cell
+        # has exactly two faces, each cell receives a contribution from its
+        # "right" face and "left" face
+        mesh = line_mesh(4)
+        dΓ = Measure(AllFaceDomain(mesh), 2)
+        nΓ = get_face_normals(dΓ)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 0), mesh)
+        V = TestFESpace(TrialFESpace(FunctionSpace(:Lagrange, 0), mesh))
+        a3(u, v) = ∫(side_n(u) * side_n(v) + side_p(u) * side_p(v))dΓ
+        A = assemble_bilinear(a3, U, V)
+        @test A == sparse([1, 2, 3], [1, 2, 3], [1.0, 1.0, 1.0])
     end
 
     @testset "Poisson DG" begin
@@ -301,10 +343,10 @@
         fl_Γb(v, ∇v, n, g) = -(∇v ⋅ n) * g + (γ / h) * v * g
         l_Γb(v) = ∫(fl_Γb ∘ map(side⁻, (v, ∇(v), nΓb, g)))dΓb
 
-        a(u, v) = a_Ω(u, v) + a_Γ(u, v) + a_Γb(u, v)
+        a1(u, v) = a_Ω(u, v) + a_Γ(u, v) + a_Γb(u, v)
         l(v) = l_Ω(v) + l_Γb(v)
 
-        sys = Bcube.AffineFESystem(a, l, U, V)
+        sys = Bcube.AffineFESystem(a1, l, U, V)
         uh = Bcube.solve(sys)
 
         l2(u) = sqrt(sum(compute(∫(u ⋅ u)dΩ)))
@@ -363,7 +405,7 @@
         volume = sum(compute(∫(PhysicalFunction(x -> 1.0))dΩ))
 
         # Define bilinear and linear forms
-        function a((u, λᵤ), (v, λᵥ))
+        function a1((u, λᵤ), (v, λᵥ))
             ∫(∇(u) ⋅ ∇(v))dΩ + ∫(side⁻(λᵤ) * side⁻(v))dΓ + ∫(side⁻(λᵥ) * side⁻(u))dΓ
         end
 
@@ -372,7 +414,7 @@
         end
 
         # Assemble to get matrices and vectors
-        A = assemble_bilinear(a, P, Q)
+        A = assemble_bilinear(a1, P, Q)
         L = assemble_linear(l, Q)
         # Solve problem
         sol = A \ L
