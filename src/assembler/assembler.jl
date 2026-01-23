@@ -128,7 +128,7 @@ function _nnz_bilinear_by_element(elementInfo::FaceInfo, U, V)
     kdofs = nU_n * nV_n
 
     # skip boundary faces:
-    if get_element_index(cellInfo_n) ≠ get_element_index(cellInfo_p)
+    if has_opposite_side(elementInfo)
         nU_p = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_p)))
         nV_p = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_p)))
         kdofs += nU_n * nV_p + nU_p * nV_n + nU_p * nV_p
@@ -612,9 +612,12 @@ function _append_contribution!(
     row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
 
     _offset = offset
-    for (k, (row, col)) in enumerate(
-        Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p)),
-    )
+    iterator = if has_opposite_side(elementInfo)
+        Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p))
+    else
+        Iterators.product((row_dofs_V_n,), (col_dofs_U_n,))
+    end
+    for (k, (row, col)) in enumerate(iterator)
         _offset = _append_bilinear!(I, J, X, _offset, row, col, unwrapValues[k], backend)
     end
     return nothing
