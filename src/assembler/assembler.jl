@@ -794,7 +794,7 @@ function _update_b!(
         jdofs = get_dofs(
             V,
             cellindex(get_cellinfo_p(elementInfo)),
-            shape(celltype(get_cellinfo_n(elementInfo))),
+            shape(celltype(get_cellinfo_p(elementInfo))),
         )
         jdofs = _map_idofs(V, jdofs)
         __update_b!(b, jdofs, values_j, backend)
