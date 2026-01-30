@@ -1053,12 +1053,16 @@ Return block-mapped shape functions for a face element.
 Combines shape functions from both sides of the face (n⁻ and n⁺).
 
 # Dev note :
-Materialize the integrand function on all the different possible Tuples of
+- Materialize the integrand function on all the different possible Tuples of
 `v=(v1,0,0,...), (0,v2,0,...), ..., (..., vi, ...)`
+- For now, `cshape_j` is set to `cshape_i` to "fake" the opposite side
+when there is no existing opposite side. This could be improved in the
+future to avoiding useless computation.
 """
 function blockmap_shape_functions(feSpace, faceinfo::FaceInfo)
     cshape_i = shape(celltype(get_cellinfo_n(faceinfo)))
-    cshape_j = shape(celltype(get_cellinfo_p(faceinfo)))
+    hasOppositeSide = has_opposite_side(faceinfo)
+    cshape_j = hasOppositeSide ? shape(celltype(get_cellinfo_p(faceinfo))) : cshape_i
     _cellpair_blockmap_shape_functions(feSpace, cshape_i, cshape_j)
 end
 
@@ -1167,6 +1171,11 @@ Return block-mapped bilinear shape functions for face integrations.
 
 Creates four combinations of shape functions for the two sides of the face (n⁻, n⁺):
 nn, pn, np, pp.
+
+# Dev notes:
+- For now, `cellinfo_p` is set to `cellinfo_n` to "fake" the opposite side
+when there is no existing opposite side. This could be improved in the
+future to avoiding useless computation.
 """
 function blockmap_bilinear_shape_functions(
     U::AbstractFESpace,
@@ -1174,7 +1183,7 @@ function blockmap_bilinear_shape_functions(
     faceinfo::FaceInfo,
 )
     cellinfo_n = get_cellinfo_n(faceinfo)
-    cellinfo_p = get_cellinfo_p(faceinfo)
+    cellinfo_p = has_opposite_side(faceinfo) ? get_cellinfo_p(faceinfo) : cellinfo_n
     U_nn, V_nn = blockmap_bilinear_shape_functions(U, V, cellinfo_n, cellinfo_n)
     U_pn, V_pn = blockmap_bilinear_shape_functions(U, V, cellinfo_n, cellinfo_p)
     U_np, V_np = blockmap_bilinear_shape_functions(U, V, cellinfo_p, cellinfo_n)

@@ -498,7 +498,7 @@ get_element_index(c::CellSide) = cellindex(c)
 abstract type AbstractFaceInfo <: AbstractDomainIndex end
 
 """
-    FaceInfo{CN<:CellInfo,CP<:CellInfo,FT,FN,F2N,I}
+    FaceInfo{CN<:CellInfo,CP<:Union{CellInfo,Nothing},FT,FN,F2N,I}
 
 Type describing a face as the common side of two adjacent cells.
 `CellInfo` of cells from both sides is stored with
@@ -517,7 +517,7 @@ parameters, namely `CSN` and `CSP` whereas in practice `CSN == CSP == Int`
 (bmxam : I've done multiple tests and this is the only solution I have for now.
 But I don't understand this solution and this might not be necessary)
 """
-struct FaceInfo{CN <: CellInfo, CP <: CellInfo, CSN, CSP, FT, FN, F2N, I} <:
+struct FaceInfo{CN <: CellInfo, CP <: Union{CellInfo, Nothing}, CSN, CSP, FT, FN, F2N, I} <:
        AbstractFaceInfo
     cellinfo_n::CN
     cellinfo_p::CP
@@ -527,7 +527,6 @@ struct FaceInfo{CN <: CellInfo, CP <: CellInfo, CSN, CSP, FT, FN, F2N, I} <:
     faceNodes::FN
     f2n::F2N
     iface::I
-    hasOppositeSide::Bool # See `has_opposite_side`
 end
 
 """
@@ -538,27 +537,24 @@ end
         faceNodes,
         f2n::AbstractVector,
         iface,
-        hasOppositeSide,
     )
 
 Face info constructor. Cell sides are computed automatically.
-
-# Dev notes
-It could be tempting to determine automaticall `hasOppositeSide`
-from `cellinfo_n` and `cellinfo_p`, but this is not possible when
-dealing with periodic BoundaryFaceDomain.
 """
 function FaceInfo(
     cellinfo_n::CellInfo,
-    cellinfo_p::CellInfo,
+    cellinfo_p::Union{CellInfo, Nothing},
     faceType,
     faceNodes,
     f2n::AbstractVector,
     iface,
-    hasOppositeSide,
 )
     cellside_n = cell_side(celltype(cellinfo_n), get_nodes_index(cellinfo_n), f2n)
-    cellside_p = cell_side(celltype(cellinfo_p), get_nodes_index(cellinfo_p), f2n)
+    if isa(cellinfo_p, CellInfo)
+        cellside_p = cell_side(celltype(cellinfo_p), get_nodes_index(cellinfo_p), f2n)
+    else
+        cellside_p = nothing
+    end
     # Rq bmxam : I have to comment this block for GPU compatibility
     #    if cellside_n === nothing || cellside_p === nothing
     #        printstyled("\n=== ERROR in FaceInfo ===\n"; color = :red)
@@ -582,7 +578,6 @@ function FaceInfo(
         faceNodes,
         f2n,
         iface,
-        hasOppositeSide,
     )
 end
 
@@ -600,9 +595,9 @@ function FaceInfo(mesh::Mesh, kface::Int)
 
     cellinfo_n = CellInfo(mesh, f2c[kface][1])
     hasOppositeSide = length(f2c[kface]) > 1
-    cellinfo_p = hasOppositeSide ? CellInfo(mesh, f2c[kface][2]) : cellinfo_n
+    cellinfo_p = hasOppositeSide ? CellInfo(mesh, f2c[kface][2]) : nothing
 
-    return FaceInfo(cellinfo_n, cellinfo_p, ftype, fnodes, _f2n, kface, hasOppositeSide)
+    return FaceInfo(cellinfo_n, cellinfo_p, ftype, fnodes, _f2n, kface)
 end
 
 nodes(faceInfo::FaceInfo) = faceInfo.faceNodes
@@ -618,8 +613,10 @@ get_element_index(f::FaceInfo) = faceindex(f)
 
 """
 Return the opposite side of the `FaceInfo` : cellside "n" because cellside "p"
+
+Only defined for `FaceInfo` with two `CellInfo`
 """
-function opposite_side(fInfo::FaceInfo)
+function opposite_side(fInfo::FaceInfo{<:CellInfo, <:CellInfo})
     return FaceInfo(
         get_cellinfo_p(fInfo),
         get_cellinfo_n(fInfo),
@@ -629,7 +626,6 @@ function opposite_side(fInfo::FaceInfo)
         nodes(fInfo),
         get_nodes_index(fInfo),
         faceindex(fInfo),
-        has_opposite_side(fInfo),
     )
 end
 
@@ -641,7 +637,8 @@ Indicate if the `FaceInfo` has an opposite side, i.e if the corresponding face h
 For instance all internal mesh faces have two sides, while boundary faces (not periodic) have
 only one side.
 """
-has_opposite_side(fInfo::FaceInfo) = fInfo.hasOppositeSide
+has_opposite_side(fInfo::FaceInfo{<:CellInfo, <:CellInfo}) = true
+has_opposite_side(fInfo::FaceInfo{<:CellInfo, Nothing}) = false
 
 """
     get_face_normals(::AbstractFaceDomain)
@@ -782,12 +779,12 @@ function _get_index(domain::D, subdomain, i::Integer) where {D <: AbstractFaceDo
     f2n = connectivities_indices(mesh, :f2n)
 
     ftype, = get_elementtype(subdomain)
-    cellinfo1, cellinfo2, hasOppositeSide = _get_face_cellinfo(domain, subdomain, iface)
+    cellinfo1, cellinfo2 = _get_face_cellinfo(domain, subdomain, iface)
 
     n_fnodes = Val(nnodes(ftype))
     _f2n = f2n[iface, n_fnodes]
     fnodes = get_nodes(mesh, _f2n)
-    FaceInfo(cellinfo1, cellinfo2, ftype, fnodes, _f2n, iface, hasOppositeSide)
+    FaceInfo(cellinfo1, cellinfo2, ftype, fnodes, _f2n, iface)
 end
 
 """
@@ -804,7 +801,7 @@ function _get_face_cellinfo(domain::InteriorFaceDomain, subdomain, iface)
     _, ctype1, ctype2 = get_elementtype(subdomain)
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
     cellinfo2 = _get_cellinfo(mesh, ctype2, icell2)
-    return cellinfo1, cellinfo2, true
+    return cellinfo1, cellinfo2
 end
 
 function _get_face_cellinfo(domain::AllFaceDomain, subdomain, iface)
@@ -815,12 +812,12 @@ function _get_face_cellinfo(domain::AllFaceDomain, subdomain, iface)
         icell1, icell2 = f2c[iface]
         cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
         cellinfo2 = _get_cellinfo(mesh, ctype2, icell2)
-        return cellinfo1, cellinfo2, true
+        return cellinfo1, cellinfo2
     else
         _, ctype1 = get_elementtype(subdomain)
         icell1, = f2c[iface]
         cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
-        return cellinfo1, cellinfo1, false
+        return cellinfo1, nothing
     end
 end
 
@@ -830,7 +827,7 @@ function _get_face_cellinfo(domain::BoundaryFaceDomain, subdomain, iface::Intege
     icell1, = f2c[iface]
     _, ctype1, = get_elementtype(subdomain)
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
-    return cellinfo1, cellinfo1, false
+    return cellinfo1, nothing
 end
 
 function _get_index(
@@ -883,7 +880,6 @@ function _get_index(
         fnodes,
         _f2n,
         perio_cache.bndfaces1[iface],
-        true,
     )
 end
 
