@@ -296,6 +296,7 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
         Mᵢ = center(fnodesᵢ)
         # compute a characteristic length :
         Δxᵢ = distance(center(get_nodes(mesh, c2n[icell])), Mᵢ)
+        Δxᵢ *= sqrt(spacedim(mesh))
         isfind = false
         dmin = Inf
 
@@ -342,6 +343,7 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
     for (_f2c, _f2n1, _f2n2) in zip(bnd_f2c, bnd_f2n1, bnd_f2n2)
         # distance between face center and adjacent cell center
         Δx = distance(center(get_nodes(mesh, c2n[_f2c[1]])), center(get_nodes(mesh, _f2n1)))
+        Δx *= sqrt(spacedim(mesh))
 
         for i in _f2n1
             isfind = false
