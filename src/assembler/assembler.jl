@@ -122,13 +122,13 @@ returning the sum of all four combinations: nn, np, pn, pp.
 """
 function _nnz_bilinear_by_element(elementInfo::FaceInfo, U, V)
     cellInfo_n = get_cellinfo_n(elementInfo)
-    cellInfo_p = get_cellinfo_p(elementInfo)
     nU_n = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_n)))
     nV_n = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_n)))
     kdofs = nU_n * nV_n
 
     # skip boundary faces:
     if has_opposite_side(elementInfo)
+        cellInfo_p = get_cellinfo_p(elementInfo)
         nU_p = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_p)))
         nV_p = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_p)))
         kdofs += nU_n * nV_p + nU_p * nV_n + nU_p * nV_p
@@ -594,25 +594,23 @@ function _append_contribution!(
     domain,
     backend::AbstractBcubeBackend,
 )
-    cellinfo_n = get_cellinfo_n(elementInfo)
-    cellinfo_p = get_cellinfo_p(elementInfo)
-    cellindex_n = cellindex(cellinfo_n)
-    cellindex_p = cellindex(cellinfo_p)
-
     unwrapValues = _unwrap_face_integrate(U, V, values)
 
+    cellinfo_n = get_cellinfo_n(elementInfo)
+    cellindex_n = cellindex(cellinfo_n)
     nU_n = Val(get_ndofs(U, shape(celltype(cellinfo_n))))
     nV_n = Val(get_ndofs(V, shape(celltype(cellinfo_n))))
-    nU_p = Val(get_ndofs(U, shape(celltype(cellinfo_p))))
-    nV_p = Val(get_ndofs(V, shape(celltype(cellinfo_p))))
-
     col_dofs_U_n = get_dofs(U, cellindex_n, nU_n) # columns correspond to the TrialFunction on side⁻
     row_dofs_V_n = get_dofs(V, cellindex_n, nV_n) # lines correspond to the TestFunction on side⁻
-    col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
-    row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
 
     _offset = offset
     iterator = if has_opposite_side(elementInfo)
+        cellinfo_p = get_cellinfo_p(elementInfo)
+        cellindex_p = cellindex(cellinfo_p)
+        nU_p = Val(get_ndofs(U, shape(celltype(cellinfo_p))))
+        nV_p = Val(get_ndofs(V, shape(celltype(cellinfo_p))))
+        col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
+        row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
         Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p))
     else
         Iterators.product((row_dofs_V_n,), (col_dofs_U_n,))

@@ -191,20 +191,6 @@ function InteriorFaceDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
 end
 LazyOperators.pretty_name(domain::InteriorFaceDomain) = "InteriorFaceDomain"
 
-struct AllFaceDomain{M, SD, T} <: AbstractFaceDomain{M}
-    mesh::M
-    subdomains::SD
-    uniqueTags::T
-end
-@inline topodim(d::AllFaceDomain) = topodim(get_mesh(d)) - 1
-AllFaceDomain(mesh::AbstractMesh) = AllFaceDomain(mesh, 1:nfaces(mesh))
-function AllFaceDomain(mesh::AbstractMesh, indices)
-    subdomains = build_subdomains_by_facetypes(mesh, indices)
-    tags = tuple(unique(map(get_tag, subdomains))...)
-    AllFaceDomain(mesh, subdomains, tags)
-end
-LazyOperators.pretty_name(domain::AllFaceDomain) = "AllFaceDomain"
-
 struct BoundaryFaceDomain{M, BC, L, C, SD, T} <: AbstractFaceDomain{M}
     mesh::M
     bc::BC
@@ -606,10 +592,16 @@ nodes(faceInfo::FaceInfo) = faceInfo.faceNodes
 facetype(faceInfo::FaceInfo) = faceInfo.faceType
 faceindex(faceInfo::FaceInfo) = faceInfo.iface
 get_cellinfo_n(faceInfo::FaceInfo) = faceInfo.cellinfo_n
-get_cellinfo_p(faceInfo::FaceInfo) = faceInfo.cellinfo_p
+function get_cellinfo_p(faceInfo::FaceInfo)
+    assert_has_opposite_side(faceInfo)
+    faceInfo.cellinfo_p
+end
 @inline get_nodes_index(faceInfo::FaceInfo) = faceInfo.f2n
 get_cell_side_n(faceInfo::FaceInfo) = faceInfo.cellside_n
-get_cell_side_p(faceInfo::FaceInfo) = faceInfo.cellside_p
+function get_cell_side_p(faceInfo::FaceInfo)
+    assert_has_opposite_side(faceInfo)
+    faceInfo.cellside_p
+end
 get_element_type(f::FaceInfo) = facetype(f)
 get_element_index(f::FaceInfo) = faceindex(f)
 
@@ -618,7 +610,8 @@ Return the opposite side of the `FaceInfo` : cellside "n" because cellside "p"
 
 Only defined for `FaceInfo` with two `CellInfo`
 """
-function opposite_side(fInfo::FaceInfo{<:CellInfo, <:CellInfo})
+function opposite_side(fInfo::FaceInfo)
+    assert_has_opposite_side(fInfo)
     return FaceInfo(
         get_cellinfo_p(fInfo),
         get_cellinfo_n(fInfo),
@@ -641,6 +634,13 @@ only one side.
 """
 has_opposite_side(fInfo::FaceInfo{<:CellInfo, <:CellInfo}) = true
 has_opposite_side(fInfo::FaceInfo{<:CellInfo, Nothing}) = false
+
+function assert_has_opposite_side(
+    fInfo::FaceInfo,
+    msg::String = "Cannot materialize on Side⁺ of a FaceInfo that does not have an opposite side",
+)
+    @assert has_opposite_side(fInfo) "$(msg)"
+end
 
 """
     get_face_normals(::AbstractFaceDomain)
@@ -804,23 +804,6 @@ function _get_face_cellinfo(domain::InteriorFaceDomain, subdomain, iface)
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
     cellinfo2 = _get_cellinfo(mesh, ctype2, icell2)
     return cellinfo1, cellinfo2
-end
-
-function _get_face_cellinfo(domain::AllFaceDomain, subdomain, iface)
-    mesh = get_mesh(domain)
-    f2c = connectivities_indices(mesh, :f2c)
-    if length(get_elementtype(subdomain)) > 2 #if it's an interior face (eqv to: length(f2c[iface]) > 1)
-        _, ctype1, ctype2 = get_elementtype(subdomain)
-        icell1, icell2 = f2c[iface]
-        cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
-        cellinfo2 = _get_cellinfo(mesh, ctype2, icell2)
-        return cellinfo1, cellinfo2
-    else
-        _, ctype1 = get_elementtype(subdomain)
-        icell1, = f2c[iface]
-        cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
-        return cellinfo1, nothing
-    end
 end
 
 function _get_face_cellinfo(domain::BoundaryFaceDomain, subdomain, iface::Integer)
