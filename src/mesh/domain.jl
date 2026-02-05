@@ -191,6 +191,20 @@ function InteriorFaceDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
 end
 LazyOperators.pretty_name(domain::InteriorFaceDomain) = "InteriorFaceDomain"
 
+struct AllFaceDomain{M, SD, T} <: AbstractFaceDomain{M}
+    mesh::M
+    subdomains::SD
+    uniqueTags::T
+end
+@inline topodim(d::AllFaceDomain) = topodim(get_mesh(d)) - 1
+AllFaceDomain(mesh::AbstractMesh) = AllFaceDomain(mesh, 1:nfaces(mesh))
+function AllFaceDomain(mesh::AbstractMesh, indices)
+    subdomains = build_subdomains_by_facetypes(mesh, indices)
+    tags = tuple(unique(map(get_tag, subdomains))...)
+    AllFaceDomain(mesh, subdomains, tags)
+end
+LazyOperators.pretty_name(domain::AllFaceDomain) = "AllFaceDomain"
+
 struct BoundaryFaceDomain{M, BC, L, C, SD, T} <: AbstractFaceDomain{M}
     mesh::M
     bc::BC
