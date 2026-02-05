@@ -155,29 +155,38 @@ function _minmax_cells!(minval, maxval, v, dω)
 end
 
 function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractCellDomain})
-    dΓ = Measure(AllFaceDomain(get_mesh(get_domain(dω))), get_quadrature(dω))
+    dΓ = Measure(InteriorFaceDomain(get_mesh(get_domain(dω))), get_quadrature(dω))
     _minmax_faces!(minval, maxval, v, dΓ)
+    dΓb = Measure(BoundaryFaceDomain(get_mesh(get_domain(dω))), get_quadrature(dω))
+    _minmax_faces!(minval, maxval, v, dΓb)
 end
 
 function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractFaceDomain})
     quadrature = get_quadrature(dω)
 
     foreach_element(get_domain(dω)) do faceInfo, _, _
-        i = cellindex(get_cellinfo_n(faceInfo))
-        j = cellindex(get_cellinfo_p(faceInfo))
+        if has_opposite_side(faceInfo)
+            oppositeFaceInfo = opposite_side(faceInfo)
+        else
+            oppositeFaceInfo = nothing
+        end
 
         mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ = _minmax_on_face(
             side_n(v),
             quadrature,
             facetype(faceInfo),
             faceInfo,
-            opposite_side(faceInfo),
+            oppositeFaceInfo,
         )
 
+        i = cellindex(get_cellinfo_n(faceInfo))
         minval[i] = min(mᵢⱼ, minval[i])
         maxval[i] = max(Mᵢⱼ, maxval[i])
-        minval[j] = min(mⱼᵢ, minval[j])
-        maxval[j] = max(Mⱼᵢ, maxval[j])
+        if has_opposite_side(faceInfo)
+            j = cellindex(get_cellinfo_p(faceInfo))
+            minval[j] = min(mⱼᵢ, minval[j])
+            maxval[j] = max(Mⱼᵢ, maxval[j])
+        end
     end
     return nothing
 end
@@ -225,14 +234,18 @@ end
 
 function _minmax_on_face(v, quadrature, ftype, finfo_ij, finfo_ji)
     quadrule = QuadratureRule(shape(ftype), quadrature)
-    face_map_ij(ξ) = FacePoint(ξ, finfo_ij, ReferenceDomain())
-    face_map_ji(ξ) = FacePoint(ξ, finfo_ji, ReferenceDomain())
 
+    face_map_ij(ξ) = FacePoint(ξ, finfo_ij, ReferenceDomain())
     v_ij = materialize(v, finfo_ij)
     m_ij, M_ij = _minmax(v_ij ∘ face_map_ij, quadrule)
 
-    v_ji = materialize(v, finfo_ji)
-    m_ji, M_ji = _minmax(v_ji ∘ face_map_ji, quadrule)
+    if !isa(finfo_ji, Nothing)
+        face_map_ji(ξ) = FacePoint(ξ, finfo_ji, ReferenceDomain())
+        v_ji = materialize(v, finfo_ji)
+        m_ji, M_ji = _minmax(v_ji ∘ face_map_ji, quadrule)
+    else
+        m_ji = M_ji = nothing
+    end
 
     return m_ij, M_ij, m_ji, M_ji
 end
@@ -334,5 +347,5 @@ function linear_scaling_limiter(
     lim_u, u̅ = linear_scaling_limiter_coef(u, dω, bounds, DMPrelax, periodicBCs, checkmean)
     u_lim = FEFunction(get_fespace(u), get_dof_type(u))
     projection_l2!(u_lim, u̅ + lim_u * (u - u̅), dω; mass = mass)
-    lim_u, u_lim
+    lim_u, u_lim, u̅
 end

@@ -156,7 +156,7 @@ tempdir = mktempdir()
     custom_include("./integration/test_integration.jl")
     # custom_include("./dof/test_variable.jl")  #TODO : update with new API
     custom_include("./interpolation/test_shapefunctions.jl")
-    # custom_include("./interpolation/test_limiter.jl")
+    custom_include("./interpolation/test_limiter.jl")
     custom_include("./interpolation/test_cellfunction.jl")
     custom_include("./dof/test_assembler.jl")
     custom_include("./dof/test_dirichlet.jl")

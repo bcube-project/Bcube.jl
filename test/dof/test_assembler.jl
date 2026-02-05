@@ -292,7 +292,7 @@
         dΓ = Measure(BoundaryFaceDomain(mesh), 2)
         U = TrialFESpace(FunctionSpace(:Lagrange, 0), mesh)
         V = TestFESpace(U)
-        a2(u, v) = ∫(side_n(u) * (side_n(v) + side_p(v)))dΓ
+        a2(u, v) = ∫(side_n(u) * (side_n(v)))dΓ
         A = assemble_bilinear(a2, U, V)
         @test A == sparse([1, 3], [1, 3], [1.0, 1.0])
 
@@ -300,10 +300,13 @@
         # has exactly two faces, each cell receives a contribution from its
         # "right" face and "left" face
         mesh = line_mesh(4)
-        dΓ = Measure(AllFaceDomain(mesh), 2)
+        dΓ = Measure(InteriorFaceDomain(mesh), 2)
+        dΓb = Measure(BoundaryFaceDomain(mesh), 2)
         U = TrialFESpace(FunctionSpace(:Lagrange, 0), mesh)
         V = TestFESpace(U)
-        a3(u, v) = ∫(side_n(u) * side_n(v) + side_p(u) * side_p(v))dΓ
+        function a3(u, v)
+            ∫(side_n(u) * side_n(v) + side_p(u) * side_p(v))dΓ + ∫(side_n(u) * side_n(v))dΓb
+        end
         A = assemble_bilinear(a3, U, V)
         @test A == sparse([1, 2, 3], [1, 2, 3], [2.0, 2.0, 2.0])
     end
@@ -587,18 +590,22 @@
             U = TrialFESpace(fs, mesh)
             V = TestFESpace(U)
 
-            # AllFaceDomain
-            Γ_all = Bcube.AllFaceDomain(mesh)
-            dΓ_all = Measure(Γ_all, 2)
-            nΓ_all = get_face_normals(dΓ_all)
-            l_all(v) = ∫(f ⋅ side_n(nΓ_all) * jump(v))dΓ_all
-            y_all = assemble_linear(l_all, V)
-            @show all(y_all .< eps())
-
             # InteriorFaceDomain
             Γ_int = InteriorFaceDomain(mesh)
             dΓ_int = Measure(Γ_int, 2)
             nΓ_int = get_face_normals(dΓ_int)
+
+            # BoundaryFaceDomain
+            Γb = Bcube.BoundaryFaceDomain(mesh)
+            dΓb = Measure(Γb, 2)
+            nΓb = get_face_normals(dΓb)
+            function l_all(v)
+                ∫(f ⋅ side_n(nΓ_int) * jump(v))dΓ_int + ∫(f ⋅ side_n(nΓb) * side_n(v))dΓb
+            end
+            y_all = assemble_linear(l_all, V)
+            @test all(y_all .< eps())
+
+            # InteriorFaceDomain
             c2f_all = Bcube.connectivities_indices(mesh, :c2f)
             f2c_all = Bcube.connectivities_indices(mesh, :f2c)
             cell2interior = map(c2f_all) do c2f
@@ -607,7 +614,7 @@
             interior_cells = findall(cell2interior)
             l_int(v) = ∫(f ⋅ side_n(nΓ_int) * jump(v))dΓ_int
             y_int = assemble_linear(l_int, V)
-            @show all(y_int[interior_cells] .< eps())
+            @test all(y_int[interior_cells] .< eps())
         end
     end
 

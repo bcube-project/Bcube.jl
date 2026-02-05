@@ -298,7 +298,9 @@ Represent the side a of face between two cells.
 """
 side_p(t::Tuple) = map(side_p, t)
 side_n(t::Tuple) = map(side_n, t)
-side_p(fInfo::FaceInfo) = get_cellinfo_p(fInfo)
+function side_p(fInfo::FaceInfo)
+    has_opposite_side(fInfo) ? get_cellinfo_p(fInfo) : NullOperator()
+end
 side_n(fInfo::FaceInfo) = get_cellinfo_n(fInfo)
 const side⁺ = side_p
 const side⁻ = side_n
@@ -395,6 +397,8 @@ function LazyOperators.materialize(
 )
     fPoint, = get_args(sideFacePoint)
     fInfo = get_faceinfo(fPoint)
+    assert_has_opposite_side(fInfo)
+
     ξface = get_coords(fPoint)
 
     cInfo = get_cellinfo_p(fInfo)
@@ -444,10 +448,14 @@ function _unpack_face_point(sideFacePoint)
     ctype_n = celltype(cInfo_n)
     ξ_n = get_coords(side_n(fPoint))
 
-    cInfo_p = get_cellinfo_p(fInfo)
-    cnodes_p = nodes(cInfo_p)
-    ctype_p = celltype(cInfo_p)
-    ξ_p = get_coords(side_p(fPoint))
+    if has_opposite_side(fInfo)
+        cInfo_p = get_cellinfo_p(fInfo)
+        cnodes_p = nodes(cInfo_p)
+        ctype_p = celltype(cInfo_p)
+        ξ_p = get_coords(side_p(fPoint))
+    else
+        cnodes_p = ctype_p = ξ_p = nothing
+    end
 
     return cnodes_n, cnodes_p, ctype_n, ctype_p, ξ_n, ξ_p
 end

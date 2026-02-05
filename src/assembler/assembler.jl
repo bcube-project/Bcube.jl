@@ -122,13 +122,13 @@ returning the sum of all four combinations: nn, np, pn, pp.
 """
 function _nnz_bilinear_by_element(elementInfo::FaceInfo, U, V)
     cellInfo_n = get_cellinfo_n(elementInfo)
-    cellInfo_p = get_cellinfo_p(elementInfo)
     nU_n = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_n)))
     nV_n = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_n)))
     kdofs = nU_n * nV_n
 
     # skip boundary faces:
     if has_opposite_side(elementInfo)
+        cellInfo_p = get_cellinfo_p(elementInfo)
         nU_p = Bcube.get_ndofs(U, shape(Bcube.celltype(cellInfo_p)))
         nV_p = Bcube.get_ndofs(V, shape(Bcube.celltype(cellInfo_p)))
         kdofs += nU_n * nV_p + nU_p * nV_n + nU_p * nV_p
@@ -594,25 +594,23 @@ function _append_contribution!(
     domain,
     backend::AbstractBcubeBackend,
 )
-    cellinfo_n = get_cellinfo_n(elementInfo)
-    cellinfo_p = get_cellinfo_p(elementInfo)
-    cellindex_n = cellindex(cellinfo_n)
-    cellindex_p = cellindex(cellinfo_p)
-
     unwrapValues = _unwrap_face_integrate(U, V, values)
 
+    cellinfo_n = get_cellinfo_n(elementInfo)
+    cellindex_n = cellindex(cellinfo_n)
     nU_n = Val(get_ndofs(U, shape(celltype(cellinfo_n))))
     nV_n = Val(get_ndofs(V, shape(celltype(cellinfo_n))))
-    nU_p = Val(get_ndofs(U, shape(celltype(cellinfo_p))))
-    nV_p = Val(get_ndofs(V, shape(celltype(cellinfo_p))))
-
     col_dofs_U_n = get_dofs(U, cellindex_n, nU_n) # columns correspond to the TrialFunction on side⁻
     row_dofs_V_n = get_dofs(V, cellindex_n, nV_n) # lines correspond to the TestFunction on side⁻
-    col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
-    row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
 
     _offset = offset
     iterator = if has_opposite_side(elementInfo)
+        cellinfo_p = get_cellinfo_p(elementInfo)
+        cellindex_p = cellindex(cellinfo_p)
+        nU_p = Val(get_ndofs(U, shape(celltype(cellinfo_p))))
+        nV_p = Val(get_ndofs(V, shape(celltype(cellinfo_p))))
+        col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
+        row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
         Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p))
     else
         Iterators.product((row_dofs_V_n,), (col_dofs_U_n,))
@@ -1053,12 +1051,16 @@ Return block-mapped shape functions for a face element.
 Combines shape functions from both sides of the face (n⁻ and n⁺).
 
 # Dev note :
-Materialize the integrand function on all the different possible Tuples of
+- Materialize the integrand function on all the different possible Tuples of
 `v=(v1,0,0,...), (0,v2,0,...), ..., (..., vi, ...)`
+- For now, `cshape_j` is set to `cshape_i` to "fake" the opposite side
+when there is no existing opposite side. This could be improved in the
+future to avoiding useless computation.
 """
 function blockmap_shape_functions(feSpace, faceinfo::FaceInfo)
     cshape_i = shape(celltype(get_cellinfo_n(faceinfo)))
-    cshape_j = shape(celltype(get_cellinfo_p(faceinfo)))
+    hasOppositeSide = has_opposite_side(faceinfo)
+    cshape_j = hasOppositeSide ? shape(celltype(get_cellinfo_p(faceinfo))) : cshape_i
     _cellpair_blockmap_shape_functions(feSpace, cshape_i, cshape_j)
 end
 
@@ -1167,6 +1169,11 @@ Return block-mapped bilinear shape functions for face integrations.
 
 Creates four combinations of shape functions for the two sides of the face (n⁻, n⁺):
 nn, pn, np, pp.
+
+# Dev notes:
+- For now, `cellinfo_p` is set to `cellinfo_n` to "fake" the opposite side
+when there is no existing opposite side. This could be improved in the
+future to avoiding useless computation.
 """
 function blockmap_bilinear_shape_functions(
     U::AbstractFESpace,
@@ -1174,7 +1181,7 @@ function blockmap_bilinear_shape_functions(
     faceinfo::FaceInfo,
 )
     cellinfo_n = get_cellinfo_n(faceinfo)
-    cellinfo_p = get_cellinfo_p(faceinfo)
+    cellinfo_p = has_opposite_side(faceinfo) ? get_cellinfo_p(faceinfo) : cellinfo_n
     U_nn, V_nn = blockmap_bilinear_shape_functions(U, V, cellinfo_n, cellinfo_n)
     U_pn, V_pn = blockmap_bilinear_shape_functions(U, V, cellinfo_n, cellinfo_p)
     U_np, V_np = blockmap_bilinear_shape_functions(U, V, cellinfo_p, cellinfo_n)
