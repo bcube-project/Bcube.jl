@@ -1,3 +1,5 @@
+abstract type AbstractSubDomain end
+
 """
 A `SubDomain` groups a collection of mesh elements (cells, faces, …) that share
 the same `elementType`.
@@ -8,7 +10,7 @@ sub‑domains of the same element type (e.g., for coloring or labeling). This
 structure is primarily intended for internal organization of mesh entities
 belonging to a `Domain`.
 """
-struct SubDomain{A, E, I}
+struct SubDomain{A, E, I} <: AbstractSubDomain
     tag::A
     elementType::E
     indices::I
@@ -16,7 +18,8 @@ struct SubDomain{A, E, I}
 end
 get_tag(sdom::SubDomain) = sdom.tag
 get_indices(sdom::SubDomain) = sdom.indices
-get_elementtype(sdom::SubDomain) = sdom.elementType
+get_element_type(sdom::SubDomain) = sdom.elementType
+get_offset(sdom::SubDomain) = sdom.offset
 
 """
     build_subdomains_by_celltypes(mesh, indices)
@@ -164,9 +167,13 @@ struct CellDomain{M, SD, T} <: AbstractCellDomain{M, I}
 end
 @inline topodim(d::CellDomain) = topodim(get_mesh(d))
 
-CellDomain(mesh::AbstractMesh) = CellDomain(parent(mesh))
-CellDomain(mesh::Mesh) = CellDomain(mesh, 1:ncells(mesh))
+CellDomain(mesh::AbstractMesh, indices) = CellDomain(parent(mesh), indices)
+CellDomain(mesh::AbstractMesh) = CellDomain(mesh, 1:ncells(mesh))
 function CellDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
+    build_cell_domain(mesh, indices)
+end
+
+function build_cell_domain(mesh, indices)
     subdomains = build_subdomains_by_celltypes(mesh, indices)
     tags = tuple(unique(map(get_tag, subdomains))...)
     CellDomain(mesh, subdomains, tags)
@@ -444,7 +451,7 @@ abstract type AbstractDomainIndex end
 
 abstract type AbstractCellInfo <: AbstractDomainIndex end
 
-struct CellInfo{C, N, CN} <: AbstractCellInfo
+struct CellInfo{C <: AbstractEntityType, N, CN} <: AbstractCellInfo
     icell::Int
     ctype::C
     nodes::N # List/array of the cell `Node`s
@@ -754,7 +761,8 @@ function Base.getindex(iter::DomainIteratorByTags, i)
     return nothing
 end
 
-struct SubDomainIterator{D <: AbstractDomain, SD <: SubDomain} <: AbstractDomainIterator{D}
+struct SubDomainIterator{D <: AbstractDomain, SD <: AbstractSubDomain} <:
+       AbstractDomainIterator{D}
     domain::D
     subdomain::SD
 end
@@ -771,13 +779,16 @@ function Base.iterate(iter::SubDomainIterator, i::Integer = 1)
 end
 
 function Base.getindex(iter::SubDomainIterator, i)
-    indexDomain = iter.subdomain.offset + i
+    indexDomain = get_offset(iter.subdomain) + i
     _get_index(iter.domain, iter.subdomain, i), indexDomain, i
 end
 
+"""
+Get `i`th element of the subdomain.
+"""
 function _get_index(domain::D, subdomain, i::Integer) where {D <: AbstractCellDomain}
     mesh = get_mesh(domain)
-    ctype = get_elementtype(subdomain)
+    ctype = get_element_type(subdomain)
     icell = get_indices(subdomain)[i]
     _get_cellinfo(mesh, ctype, icell)
 end
@@ -794,7 +805,7 @@ function _get_index(domain::D, subdomain, i::Integer) where {D <: AbstractFaceDo
     mesh = get_mesh(domain)
     f2n = connectivities_indices(mesh, :f2n)
 
-    ftype, = get_elementtype(subdomain)
+    ftype, = get_element_type(subdomain)
     cellinfo1, cellinfo2 = _get_face_cellinfo(domain, subdomain, iface)
 
     n_fnodes = Val(nnodes(ftype))
@@ -814,7 +825,7 @@ for instance).
 function _get_face_cellinfo(domain::InteriorFaceDomain, subdomain, iface)
     mesh = get_mesh(domain)
     icell1, icell2 = connectivities_indices(mesh, :f2c)[iface]
-    _, ctype1, ctype2 = get_elementtype(subdomain)
+    _, ctype1, ctype2 = get_element_type(subdomain)
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
     cellinfo2 = _get_cellinfo(mesh, ctype2, icell2)
     return cellinfo1, cellinfo2
@@ -824,7 +835,7 @@ function _get_face_cellinfo(domain::BoundaryFaceDomain, subdomain, iface::Intege
     mesh = get_mesh(domain)
     f2c = connectivities_indices(mesh, :f2c)
     icell1, = f2c[iface]
-    _, ctype1, = get_elementtype(subdomain)
+    _, ctype1, = get_element_type(subdomain)
     cellinfo1 = _get_cellinfo(mesh, ctype1, icell1)
     return cellinfo1, nothing
 end
@@ -837,7 +848,7 @@ function _get_index(
     mesh = get_mesh(domain)
     c2n = connectivities_indices(mesh, :c2n)
     iface = get_indices(subdomain)[i]
-    ftype, ctype1, ctype2 = get_elementtype(subdomain)
+    ftype, ctype1, ctype2 = get_element_type(subdomain)
 
     # TODO : add a specific API for the domain cache:
     perio_cache = get_cache(domain)
@@ -1145,6 +1156,6 @@ function _map_element(
     domain::D,
     subdomain::SD,
     backend::AbstractBcubeBackend,
-) where {F, D <: AbstractDomain, SD <: SubDomain}
+) where {F, D <: AbstractDomain, SD <: AbstractSubDomain}
     map(f, SubDomainIterator(domain, subdomain))
 end
