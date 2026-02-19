@@ -225,3 +225,5 @@ function cumsum_exclusive(a::Tuple)
     b = Base.front(cumsum(a))
     return (zero(eltype(a)), b...)
 end
+
+cumsum_exclusive(::Tuple{}) = ()
