@@ -108,13 +108,13 @@ function _msh_to_bcube_mesh(
     _, glo2loc_node_indices = densify(absolute_node_indices; permute_back = true)
 
     # filter to retain only "volumic" elements
-    ind = findall(t -> topodim(GMSHTYPE[t]) == _topodim, elt_types)
+    ind = findall(t -> topodim(GMSH_INT_TO_BCUBE_ENTITY[t]) == _topodim, elt_types)
 
     # cells
     absolute_cell_indices = elt_ids[ind]
     # _, glo2loc_cell_indices = densify(absolute_cell_indices; permute_back = true)
 
-    celltypes = map(t -> GMSHTYPE[t], elt_types[ind])
+    celltypes = map(t -> GMSH_INT_TO_BCUBE_ENTITY[t], elt_types[ind])
 
     # create connectivity
     c2n_gmsh = Connectivity(
@@ -144,7 +144,121 @@ function _msh_to_bcube_mesh(
     return mesh
 end
 
-const GMSHTYPE = Dict(
+# convert connectivity from the internal (CGNS-like) numbering back to
+# the ordering expected by Gmsh.  This is simply the inverse permutation of
+# `nodes_gmsh2cgns` which is defined in the reader.
+function _c2n_cgns2gmsh(celltype::Bcube.AbstractEntityType, c2n::AbstractVector{Int})
+    perm = nodes_gmsh2cgns(celltype)
+    inv = invperm(perm)
+    return [c2n[i] for i in inv]
+end
+
+function write_mesh(::Gmsh22IoHandler, filepath::String, mesh::Mesh)
+    topod = topodim(mesh)
+    # build a trivial physical names dictionary: one "zone" for the
+    # volumic domain and a tag for each boundary name that may exist.  we
+    # will keep the association between a boundary *name* (Symbol) and the
+    # corresponding Gmsh physical tag in `phys_lookup` so that we can use it
+    # later when writing the face elements.
+    phys = Dict{Int, Tuple{Int, String}}()
+    phys_lookup = Dict{Symbol, Int}()
+    phys_tag = 1
+    phys[phys_tag] = (topod, "Zone")
+    for name in boundary_names(mesh)
+        phys_tag += 1
+        phys[phys_tag] = (topod - 1, String(name))
+        phys_lookup[name] = phys_tag
+    end
+
+    open(filepath, "w") do io
+        # header
+        println(io, "\$MeshFormat")
+        println(io, "2.2 0 8")
+        println(io, "\$EndMeshFormat")
+
+        # physical names
+        println(io, "\$PhysicalNames")
+        println(io, length(phys))
+        for (tag, (dim, name)) in phys
+            println(io, "$(dim) $(tag) \"$(name)\"")
+        end
+        println(io, "\$EndPhysicalNames")
+
+        # nodes
+        nn = nnodes(mesh)
+        println(io, "\$Nodes")
+        println(io, nn)
+        for i in 1:nn
+            coords = get_coords(mesh, i)
+            # pad to three components (Gmsh format always has 3 values)
+            x = ntuple(j -> j ≤ length(coords) ? coords[j] : 0.0, 3)
+            println(io, "$(i) $(x[1]) $(x[2]) $(x[3])")
+        end
+        println(io, "\$EndNodes")
+
+        # elements : cells first, then boundary faces if any.  we build an
+        # intermediate list so that we know the total number of elements to
+        # declare at the top of the section.
+
+        cell_cts = cells(mesh)
+        c2n_list = connectivities_indices(mesh, :c2n)
+        # prepare volume cells
+        elems = Vector{Tuple{Int, Int, Int, Vector{Int}}}() # (id,type,tag,conn)
+        for (i, ct) in enumerate(cell_cts)
+            gmshnum = get(BCUBE2GMSH, typeof(ct), nothing)
+            @assert gmshnum !== nothing "unsupported entity type $(typeof(ct)) for gmsh export"
+            conn = _c2n_cgns2gmsh(ct, c2n_list[i])
+            push!(elems, (i, gmshnum, 1, conn))
+        end
+
+        # boundary faces: try to detect them using bc_nodes info and the
+        # face->node connectivity
+        if has_connectivities(mesh, :f2n) && has_connectivities(mesh, :f2c)
+            f2n = connectivities_indices(mesh, :f2n)
+            f2c = connectivities_indices(mesh, :f2c)
+            # membership sets for each boundary name
+            bc_nodes = mesh.bc_nodes
+            bc_sets = Dict(name => Set(bc_nodes[name]) for name in keys(bc_nodes))
+            for (iface, nodes) in enumerate(f2n)
+                # only faces that touch a single cell are potential boundaries
+                if length(f2c[iface]) == 1
+                    for (name, nset) in bc_sets
+                        if all(n in nset for n in nodes)
+                            # this face belongs to this boundary
+                            ft = faces(mesh)[iface]
+                            gmshnum = get(BCUBE2GMSH, typeof(ft), nothing)
+                            @assert gmshnum !== nothing
+                            conn = _c2n_cgns2gmsh(ft, nodes)
+                            tag = phys_lookup[name]
+                            push!(elems, (length(elems) + 1, gmshnum, tag, conn))
+                            break
+                        end
+                    end
+                end
+            end
+        end
+
+        println(io, "\$Elements")
+        println(io, length(elems))
+        for (id, gmshnum, tag, conn) in elems
+            ntags = 1
+            line = string(
+                id,
+                ' ',
+                gmshnum,
+                ' ',
+                ntags,
+                ' ',
+                tag,
+                join([' ', string(j)] for j in conn)...,
+            )
+            println(io, line)
+        end
+        println(io, "\$EndElements")
+    end
+end
+
+const GMSH_INT_TO_BCUBE_ENTITY = Dict(
     1 => Bar2_t(),
     2 => Tri3_t(),
     3 => Quad4_t(),
@@ -158,6 +272,8 @@ const GMSHTYPE = Dict(
     21 => Tri10_t(),
     36 => Quad16_t(),
 )
+
+const BCUBE_ENTITY_TO_GMSH_INT = Dict(v => k for (k, v) in GMSH_INT_TO_BCUBE_ENTITY)
 
 """
     nodes_gmsh2cgns(entity::AbstractEntityType, nodes::AbstractArray)

@@ -138,6 +138,6 @@ export linear_scaling_limiter
 include("./io/io_interface.jl")
 export read_file, read_mesh, write_file
 
-include("./io/gmsh22_reader.jl")
+include("./io/gmsh22.jl")
 
 end

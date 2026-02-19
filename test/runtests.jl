@@ -162,6 +162,7 @@ tempdir = mktempdir()
     custom_include("./dof/test_dirichlet.jl")
     custom_include("./operator/test_algebra.jl")
     custom_include("./dof/test_meshdata.jl")
+    custom_include("./io/test_gmsh_writer.jl")
 
     @testset "Issues" begin
         custom_include("./issues/issue_112.jl")
