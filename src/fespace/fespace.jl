@@ -497,7 +497,7 @@ function get_dofs(feSpace::MultiFESpace, icell::Int)
     map(Base.Fix2(get_dofs, icell), get_fespace(feSpace))
 end
 
-function get_dofs(feSpace::MultiFESpace, icell::Int, shape::AbstractShape)
+function get_dofs(feSpace::AbstractMultiFESpace, icell::Int, shape::AbstractShape)
     map(fe -> get_dofs(fe, icell, shape), get_fespace(feSpace))
 end
 
