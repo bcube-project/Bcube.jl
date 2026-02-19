@@ -134,26 +134,20 @@ get_ndofs(::FunctionSpace{<:Taylor, 0}, ::Union{Square, Triangle}) = 1
 get_ndofs(::FunctionSpace{<:Taylor, 1}, ::Union{Square, Triangle}) = 3
 
 # For Taylor base there are never any dof on vertex, edge or face
-function idof_by_vertex(::FunctionSpace{<:Taylor, N}, shape::AbstractShape) where {N}
-    fill(Int[], nvertices(shape))
-end
+# Rq: proceeding with "@eval" rather than using `AbstractShape` helps solving ambiguities
+for S in (:Line, :Triangle, :Square, :Cube, :Tetra, :Prism, :Pyramid)
+    @eval idof_by_vertex(::FunctionSpace{<:Taylor}, shape::$S) =
+        ntuple(i -> SA[], nvertices(shape))
 
-function idof_by_edge(::FunctionSpace{<:Taylor, N}, shape::AbstractShape) where {N}
-    ntuple(i -> SA[], nedges(shape))
-end
-function idof_by_edge_with_bounds(
-    ::FunctionSpace{<:Taylor, N},
-    shape::AbstractShape,
-) where {N}
-    ntuple(i -> SA[], nedges(shape))
-end
+    @eval idof_by_edge(::FunctionSpace{<:Taylor}, shape::$S) =
+        ntuple(i -> SA[], nedges(shape))
 
-function idof_by_face(::FunctionSpace{<:Taylor, N}, shape::AbstractShape) where {N}
-    ntuple(i -> SA[], nfaces(shape))
-end
-function idof_by_face_with_bounds(
-    ::FunctionSpace{<:Taylor, N},
-    shape::AbstractShape,
-) where {N}
-    ntuple(i -> SA[], nfaces(shape))
+    @eval idof_by_edge_with_bounds(::FunctionSpace{<:Taylor}, shape::$S) =
+        ntuple(i -> SA[], nedges(shape))
+
+    @eval idof_by_face(::FunctionSpace{<:Taylor}, shape::$S) =
+        ntuple(i -> SA[], nfaces(shape))
+
+    @eval idof_by_face_with_bounds(::FunctionSpace{<:Taylor}, shape::$S) =
+        ntuple(i -> SA[], nfaces(shape))
 end
