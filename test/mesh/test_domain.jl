@@ -79,7 +79,7 @@
             @test length(subdomains) == 2
             @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) == ncells(mesh)
             # subdomain #1
-            @test Bcube.get_elementtype(subdomains[1]) == Bcube.Tri3_t()
+            @test Bcube.get_element_type(subdomains[1]) == Bcube.Tri3_t()
             @test length(Bcube.get_indices(subdomains[1])) == 112
             @test all(Bcube.get_indices(subdomains[1])[1:5] .== [1, 2, 3, 4, 5])
             @test all(
@@ -87,7 +87,7 @@
                 [107, 108, 109, 110, 111, 112],
             )
             # subdomain #2
-            @test Bcube.get_elementtype(subdomains[2]) == Bcube.Quad4_t()
+            @test Bcube.get_element_type(subdomains[2]) == Bcube.Quad4_t()
             @test length(Bcube.get_indices(subdomains[2])) == 45
             @test all(Bcube.get_indices(subdomains[2])[1:5] .== [113, 114, 115, 116, 117])
             @test all(
@@ -114,7 +114,7 @@
             @test all(Bcube.map_element(Bcube.has_opposite_side, Γ))
 
             # subdomain #1
-            @test Bcube.get_elementtype(subdomains[1]) ==
+            @test Bcube.get_element_type(subdomains[1]) ==
                   (Bcube.Bar2_t(), Bcube.Tri3_t(), Bcube.Tri3_t())
             @test length(Bcube.get_indices(subdomains[1])) == 154
             @test all(Bcube.get_indices(subdomains[1])[1:5] .== [1, 2, 3, 4, 5])
@@ -123,7 +123,7 @@
                 [177, 178, 179, 180, 181, 182],
             )
             # subdomain #2
-            @test Bcube.get_elementtype(subdomains[2]) ==
+            @test Bcube.get_element_type(subdomains[2]) ==
                   (Bcube.Bar2_t(), Bcube.Tri3_t(), Bcube.Quad4_t())
             @test length(Bcube.get_indices(subdomains[2])) == 9
             @test all(Bcube.get_indices(subdomains[2])[1:5] .== [41, 43, 65, 76, 84])
@@ -132,7 +132,7 @@
                 [76, 84, 91, 93, 135, 141],
             )
             # subdomain #3
-            @test Bcube.get_elementtype(subdomains[3]) ==
+            @test Bcube.get_element_type(subdomains[3]) ==
                   (Bcube.Bar2_t(), Bcube.Quad4_t(), Bcube.Quad4_t())
             @test length(Bcube.get_indices(subdomains[3])) == 76
             @test all(Bcube.get_indices(subdomains[3])[1:5] .== [183, 184, 186, 187, 189])
@@ -167,7 +167,7 @@
             @test length(subdomains) == 2
             @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) == 10
             # subdomain #1
-            @test Bcube.get_elementtype(subdomains[1]) ==
+            @test Bcube.get_element_type(subdomains[1]) ==
                   (Bcube.Bar2_t(), Bcube.Tri3_t(), Bcube.Tri3_t())
             @test length(Bcube.get_indices(subdomains[1])) == 5
             @test all(Bcube.get_indices(subdomains[1]) .== 1:5)
@@ -181,7 +181,7 @@
             )
 
             # subdomain #2
-            @test Bcube.get_elementtype(subdomains[2]) ==
+            @test Bcube.get_element_type(subdomains[2]) ==
                   (Bcube.Bar2_t(), Bcube.Quad4_t(), Bcube.Quad4_t())
             @test length(Bcube.get_indices(subdomains[2])) == 5
             @test all(Bcube.get_indices(subdomains[2])[1:5] .== 6:10)
@@ -198,7 +198,7 @@
             @test length(subdomains) == 1
             @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) == 9
             # subdomain #1
-            @test Bcube.get_elementtype(subdomains[1]) ==
+            @test Bcube.get_element_type(subdomains[1]) ==
                   (Bcube.Bar2_t(), Bcube.Quad4_t(), Bcube.Tri3_t())
             @test length(Bcube.get_indices(subdomains[1])) == 9
             @test all(Bcube.get_indices(subdomains[1]) .== 1:9)
@@ -234,7 +234,7 @@
             @test length(subdomains) == 1
             @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) == 9
             # subdomain #1
-            @test Bcube.get_elementtype(subdomains[1]) == (Bcube.Bar2_t(), Bcube.Tri3_t())
+            @test Bcube.get_element_type(subdomains[1]) == (Bcube.Bar2_t(), Bcube.Tri3_t())
             @test length(Bcube.get_indices(subdomains[1])) == 9
             @test all(
                 Bcube.get_indices(subdomains[1]) .== [39, 46, 63, 77, 80, 82, 92, 132, 138],
@@ -244,11 +244,11 @@
             @test length(subdomains) == 2
             @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) == 10
             # subdomain #1
-            @test Bcube.get_elementtype(subdomains[1]) == (Bcube.Bar2_t(), Bcube.Tri3_t())
+            @test Bcube.get_element_type(subdomains[1]) == (Bcube.Bar2_t(), Bcube.Tri3_t())
             @test length(Bcube.get_indices(subdomains[1])) == 5
             @test all(Bcube.get_indices(subdomains[1]) .== [106, 120, 123, 149, 151])
             # subdomain #2
-            @test Bcube.get_elementtype(subdomains[2]) == (Bcube.Bar2_t(), Bcube.Quad4_t())
+            @test Bcube.get_element_type(subdomains[2]) == (Bcube.Bar2_t(), Bcube.Quad4_t())
             @test length(Bcube.get_indices(subdomains[2])) == 5
             @test all(Bcube.get_indices(subdomains[2]) .== [268, 270, 272, 274, 276])
 
@@ -256,7 +256,7 @@
             @test length(subdomains) == 1
             @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) == 9
             # subdomain #1
-            @test Bcube.get_elementtype(subdomains[1]) == (Bcube.Bar2_t(), Bcube.Quad4_t())
+            @test Bcube.get_element_type(subdomains[1]) == (Bcube.Bar2_t(), Bcube.Quad4_t())
             @test length(Bcube.get_indices(subdomains[1])) == 9
             @test all(
                 Bcube.get_indices(subdomains[1]) .==
@@ -267,11 +267,11 @@
             @test length(subdomains) == 2
             @test sum(sdom -> length(Bcube.get_indices(sdom)), subdomains) == 10
             # subdomain #1
-            @test Bcube.get_elementtype(subdomains[1]) == (Bcube.Bar2_t(), Bcube.Tri3_t())
+            @test Bcube.get_element_type(subdomains[1]) == (Bcube.Bar2_t(), Bcube.Tri3_t())
             @test length(Bcube.get_indices(subdomains[1])) == 5
             @test all(Bcube.get_indices(subdomains[1]) .== [103, 114, 117, 145, 147])
             # subdomain #2
-            @test Bcube.get_elementtype(subdomains[2]) == (Bcube.Bar2_t(), Bcube.Quad4_t())
+            @test Bcube.get_element_type(subdomains[2]) == (Bcube.Bar2_t(), Bcube.Quad4_t())
             @test length(Bcube.get_indices(subdomains[2])) == 5
             @test all(Bcube.get_indices(subdomains[2]) .== [185, 188, 191, 194, 197])
         end
