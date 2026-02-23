@@ -84,10 +84,10 @@
         cell2node = Bcube.Connectivity([4, 3], [1, 2, 3, 4, 2, 5, 3])
         mesh = Bcube.Mesh(nodes, celltypes, cell2node)
         dΓ = Measure(InteriorFaceDomain(mesh), 1)
-        l3(v) = ∫(side_n(v) + side_p(v))dΓ
+        l4(v) = ∫(side_n(v) + side_p(v))dΓ
         U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
         V = TestFESpace(U)
-        y = assemble_linear(l3, V)
+        y = assemble_linear(l4, V)
         node2idof = [1, 2, 4, 3, 5] # obtained with "build_node2idof"
         @test y[node2idof[2]] == y[node2idof[3]] == 1.0
         @test y[node2idof[1]] == y[node2idof[4]] == y[node2idof[5]] == 0.0

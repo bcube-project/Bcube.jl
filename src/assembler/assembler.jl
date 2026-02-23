@@ -1103,6 +1103,136 @@ function _cellpair_blockmap_shape_functions(
 end
 
 """
+    AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A}
+
+Abstract base type for lazy bilinear wrappers.
+- `I` indicates whether this is for Trial (`:U`) or Test (`:V`) FESpace,
+- `N` is the number of DoFs of the complementary FESpace (i.e. Trial if `I` is set to `:V`),
+- `A` is the wrapped argument type.
+"""
+abstract type AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A} end
+Bcube.LazyOperators.get_args(a::AbstractLazyBilinearWrap) = a.a
+
+struct LazyBilinearWrap{I, N, A} <: AbstractLazyBilinearWrap{I, N, A}
+    a::A
+end
+
+"""
+    LazyBilinearWrapU(λu::A, ::Val{N}) where {A, N}
+
+Helper constructor for lazy Trial functions (`:U`) wrapper in bilinear forms.
+"""
+LazyBilinearWrapU(λu::A, ::Val{N}) where {A, N} = LazyBilinearWrap{:U, N, A}(λu)
+
+"""
+    LazyBilinearWrapV(λv::A, ::Val{N}) where {A, N}
+
+Helper constructor for lazy Test functions (`:V`) wrapper in bilinear forms.
+"""
+LazyBilinearWrapV(λv::A, ::Val{N}) where {A, N} = LazyBilinearWrap{:V, N, A}(λv)
+
+"""
+Materialize a `LazyBilinearWrap` on a `CellInfo` by recursively materialize the inner argument.
+"""
+function LazyOperators.materialize(a::LazyBilinearWrap{I, N}, cInfo::CellInfo) where {I, N}
+    args = materialize(get_args(a), cInfo)
+    LazyBilinearWrap{I, N, typeof(args)}(args)
+end
+
+"""
+    generate_bilinear(::LazyBilinearWrap{:U, M}, λ) where M
+
+Generate the bilinear matrix structure for Trial functions (`:U`) corresponding to:
+```math
+U \\equiv \\begin{pmatrix}
+u_1 & u_2 & ⋯ & u_n\\\\
+u_1 & u_2 & ⋯ & u_n\\\\
+ ⋮  &  ⋮  & ⋮ & ⋮  \\\\
+u_1 & u_2 & ⋯ & u_n
+\\end{pmatrix}
+```
+where `M=size(U,1)` and `n` are the number of lines and columns
+and correspond to the number of DoFs of the TestFESpace
+and the TrialFESpace, respectively.
+
+`U` is wrapped in `LazyMapOver` structures so that
+all operations on them are done elementwise by default (in other words,
+it can be considered that the operations are automatically broadcasted).
+
+# Dev note :
+`U` is stored as a tuple of tuples, wrapped by `LazyMapOver`, where
+inner tuples correspond to each columns of a matrix.
+This hierarchical structure reduces both inference and compile times
+by avoiding the use of large tuples.
+"""
+function generate_bilinear(::LazyBilinearWrap{:U, M}, λ) where {M}
+    MapOver(ntuple(j -> begin
+        MapOver(ntuple(i -> λ[j], Val(M)))
+    end, Val(length(λ))))
+end
+
+"""
+    generate_bilinear(::LazyBilinearWrap{:V, N}, λ) where N
+
+Generate the bilinear matrix structure for TestFESpace (`:V`) corresponding to:
+```math
+V \\equiv \\begin{pmatrix}
+v_1 & v_1 & ⋯ & v_1\\\\
+v_2 & v_2 & ⋯ & v_2\\\\
+ ⋮  &  ⋮  & ⋮ & ⋮  \\\\
+v_m & v_m & ⋯ & v_m
+\\end{pmatrix}
+```
+where `m` and `N=size(V,2)` are the number of lines and columns
+and correspond to the number of DoFs of the TestFESpace
+and the TrialFESpace, respectively.
+
+`V` is wrapped in `LazyMapOver` structures so that
+all operations on them are done elementwise by default (in other words,
+it can be considered that the operations are automatically broadcasted).
+
+# Dev note :
+`V` is stored as a tuple of tuples, wrapped by `LazyMapOver`, where
+inner tuples correspond to each columns of a matrix.
+This hierarchical structure reduces both inference and compile times
+by avoiding the use of large tuples.
+"""
+function generate_bilinear(::LazyBilinearWrap{:V, N}, λ) where {N}
+    MapOver(ntuple(j -> begin
+        MapOver(ntuple(i -> λ[i], Val(length(λ))))
+    end, Val(N)))
+end
+
+"""
+    LazyOperators.materialize(a::AbstractLazyBilinearWrap, cpoint::CellPoint)
+
+Materialize an `AbstractLazyBilinearWrap` on a `CellPoint`:
+first materialize the wrapped argument, then build the bilinear structure.
+"""
+function LazyOperators.materialize(a::AbstractLazyBilinearWrap, cpoint::CellPoint)
+    λ = materialize(get_args(a), cpoint)
+    return generate_bilinear(a, λ)
+end
+
+"""
+    LazyOperators.materialize(
+        lOp::Gradient{O, <:Tuple{AbstractLazyBilinearWrap}},
+        cPoint::CellPoint,
+    ) where {O}
+
+Materialize a gradient of a lazy bilinear wrapper on a `CellPoint`.
+Computes the gradient of the inner arguments and then builds the bilinear structure.
+"""
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{AbstractLazyBilinearWrap}},
+    cPoint::CellPoint,
+) where {O}
+    args = get_args(get_args(lOp)...)
+    grad = materialize(Gradient(LazyMapOver(args), gradient_style(lOp)), cPoint)
+    return generate_bilinear(get_args(lOp)..., grad.args)
+end
+
+"""
     blockmap_bilinear_shape_functions(
         U::AbstractFESpace,
         V::AbstractFESpace,
@@ -1136,10 +1266,11 @@ function blockmap_bilinear_shape_functions(
     cellinfo::AbstractCellInfo,
 )
     cshape = shape(celltype(cellinfo))
-    λU = get_shape_functions(U, cshape)
-    λV = get_shape_functions(V, cshape)
-    blockV, blockU = _blockmap_bilinear(λV, λU)
-    blockU, blockV
+    λU = get_cell_shape_functions(U, cshape)
+    λV = get_cell_shape_functions(V, cshape)
+    Nu = get_ndofs(U, cshape)
+    Nv = get_ndofs(V, cshape)
+    LazyBilinearWrapU(λU, Val(Nv)), LazyBilinearWrapV(λV, Val(Nu))
 end
 
 """
