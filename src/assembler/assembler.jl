@@ -1106,8 +1106,8 @@ end
     AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A}
 
 Abstract base type for lazy bilinear wrappers.
-- `I` indicates whether this is for trial (`:U`) or test (`:V`) functions,
-- `N` is the bilinear size in the other dimension
+- `I` indicates whether this is for Trial (`:U`) or Test (`:V`) FESpace,
+- `N` is the number of DoFs of the complementary FESpace (i.e. Trial if `I` is set to `:V`),
 - `A` is the wrapped argument type.
 """
 abstract type AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A} end
@@ -1140,7 +1140,7 @@ function LazyOperators.materialize(a::LazyBilinearWrap{I, N}, cInfo::CellInfo) w
 end
 
 """
-    generate_bililinear(::LazyBilinearWrap{:U, N}, λ) where N
+    generate_bilinear(::LazyBilinearWrap{:U, M}, λ) where M
 
 Generate the bilinear matrix structure for Trial functions (`:U`) corresponding to:
 ```math
@@ -1151,7 +1151,9 @@ u_1 & u_2 & ⋯ & u_n\\\\
 u_1 & u_2 & ⋯ & u_n
 \\end{pmatrix}
 ```
-where `size(U,1) = N`
+where `M=size(U,1)` and `n` are the number of lines and columns
+and correspond to the number of DoFs of the TestFESpace
+and the TrialFESpace, respectively.
 
 `U` is wrapped in `LazyMapOver` structures so that
 all operations on them are done elementwise by default (in other words,
@@ -1160,18 +1162,19 @@ it can be considered that the operations are automatically broadcasted).
 # Dev note :
 `U` is stored as a tuple of tuples, wrapped by `LazyMapOver`, where
 inner tuples correspond to each columns of a matrix.
-This hierarchical structure reduces both inference and compile times by avoiding the use of large tuples.
+This hierarchical structure reduces both inference and compile times
+by avoiding the use of large tuples.
 """
-function generate_bililinear(::LazyBilinearWrap{:U, N}, λ) where {N}
+function generate_bilinear(::LazyBilinearWrap{:U, M}, λ) where {M}
     MapOver(ntuple(j -> begin
-        MapOver(ntuple(i -> λ[j], Val(N)))
+        MapOver(ntuple(i -> λ[j], Val(M)))
     end, Val(length(λ))))
 end
 
 """
-    generate_bililinear(::LazyBilinearWrap{:V, N}, λ) where N
+    generate_bilinear(::LazyBilinearWrap{:V, N}, λ) where N
 
-Generate the bilinear matrix structure for Test functions (`:V`) corresponding to:
+Generate the bilinear matrix structure for TestFESpace (`:V`) corresponding to:
 ```math
 V \\equiv \\begin{pmatrix}
 v_1 & v_1 & ⋯ & v_1\\\\
@@ -1180,7 +1183,9 @@ v_2 & v_2 & ⋯ & v_2\\\\
 v_m & v_m & ⋯ & v_m
 \\end{pmatrix}
 ```
-where `size(V,2) = N`
+where `m` and `N=size(V,2)` are the number of lines and columns
+and correspond to the number of DoFs of the TestFESpace
+and the TrialFESpace, respectively.
 
 `V` is wrapped in `LazyMapOver` structures so that
 all operations on them are done elementwise by default (in other words,
@@ -1189,9 +1194,10 @@ it can be considered that the operations are automatically broadcasted).
 # Dev note :
 `V` is stored as a tuple of tuples, wrapped by `LazyMapOver`, where
 inner tuples correspond to each columns of a matrix.
-This hierarchical structure reduces both inference and compile times by avoiding the use of large tuples.
+This hierarchical structure reduces both inference and compile times
+by avoiding the use of large tuples.
 """
-function generate_bililinear(::LazyBilinearWrap{:V, N}, λ) where {N}
+function generate_bilinear(::LazyBilinearWrap{:V, N}, λ) where {N}
     MapOver(ntuple(j -> begin
         MapOver(ntuple(i -> λ[i], Val(length(λ))))
     end, Val(N)))
@@ -1205,7 +1211,7 @@ first materialize the wrapped argument, then build the bilinear structure.
 """
 function LazyOperators.materialize(a::AbstractLazyBilinearWrap, cpoint::CellPoint)
     λ = materialize(get_args(a), cpoint)
-    return generate_bililinear(a, λ)
+    return generate_bilinear(a, λ)
 end
 
 """
@@ -1223,7 +1229,7 @@ function LazyOperators.materialize(
 ) where {O}
     args = get_args(get_args(lOp)...)
     grad = materialize(Gradient(LazyMapOver(args), gradient_style(lOp)), cPoint)
-    return generate_bililinear(get_args(lOp)..., grad.args)
+    return generate_bilinear(get_args(lOp)..., grad.args)
 end
 
 """
