@@ -1102,6 +1102,14 @@ function _cellpair_blockmap_shape_functions(
     LazyMapOver((λij,))
 end
 
+"""
+    AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A}
+
+Abstract base type for lazy bilinear wrappers.
+- `I` indicates whether this is for trial (`:U`) or test (`:V`) functions,
+- `N` is the bilinear size in the other dimension
+- `A` is the wrapped argument type.
+"""
 abstract type AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A} end
 Bcube.LazyOperators.get_args(a::AbstractLazyBilinearWrap) = a.a
 
@@ -1109,30 +1117,68 @@ struct LazyBilinearWrap{I, N, A} <: AbstractLazyBilinearWrap{I, N, A}
     a::A
 end
 
+"""
+    LazyBilinearWrapU(λu::A, ::Val{N}) where {A, N}
+
+Helper constructor for lazy Trial functions (`:U`) wrapper in bilinear forms.
+"""
 LazyBilinearWrapU(λu::A, ::Val{N}) where {A, N} = LazyBilinearWrap{:U, N, A}(λu)
+
+"""
+    LazyBilinearWrapV(λv::A, ::Val{N}) where {A, N}
+
+Helper constructor for lazy Test functions (`:V`) wrapper in bilinear forms.
+"""
 LazyBilinearWrapV(λv::A, ::Val{N}) where {A, N} = LazyBilinearWrap{:V, N, A}(λv)
 
+"""
+Materialize a `LazyBilinearWrap` on a `CellInfo` by recursively materialize the inner argument.
+"""
 function LazyOperators.materialize(a::LazyBilinearWrap{I, N}, cInfo::CellInfo) where {I, N}
     args = materialize(get_args(a), cInfo)
     LazyBilinearWrap{I, N, typeof(args)}(args)
 end
 
+"""
+Generate the bilinear matrix structure for trial functions (`:U`).
+Produces a flatten block‑wise `MapOver` where each column repeats the same shape function.
+"""
 function generate_bililinear(::LazyBilinearWrap{:U, N}, λ) where {N}
     MapOver(ntuple(j -> begin
         MapOver(ntuple(i -> λ[j], Val(N)))
     end, Val(length(λ))))
 end
+
+"""
+Generate the bilinear matrix structure for test functions (`:V`).
+Produces a flatten block‑wise `MapOver` where each row repeats the same shape function.
+"""
 function generate_bililinear(::LazyBilinearWrap{:V, N}, λ) where {N}
     MapOver(ntuple(j -> begin
         MapOver(ntuple(i -> λ[i], Val(length(λ))))
     end, Val(N)))
 end
 
+"""
+    LazyOperators.materialize(a::AbstractLazyBilinearWrap, cpoint::CellPoint)
+
+Materialize an `AbstractLazyBilinearWrap` on a `CellPoint`:
+first materialize the wrapped argument, then build the bilinear structure.
+"""
 function LazyOperators.materialize(a::AbstractLazyBilinearWrap, cpoint::CellPoint)
     λ = materialize(get_args(a), cpoint)
     return generate_bililinear(a, λ)
 end
 
+"""
+    LazyOperators.materialize(
+        lOp::Gradient{O, <:Tuple{AbstractLazyBilinearWrap}},
+        cPoint::CellPoint,
+    ) where {O}
+
+Materialize a gradient of a lazy bilinear wrapper on a `CellPoint`.
+Computes the gradient of the inner arguments and then builds the bilinear structure.
+"""
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{AbstractLazyBilinearWrap}},
     cPoint::CellPoint,
