@@ -1140,8 +1140,27 @@ function LazyOperators.materialize(a::LazyBilinearWrap{I, N}, cInfo::CellInfo) w
 end
 
 """
-Generate the bilinear matrix structure for trial functions (`:U`).
-Produces a flatten block‑wise `MapOver` where each column repeats the same shape function.
+    generate_bililinear(::LazyBilinearWrap{:U, N}, λ) where N
+
+Generate the bilinear matrix structure for Trial functions (`:U`) corresponding to:
+```math
+U \\equiv \\begin{pmatrix}
+u_1 & u_2 & ⋯ & u_n\\\\
+u_1 & u_2 & ⋯ & u_n\\\\
+ ⋮  &  ⋮  & ⋮ & ⋮  \\\\
+u_1 & u_2 & ⋯ & u_n
+\\end{pmatrix}
+```
+where `size(U,1) = N`
+
+`U` is wrapped in `LazyMapOver` structures so that
+all operations on them are done elementwise by default (in other words,
+it can be considered that the operations are automatically broadcasted).
+
+# Dev note :
+`U` is stored as a tuple of tuples, wrapped by `LazyMapOver`, where
+inner tuples correspond to each columns of a matrix.
+This hierarchical structure reduces both inference and compile times by avoiding the use of large tuples.
 """
 function generate_bililinear(::LazyBilinearWrap{:U, N}, λ) where {N}
     MapOver(ntuple(j -> begin
@@ -1150,8 +1169,27 @@ function generate_bililinear(::LazyBilinearWrap{:U, N}, λ) where {N}
 end
 
 """
-Generate the bilinear matrix structure for test functions (`:V`).
-Produces a flatten block‑wise `MapOver` where each row repeats the same shape function.
+    generate_bililinear(::LazyBilinearWrap{:V, N}, λ) where N
+
+Generate the bilinear matrix structure for Test functions (`:V`) corresponding to:
+```math
+V \\equiv \\begin{pmatrix}
+v_1 & v_1 & ⋯ & v_1\\\\
+v_2 & v_2 & ⋯ & v_2\\\\
+ ⋮  &  ⋮  & ⋮ & ⋮  \\\\
+v_m & v_m & ⋯ & v_m
+\\end{pmatrix}
+```
+where `size(V,2) = N`
+
+`V` is wrapped in `LazyMapOver` structures so that
+all operations on them are done elementwise by default (in other words,
+it can be considered that the operations are automatically broadcasted).
+
+# Dev note :
+`V` is stored as a tuple of tuples, wrapped by `LazyMapOver`, where
+inner tuples correspond to each columns of a matrix.
+This hierarchical structure reduces both inference and compile times by avoiding the use of large tuples.
 """
 function generate_bililinear(::LazyBilinearWrap{:V, N}, λ) where {N}
     MapOver(ntuple(j -> begin
