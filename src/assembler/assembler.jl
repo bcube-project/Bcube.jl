@@ -1102,54 +1102,44 @@ function _cellpair_blockmap_shape_functions(
     LazyMapOver((λij,))
 end
 
-abstract type AbstractLazyBilinearWrap{A, N} <: Bcube.LazyOperators.AbstractLazyMapOver{A} end
+abstract type AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A} end
 Bcube.LazyOperators.get_args(a::AbstractLazyBilinearWrap) = a.a
 
-struct LazyBilinearWrapU{A, Nv} <: AbstractLazyBilinearWrap{A, Nv}
-    a::A
-end
-struct LazyBilinearWrapV{A, Nu} <: AbstractLazyBilinearWrap{A, Nu}
+struct LazyBilinearWrap{I, N, A} <: AbstractLazyBilinearWrap{I, N, A}
     a::A
 end
 
-LazyBilinearWrapU(λ::T, ::Val{N}) where {T, N} = LazyBilinearWrapU{T, N}(λ)
-LazyBilinearWrapV(λ::T, ::Val{N}) where {T, N} = LazyBilinearWrapV{T, N}(λ)
+LazyBilinearWrapU(λu::A, ::Val{N}) where {A, N} = LazyBilinearWrap{:U, N, A}(λu)
+LazyBilinearWrapV(λv::A, ::Val{N}) where {A, N} = LazyBilinearWrap{:V, N, A}(λv)
 
-function LazyOperators.materialize(a::LazyBilinearWrapU{A, N}, cInfo::CellInfo) where {A, N}
+function LazyOperators.materialize(a::LazyBilinearWrap{I, N}, cInfo::CellInfo) where {I, N}
     args = materialize(get_args(a), cInfo)
-    LazyBilinearWrapU(args, Val(N))
-end
-function LazyOperators.materialize(a::LazyBilinearWrapV{A, N}, cInfo::CellInfo) where {A, N}
-    args = materialize(get_args(a), cInfo)
-    LazyBilinearWrapV(args, Val(N))
+    LazyBilinearWrap{I, N, typeof(args)}(args)
 end
 
-function generate_bililinear(::LazyBilinearWrapU, λ, ::Val{Nv}) where {Nv}
+function generate_bililinear(::LazyBilinearWrap{:U, N}, λ) where {N}
     MapOver(ntuple(j -> begin
-        MapOver(ntuple(i -> λ[j], Val(Nv)))
+        MapOver(ntuple(i -> λ[j], Val(N)))
     end, Val(length(λ))))
 end
-function generate_bililinear(::LazyBilinearWrapV, λ, ::Val{Nu}) where {Nu}
+function generate_bililinear(::LazyBilinearWrap{:V, N}, λ) where {N}
     MapOver(ntuple(j -> begin
         MapOver(ntuple(i -> λ[i], Val(length(λ))))
-    end, Val(Nu)))
+    end, Val(N)))
 end
 
-function LazyOperators.materialize(
-    a::AbstractLazyBilinearWrap{A, N},
-    cpoint::CellPoint,
-) where {A, N}
+function LazyOperators.materialize(a::AbstractLazyBilinearWrap, cpoint::CellPoint)
     λ = materialize(get_args(a), cpoint)
-    return generate_bililinear(a, λ, Val(N))
+    return generate_bililinear(a, λ)
 end
 
 function LazyOperators.materialize(
-    lOp::Gradient{O, <:Tuple{AbstractLazyBilinearWrap{A, N}}},
+    lOp::Gradient{O, <:Tuple{AbstractLazyBilinearWrap}},
     cPoint::CellPoint,
-) where {O, A, N}
+) where {O}
     args = get_args(get_args(lOp)...)
     grad = materialize(Gradient(LazyMapOver(args), gradient_style(lOp)), cPoint)
-    return generate_bililinear(get_args(lOp)..., grad.args, Val(N))
+    return generate_bililinear(get_args(lOp)..., grad.args)
 end
 
 """
