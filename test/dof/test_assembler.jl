@@ -503,7 +503,6 @@
             scale(x) = (x[1] + 0.5)
             err = heat_solver(mesh, degree, dirichlet_dict, q, η, T2_analytical ∘ scale)
             @test err < 2.0e-14
-            #
         end
         driver_heat_solver()
     end
