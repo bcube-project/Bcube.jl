@@ -1248,6 +1248,15 @@ function LazyOperators.materialize(
     return generate_bilinear(get_args(lOp)..., grad.args)
 end
 
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{AbstractLazyBilinearWrap}},
+    sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
+) where {O}
+    op_side = get_operator(sidePoint)
+    cPoint = op_side(get_args(sidePoint)...)
+    return materialize(lOp, cPoint)
+end
+
 """
     blockmap_bilinear_shape_functions(
         U::AbstractFESpace,
@@ -1331,8 +1340,8 @@ function blockmap_bilinear_shape_functions(
     U_pp, V_pp = blockmap_bilinear_shape_functions(U, V, cellinfo_p, cellinfo_p)
 
     return (
-        BilinearTrialFaceSidePair(U_nn, U_pn, U_np, U_pp),
-        BilinearTestFaceSidePair(V_nn, V_pn, V_np, V_pp),
+        LazyWrap(BilinearTrialFaceSidePair(U_nn, U_pn, U_np, U_pp)),
+        LazyWrap(BilinearTestFaceSidePair(V_nn, V_pn, V_np, V_pp)),
     )
 end
 
