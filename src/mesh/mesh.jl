@@ -135,13 +135,17 @@ end
 `bc_nodes` : <boundary tag> => <boundary nodes tags>
 `bc_faces` : <boundary tag> => <boundary faces tags>
 """
-struct Mesh{topoDim, spaceDim, N, E, C, BCn, BCf, M, Ba} <: AbstractMesh{topoDim, spaceDim}
+struct Mesh{topoDim, spaceDim, N, E, C, BCn, BCf, ANi, ACi, M, Ba} <:
+       AbstractMesh{topoDim, spaceDim}
     nodes::N
     entities::E
     connectivities::C
 
     bc_nodes::BCn #Vector{Vector{Int}}
     bc_faces::BCf #Vector{Vector{Int}}
+
+    absoluteNodeIndices::ANi
+    absoluteCellIndices::ACi
 
     metadata::M
 
@@ -153,6 +157,8 @@ function Mesh(
     nodes::AbstractVector{<:Node{spaceDim, T}},
     celltypes::Vector{E},
     cell2node::C,
+    absoluteCellIndices::AbstractVector{<:Integer},
+    absoluteNodeIndices::AbstractVector{<:Integer},
     buildfaces::Bool,
     buildboundaryfaces::Bool,
     bc_nodes::NamedTuple,
@@ -192,6 +198,8 @@ function Mesh(
         typeof(connectivities),
         typeof(bc_nodes),
         typeof(bc_faces),
+        typeof(absoluteNodeIndices),
+        typeof(absoluteCellIndices),
         typeof(metadata),
         typeof(backend),
     }(
@@ -200,6 +208,8 @@ function Mesh(
         connectivities,
         bc_nodes,
         _bc_faces,
+        absoluteNodeIndices,
+        absoluteCellIndices,
         metadata,
         backend,
     )
@@ -216,6 +226,8 @@ function Mesh(
     bc_faces::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
     metadata::AbstractMeshMetaData = DefaultMeshMetaData(),
     backend::AbstractBcubeBackend = get_bcube_backend(),
+    absoluteCellIndices::AbstractVector{<:Integer} = Int[],#1:length(celltypes),
+    absoluteNodeIndices::AbstractVector{<:Integer} = Int[],#1:length(nodes),
 ) where {E <: AbstractVector{<:AbstractEntityType}, C <: AbstractConnectivity}
     topoDim = topodim(valtype(celltypes))
     if buildboundaryfaces
@@ -229,11 +241,14 @@ function Mesh(
     _faces = (get(bc_faces, i, Int[]) for i in keys(bc_names))
     nt_bc_nodes = (; zip(_names, _nodes)...)
     nt_bc_faces = (; zip(_names, _faces)...)
+
     Mesh(
         topoDim,
         nodes,
         celltypes,
         cell2nodes,
+        absoluteCellIndices,
+        absoluteNodeIndices,
         buildfaces,
         buildboundaryfaces,
         nt_bc_nodes,
@@ -303,6 +318,9 @@ end
 @inline function boundary_faces(mesh::Mesh, name::Union{String, Symbol})
     mesh.bc_faces[Symbol(name)]
 end
+
+get_absolute_node_indices(mesh) = mesh.absoluteNodeIndices
+get_absolute_cell_indices(mesh) = mesh.absoluteCellIndices
 
 function _build_faces!(c2n::MeshConnectivity, celltypes)
     c2n_indices = indices(c2n)
