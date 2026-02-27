@@ -294,10 +294,8 @@ function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver}},
     sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
 ) where {O}
-    ∇x = tuplemap(
-        x -> materialize(Gradient(x, gradient_style(lOp)), sidePoint),
-        get_args(get_args(lOp)...),
-    )
+    f(x) = materialize(Gradient(x, gradient_style(lOp)), sidePoint)
+    ∇x = tuplemap(f, get_args(get_args(lOp)...))
     return MapOver(∇x)
 end
 

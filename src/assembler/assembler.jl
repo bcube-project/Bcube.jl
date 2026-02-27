@@ -1108,35 +1108,52 @@ end
 Abstract base type for lazy bilinear wrappers.
 - `I` indicates whether this is for Trial (`:U`) or Test (`:V`) FESpace,
 - `N` is the number of DoFs of the complementary FESpace (i.e. Trial if `I` is set to `:V`),
-- `A` is the wrapped argument type.
+- `A` is the wrapped arguments type.
 """
-abstract type AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A} end
-Bcube.LazyOperators.get_args(a::AbstractLazyBilinearWrap) = a.a
+abstract type AbstractLazyBilinearWrap{I, N, A <: Tuple} <:
+              LazyOperators.AbstractLazyMapOver{A} end
+Bcube.LazyOperators.get_args(a::AbstractLazyBilinearWrap) = a.args
 
 struct LazyBilinearWrap{I, N, A} <: AbstractLazyBilinearWrap{I, N, A}
-    a::A
+    args::A
+end
+
+function LazyBilinearWrap(::Val{I}, ::Val{N}, λ...) where {I, N}
+    LazyBilinearWrap{I, N, typeof(λ)}(λ)
 end
 
 """
-    LazyBilinearWrapU(λu::A, ::Val{N}) where {A, N}
+    LazyBilinearWrapU(::Val{N}, λu) where {N}
 
 Helper constructor for lazy Trial functions (`:U`) wrapper in bilinear forms.
 """
-LazyBilinearWrapU(λu::A, ::Val{N}) where {A, N} = LazyBilinearWrap{:U, N, A}(λu)
+LazyBilinearWrapU(args...; kwargs...) = LazyBilinearWrap(Val(:U), args...; kwargs...)
 
 """
-    LazyBilinearWrapV(λv::A, ::Val{N}) where {A, N}
+    LazyBilinearWrapV(::Val{N}, λv) where {N}
 
 Helper constructor for lazy Test functions (`:V`) wrapper in bilinear forms.
 """
-LazyBilinearWrapV(λv::A, ::Val{N}) where {A, N} = LazyBilinearWrap{:V, N, A}(λv)
+LazyBilinearWrapV(args...; kwargs...) = LazyBilinearWrap(Val(:V), args...; kwargs...)
 
 """
 Materialize a `LazyBilinearWrap` on a `CellInfo` by recursively materialize the inner argument.
 """
-function LazyOperators.materialize(a::LazyBilinearWrap{I, N}, cInfo::CellInfo) where {I, N}
-    args = materialize(get_args(a), cInfo)
-    LazyBilinearWrap{I, N, typeof(args)}(args)
+function LazyOperators.materialize(
+    a::AbstractLazyBilinearWrap{I, N},
+    cInfo::CellInfo,
+) where {I, N}
+    args = materialize_args(get_args(a), cInfo)
+    LazyBilinearWrap(Val(I), Val(N), args...)
+end
+
+function LazyOperators.materialize(a::AbstractLazyBilinearWrap, x...)
+    error("to be defined")
+end
+
+function LazyOperators.materialize(a::AbstractLazyBilinearWrap, fside::AbstractSide)
+    op_side = get_operator(fside)
+    return materialize(a, op_side(get_args(fside)...))
 end
 
 """
@@ -1198,9 +1215,8 @@ This hierarchical structure reduces both inference and compile times
 by avoiding the use of large tuples.
 """
 function generate_bilinear(::LazyBilinearWrap{:V, N}, λ) where {N}
-    MapOver(ntuple(j -> begin
-        MapOver(ntuple(i -> λ[i], Val(length(λ))))
-    end, Val(N)))
+    a = MapOver(Tuple(λ))
+    MapOver(ntuple(j -> a, Val(N)))
 end
 
 """
@@ -1210,8 +1226,8 @@ Materialize an `AbstractLazyBilinearWrap` on a `CellPoint`:
 first materialize the wrapped argument, then build the bilinear structure.
 """
 function LazyOperators.materialize(a::AbstractLazyBilinearWrap, cpoint::CellPoint)
-    λ = materialize(get_args(a), cpoint)
-    return generate_bilinear(a, λ)
+    λ = materialize_args(get_args(a), cpoint)
+    return generate_bilinear(a, λ...)
 end
 
 """
@@ -1228,8 +1244,17 @@ function LazyOperators.materialize(
     cPoint::CellPoint,
 ) where {O}
     args = get_args(get_args(lOp)...)
-    grad = materialize(Gradient(LazyMapOver(args), gradient_style(lOp)), cPoint)
+    grad = materialize(Gradient(LazyMapOver(args...), gradient_style(lOp)), cPoint)
     return generate_bilinear(get_args(lOp)..., grad.args)
+end
+
+function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{AbstractLazyBilinearWrap}},
+    sidePoint::AbstractSide{Nothing, <:Tuple{FacePoint}},
+) where {O}
+    op_side = get_operator(sidePoint)
+    cPoint = op_side(get_args(sidePoint)...)
+    return materialize(lOp, cPoint)
 end
 
 """
@@ -1265,12 +1290,7 @@ function blockmap_bilinear_shape_functions(
     V::AbstractFESpace,
     cellinfo::AbstractCellInfo,
 )
-    cshape = shape(celltype(cellinfo))
-    λU = get_cell_shape_functions(U, cshape)
-    λV = get_cell_shape_functions(V, cshape)
-    Nu = get_ndofs(U, cshape)
-    Nv = get_ndofs(V, cshape)
-    LazyBilinearWrapU(λU, Val(Nv)), LazyBilinearWrapV(λV, Val(Nu))
+    blockmap_bilinear_shape_functions(U, V, cellinfo, cellinfo)
 end
 
 """
@@ -1287,10 +1307,11 @@ function blockmap_bilinear_shape_functions(
     cellinfo_u::AbstractCellInfo,
     cellinfo_v::AbstractCellInfo,
 )
-    λU = get_shape_functions(U, shape(celltype(cellinfo_u)))
-    λV = get_shape_functions(V, shape(celltype(cellinfo_v)))
-    blockV, blockU = _blockmap_bilinear(λV, λU)
-    blockU, blockV
+    λU = get_cell_shape_functions(U, shape(celltype(cellinfo_u)))
+    λV = get_cell_shape_functions(V, shape(celltype(cellinfo_v)))
+    Nu = get_ndofs(U, shape(celltype(cellinfo_u)))
+    Nv = get_ndofs(V, shape(celltype(cellinfo_v)))
+    LazyBilinearWrapU(Val(Nv), λU), LazyBilinearWrapV(Val(Nu), λV)
 end
 
 """
@@ -1322,46 +1343,6 @@ function blockmap_bilinear_shape_functions(
         LazyWrap(BilinearTrialFaceSidePair(U_nn, U_pn, U_np, U_pp)),
         LazyWrap(BilinearTestFaceSidePair(V_nn, V_pn, V_np, V_pp)),
     )
-end
-
-"""
-    _blockmap_bilinear(a::NTuple{N1}, b::NTuple{N2})
-
-From tuples ``a=(a_1, a_2, …, a_i, …, a_m)`` and ``b=(b_1, b_2, …, b_j, …, b_n)``,
-it builds `A` and `B` which correspond formally to the following two matrices :
-```math
-A \\equiv \\begin{pmatrix}
-a_1 & a_1 & ⋯ & a_1\\\\
-a_2 & a_2 & ⋯ & a_2\\\\
- ⋮  &  ⋮  & ⋮ & ⋮  \\\\
-a_m & a_m & ⋯ & a_m
-\\end{pmatrix}
-\\qquad and \\qquad
-B \\equiv \\begin{pmatrix}
-b_1 & b_2 & ⋯ & b_n\\\\
-b_1 & b_2 & ⋯ & b_n\\\\
- ⋮  &  ⋮  & ⋮ & ⋮  \\\\
-b_1 & b_2 & ⋯ & b_n
-\\end{pmatrix}
-```
-
-`A` and `B` are wrapped in `LazyMapOver` structures so that
-all operations on them are done elementwise by default (in other words,
-it can be considered that the operations are automatically broadcasted).
-
-# Dev note :
-Both `A` and `B` are stored as a tuple of tuples, wrapped by `LazyMapOver`, where
-inner tuples correspond to each columns of a matrix.
-This hierarchical structure reduces both inference and compile times by avoiding the use of large tuples.
-"""
-function _blockmap_bilinear(a::NTuple{N1}, b::NTuple{N2}) where {N1, N2}
-    _a = ntuple(j -> begin
-        LazyMapOver(ntuple(i -> a[i], Val(N1)))
-    end, Val(N2))
-    _b = ntuple(j -> begin
-        LazyMapOver(ntuple(i -> b[j], Val(N1)))
-    end, Val(N2))
-    LazyMapOver(_a), LazyMapOver(_b)
 end
 
 """
@@ -1502,8 +1483,8 @@ Construct a FaceSidePair from two arguments.
 FaceSidePair(a, b) = FaceSidePair((a, b))
 LazyOperators.pretty_name(::FaceSidePair) = "FaceSidePair"
 
-side_n(a::FaceSidePair) = Side⁻(LazyMapOver((a.data[1], NullOperator())))
-side_p(a::FaceSidePair) = Side⁺(LazyMapOver((NullOperator(), a.data[2])))
+side_n(a::FaceSidePair) = Side⁻(LazyMapOver(a.data[1], NullOperator()))
+side_p(a::FaceSidePair) = Side⁺(LazyMapOver(NullOperator(), a.data[2]))
 
 function LazyOperators.materialize(a::FaceSidePair, cPoint::CellPoint)
     _a = (materialize(a.data[1], cPoint), materialize(a.data[2], cPoint))
@@ -1604,11 +1585,11 @@ LazyOperators.pretty_name(::BilinearTrialFaceSidePair) = "BilinearTrialFaceSideP
 get_basetype(::Type{<:BilinearTrialFaceSidePair}) = BilinearTrialFaceSidePair
 
 function side_n(a::BilinearTrialFaceSidePair)
-    Side⁻(LazyMapOver((a.data[1], a.data[2], NullOperator(), NullOperator())))
+    Side⁻(LazyMapOver(a.data[1], a.data[2], NullOperator(), NullOperator()))
 end
 
 function side_p(a::BilinearTrialFaceSidePair)
-    Side⁺(LazyMapOver((NullOperator(), NullOperator(), a.data[3], a.data[4])))
+    Side⁺(LazyMapOver(NullOperator(), NullOperator(), a.data[3], a.data[4]))
 end
 
 """
