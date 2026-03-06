@@ -9,8 +9,6 @@ using FastGaussQuadrature
 using ForwardDiff
 using LinearAlgebra
 using Printf # just for tmp vtk, to be removed
-# import LinearSolve: solve, solve!, LinearProblem
-import LinearSolve
 using Symbolics # used for generation of Lagrange shape functions
 using NearestNeighbors
 
