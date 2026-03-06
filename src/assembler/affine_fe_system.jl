@@ -6,32 +6,60 @@ Dirichlet conditions on `u`
 * we could avoid having `mesh` as an attribute by storing one (or the two) form : `a` and/or `l`.
 Then the mesh can be retrieved from those two forms.
 """
-struct AffineFESystem{T <: Number, Mat <: AbstractMatrix{<:Number}, TriFE, TesFE}
+struct AffineFESystem{
+    Mat <: AbstractMatrix{<:Number},
+    Vec <: AbstractVector{<:Number},
+    TriFE,
+    TesFE,
+    M <: AbstractMesh,
+    L,
+}
     A::Mat
-    b::Vector{T}
+    b::Vec
     U::TriFE
     V::TesFE
-    mesh::Mesh
+    mesh::M
+    linsolve!::L
 
     function AffineFESystem(
         A::AbstractMatrix{<:Number},
-        b::Vector{T},
+        b::AbstractVector{<:Number},
         U,
         V,
-        mesh::Mesh,
-    ) where {T}
-        new{T, typeof(A), typeof(U), typeof(V)}(A, b, U, V, mesh)
+        mesh::AbstractMesh,
+        linsolve!,
+    )
+        new{typeof(A), typeof(b), typeof(U), typeof(V), typeof(mesh), typeof(linsolve!)}(
+            A,
+            b,
+            U,
+            V,
+            mesh,
+            linsolve!,
+        )
     end
 end
 
 """
+    AffineFESystem(a, l, U, V, linsolve! = ldiv!)
+
 Build an AffineFESystem from the bilinear form a and the linear form v.
 `U` and `V` are the test FESpace and the trial FESpace respectively.
+
+`linsolve!` should be of the form `f(y, A, x)` where `A` is the bilinear form matrix,
+`x` the right hand side, and `y` a preallocated output vector in which the result
+should be stored. The default solver is `LinearAlgebra.ldiv!` with a `lu` factorization.
 
 # Warning
 For now, `U` and `V` must be defined with the same FESpace(s) ("Petrov-Galerkin" not authorised)
 """
-function AffineFESystem(a, l, U, V)
+function AffineFESystem(
+    a,
+    l,
+    U,
+    V,
+    linsolve! = (y, A, x) -> LinearAlgebra.ldiv!(y, lu(A), x),
+)
     # Preliminary check to ensure same FESpace
     if U isa MultiFESpace
         @assert all((_U, _V) -> parent(_U) isa typeof(parent(_V)), zip(U, V)) "U and V must be defined on same FEspace"
@@ -57,38 +85,34 @@ function AffineFESystem(a, l, U, V)
         mesh = get_mesh(domain)
     end
 
-    return AffineFESystem(A, b, U, V, mesh)
+    return AffineFESystem(A, b, U, V, mesh, linsolve!)
 end
 
 _get_arrays(system::AffineFESystem) = (system.A, system.b)
 _get_fe_spaces(system::AffineFESystem) = (system.U, system.V)
 
 """
+    solve(system::AffineFESystem, t::Number = 0.0)
+    solve!(u::SingleFieldFEFunction, system::AffineFESystem, t::Number = 0.0)
+
 Solve the AffineFESystem, i.e invert the Ax=b system taking into account
 the dirichlet conditions.
 
-# Dev notes
-* should we return an FEFunction instead of a Vector?
-* we need to enable other solvers
+The out-of-place returns a `FEFunction` with the solution.
 """
-function solve(system::AffineFESystem, t::Number = 0.0; alg = nothing)
+function solve(system::AffineFESystem, t::Number = 0.0)
     U, _ = _get_fe_spaces(system)
 
     # Create FEFunction to hold the result
     u = FEFunction(U)
 
     # Solve
-    solve!(u, system, t; alg)
+    solve!(u, system, t)
 
     return u
 end
 
-function solve!(
-    u::SingleFieldFEFunction,
-    system::AffineFESystem,
-    t::Number = 0.0;
-    alg = nothing,
-)
+function solve!(u::SingleFieldFEFunction, system::AffineFESystem, t::Number = 0.0)
     A, b = _get_arrays(system)
     U, V = _get_fe_spaces(system)
 
@@ -102,9 +126,9 @@ function solve!(
     apply_homogeneous_dirichlet!(A, b0, U, V, system.mesh)
 
     # Inverse linear system
-    prob = LinearSolve.LinearProblem(A, b0)
-    sol = LinearSolve.solve(prob, alg)
+    x = Bcube.allocate_dofs(U)
+    system.linsolve!(x, A, b0)
 
     # Update FEFunction
-    set_dof_values!(u, sol.u .+ d)
+    set_dof_values!(u, x .+ d)
 end
