@@ -263,6 +263,13 @@ function idof_by_vertex(::AbstractFunctionSpace, ::AbstractShape)
     error("Function 'idof_by_vertex' is not defined")
 end
 
+function _idof_by_volume_impl(fs, shape)
+    idofs = ones(Bool, get_ndofs(fs, shape))
+    idofs_face = idof_by_face_with_bounds(fs, shape)
+    foreach(indices -> idofs[indices] .= false, idofs_face)
+    return :(SA[$(findall(idofs)...)])
+end
+
 """
     idof_by_volume(::AbstractFunctionSpace, ::AbstractShape)
 
@@ -275,14 +282,7 @@ This is simply the (ensemble) difference between all the element dofs and the
 ones returned by `idof_by_face_with_bounds`.
 """
 @generated idof_by_volume(fs::AbstractFunctionSpace, shape::AbstractShape) =
-    _idof_by_volume(fs(), shape())
-
-function _idof_by_volume(fs, shape)
-    idofs = ones(Bool, get_ndofs(fs, shape))
-    idofs_face = idof_by_face_with_bounds(fs, shape)
-    foreach(indices -> idofs[indices] .= false, idofs_face)
-    return :(SA[$(findall(idofs)...)])
-end
+    _idof_by_volume_impl(fs(), shape())
 
 """
     get_ndofs(fs::AbstractFunctionSpace, shape::AbstractShape)
