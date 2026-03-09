@@ -89,5 +89,11 @@
 
         @test all(Bcube.get_dof_type(u) .== (ComplexF64, ComplexF64))
         @test all(get_dof_values(u) .== vals)
+
+        # Test initialization with tuple of AbstractLazy
+        f1 = PhysicalFunction(x -> x[1])
+        f2 = PhysicalFunction(x -> x[1]^2)
+        u_lazy = FEFunction(U, mesh, (f1, f2))
+        @test get_dof_values(u_lazy) ≈ [0.0, 1.0, 0.25]
     end
 end
