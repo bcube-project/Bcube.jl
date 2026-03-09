@@ -112,5 +112,11 @@
         val3 = Base.materialize(expr3_c1, p1)
         val3_ref = (2.0 .* (1.5, 3) .+ (SA[0.5], SA[0.0]) .⋅ SA[10.0])
         @test all(val3 .≈ val3_ref)
+
+        # Test initialization with tuple of AbstractLazy
+        f1 = PhysicalFunction(x -> x[1])
+        f2 = PhysicalFunction(x -> x[1]^2)
+        u_lazy = FEFunction(U, mesh, (f1, f2))
+        @test get_dof_values(u_lazy) ≈ [0.0, 1.0, 0.25]
     end
 end
