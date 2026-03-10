@@ -20,46 +20,29 @@ struct AffineFESystem{
     V::TesFE
     mesh::M
     linsolve!::L
+end
 
-    function AffineFESystem(
+"""
+    AffineFESystem(
         A::AbstractMatrix{<:Number},
         b::AbstractVector{<:Number},
         U,
         V,
         mesh::AbstractMesh,
-        linsolve!,
+        linsolve! = default_linsolve!,
     )
-        new{typeof(A), typeof(b), typeof(U), typeof(V), typeof(mesh), typeof(linsolve!)}(
-            A,
-            b,
-            U,
-            V,
-            mesh,
-            linsolve!,
-        )
-    end
-end
-
-"""
-    AffineFESystem(a, l, U, V, linsolve! = ldiv!)
 
 Build an AffineFESystem from the bilinear form a and the linear form v.
 `U` and `V` are the test FESpace and the trial FESpace respectively.
 
-`linsolve!` should be of the form `f(y, A, x)` where `A` is the bilinear form matrix,
-`x` the right hand side, and `y` a preallocated output vector in which the result
-should be stored. The default solver is `LinearAlgebra.ldiv!` with a `lu` factorization.
+`linsolve!` should be a `Function`` of the form `f(y, A, x)` where `A` is the bilinear form
+matrix, `x` the right hand side, and `y` a preallocated output vector in which the result
+should be stored. The default solver is `(y, A, x) -> y .= A \\ x`.
 
 # Warning
-For now, `U` and `V` must be defined with the same FESpace(s) ("Petrov-Galerkin" not authorised)
+For now, `U` and `V` must be defined with the same FESpace(s) ("Petrov-Galerkin" not allowed)
 """
-function AffineFESystem(
-    a,
-    l,
-    U,
-    V,
-    linsolve! = (y, A, x) -> LinearAlgebra.ldiv!(y, lu(A), x),
-)
+function AffineFESystem(a, l, U, V, linsolve! = default_linsolve!)
     # Preliminary check to ensure same FESpace
     if U isa MultiFESpace
         @assert all((_U, _V) -> parent(_U) isa typeof(parent(_V)), zip(U, V)) "U and V must be defined on same FEspace"
@@ -87,6 +70,8 @@ function AffineFESystem(
 
     return AffineFESystem(A, b, U, V, mesh, linsolve!)
 end
+
+default_linsolve!(y, A, x) = y .= A \ x
 
 _get_arrays(system::AffineFESystem) = (system.A, system.b)
 _get_fe_spaces(system::AffineFESystem) = (system.U, system.V)
