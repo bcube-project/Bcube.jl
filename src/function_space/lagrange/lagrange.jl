@@ -286,77 +286,6 @@ function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Line, ξ::Num
     SA[zero(ξ)]
 end
 
-# Functions for Triangle shape
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Triangle, ξ) = SA[one(eltype(ξ))]
-get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Triangle) = 1
-
-function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Triangle, ξ)
-    _zero = zero(eltype(ξ))
-    return SA[_zero _zero]
-end
-
-function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Triangle, ξ)
-    return SA[
-        1 - ξ[1] - ξ[2]
-        ξ[1]
-        ξ[2]
-    ]
-end
-
-function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Triangle, ξ)
-    return SA[
-        -1.0 -1.0
-        1.0 0.0
-        0.0 1.0
-    ]
-end
-
-get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Triangle) = 3
-
-function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 2}, ::Triangle, ξ)
-    return SA[
-        (1 - ξ[1] - ξ[2]) * (1 - 2ξ[1] - 2ξ[2])  # = (1 - x - y)(1 - 2x - 2y)
-        ξ[1] * (2ξ[1] - 1)                 # = x (2x - 1)
-        ξ[2] * (2ξ[2] - 1)                 # = y (2y - 1)
-        4ξ[1] * (1 - ξ[1] - ξ[2])            # = 4x (1 - x - y)
-        4ξ[1] * ξ[2]
-        4ξ[2] * (1 - ξ[1] - ξ[2])             # = 4y (1 - x - y)
-    ]
-end
-
-function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 2}, ::Val{1}, ::Triangle, ξ)
-    return SA[
-        -3+4(ξ[1] + ξ[2]) -3+4(ξ[1] + ξ[2])
-        -1+4ξ[1] 0.0
-        0.0 -1+4ξ[2]
-        4(1 - 2ξ[1] - ξ[2]) -4ξ[1]
-        4ξ[2] 4ξ[1]
-        -4ξ[2] 4(1 - 2ξ[2] - ξ[1])
-    ]
-end
-
-get_ndofs(::FunctionSpace{<:Lagrange, 2}, ::Triangle) = 6
-
-function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 3}, ::Triangle, ξ)
-    λ1 = 1 - ξ[1] - ξ[2]
-    λ2 = ξ[1]
-    λ3 = ξ[2]
-    return SA[
-        0.5 * (3 * λ1 - 1) * (3 * λ1 - 2) * λ1
-        0.5 * (3 * λ2 - 1) * (3 * λ2 - 2) * λ2
-        0.5 * (3 * λ3 - 1) * (3 * λ3 - 2) * λ3
-        4.5 * λ1 * λ2 * (3 * λ1 - 1)
-        4.5 * λ1 * λ2 * (3 * λ2 - 1)
-        4.5 * λ2 * λ3 * (3 * λ2 - 1)
-        4.5 * λ2 * λ3 * (3 * λ3 - 1)
-        4.5 * λ3 * λ1 * (3 * λ3 - 1)
-        4.5 * λ3 * λ1 * (3 * λ1 - 1)
-        27 * λ1 * λ2 * λ3
-    ]
-end
-
-get_ndofs(::FunctionSpace{<:Lagrange, 3}, ::Triangle) = 10
-
 # Functions for Square shape
 _scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Square, ξ) = SA[one(eltype(ξ))]
 get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Square) = 1
@@ -486,7 +415,7 @@ get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Pyramid) = 5
 
 # Generic rule 1 : no dof per vertex, edge or face for any Lagrange element of degree 0
 # Rq: proceeding with "@eval" rather than using `AbstractShape` helps solving ambiguities
-for S in (:Line, :Triangle, :Square, :Cube, :Tetra, :Prism, :Pyramid)
+for S in (:Line, :Square, :Cube, :Tetra, :Prism, :Pyramid)
     @eval idof_by_vertex(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
         ntuple(i -> SA[], nvertices(shape))
     @eval idof_by_edge(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
@@ -500,6 +429,7 @@ for S in (:Line, :Triangle, :Square, :Cube, :Tetra, :Prism, :Pyramid)
 end
 
 # Generic rule 2 (for non tensorial elements): one dof per vertex for any Lagrange element of degree > 0
+# TO BE DELETED : MUST BE OVERWRITTEN IN EACH FILE
 function idof_by_vertex(
     ::FunctionSpace{<:Lagrange, degree},
     shape::AbstractShape,
@@ -555,24 +485,6 @@ function idof_by_edge_with_bounds(
     shape::Line,
 ) where {degree}
     idof_by_vertex(fs, shape)
-end
-
-# Triangle
-function idof_by_edge(::FunctionSpace{<:Lagrange, 1}, shape::Triangle)
-    ntuple(i -> SA[], nedges(shape))
-end
-function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Triangle)
-    (SA[1, 2], SA[2, 3], SA[3, 1])
-end
-
-idof_by_edge(::FunctionSpace{<:Lagrange, 2}, ::Triangle) = (SA[4], SA[5], SA[6])
-function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 2}, ::Triangle)
-    (SA[1, 2, 4], SA[2, 3, 5], SA[3, 1, 6])
-end
-
-idof_by_edge(::FunctionSpace{<:Lagrange, 3}, ::Triangle) = (SA[4, 5], SA[6, 7], SA[8, 9])
-function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 3}, ::Triangle)
-    (SA[1, 2, 4, 5], SA[2, 3, 6, 7], SA[3, 1, 8, 9])
 end
 
 #for Quad
@@ -752,10 +664,10 @@ end
 # get_coords
 # Generic versions for Lagrange 0 and 1
 # Rq: proceeding with "@eval" rather than using `AbstractShape` helps solving ambiguities
-for S in (:Line, :Triangle, :Square, :Cube, :Tetra, :Prism, :Pyramid)
+for S in (:Line, :Square, :Cube, :Tetra, :Prism, :Pyramid)
     @eval get_coords(::FunctionSpace{<:Lagrange, 0}, shape::$S) = (center(shape),)
 end
-for S in (:Triangle, :Tetra, :Prism, :Pyramid) # rq : ordering for tensorial elements is different, not treated here
+for S in (:Tetra, :Prism, :Pyramid) # rq : ordering for tensorial elements is different, not treated here
     @eval get_coords(::FunctionSpace{<:Lagrange, 1}, shape::$S) = get_coords(shape)
 end
 
@@ -795,26 +707,3 @@ function get_coords(fs::FunctionSpace{<:Lagrange, D}, shape::Square) where {D}
     _get_coords(fs, shape)
 end
 get_coords(fs::FunctionSpace{<:Lagrange, D}, shape::Cube) where {D} = _get_coords(fs, shape)
-
-# Triangle
-function get_coords(::FunctionSpace{<:Lagrange, 2}, shape::Triangle)
-    (
-        get_coords(shape)...,
-        sum(get_coords(shape, [1, 2])) / 2,
-        sum(get_coords(shape, [2, 3])) / 2,
-        sum(get_coords(shape, [3, 1])) / 2,
-    )
-end
-
-function get_coords(::FunctionSpace{<:Lagrange, 3}, shape::Triangle)
-    (
-        get_coords(shape)...,
-        (2 / 3) * get_coords(shape, 1) + (1 / 3) * get_coords(shape, 2),
-        (1 / 3) * get_coords(shape, 1) + (2 / 3) * get_coords(shape, 2),
-        (2 / 3) * get_coords(shape, 2) + (1 / 3) * get_coords(shape, 3),
-        (1 / 3) * get_coords(shape, 2) + (2 / 3) * get_coords(shape, 3),
-        (2 / 3) * get_coords(shape, 3) + (1 / 3) * get_coords(shape, 1),
-        (1 / 3) * get_coords(shape, 3) + (2 / 3) * get_coords(shape, 1),
-        sum(get_coords(shape)) / 3,
-    )
-end
