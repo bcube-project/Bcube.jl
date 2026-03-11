@@ -52,11 +52,22 @@ function _lagrange_poly(j, ξ, nodes)
     return coef * prod((ξ - nodes[k]) for k in eachindex(nodes) if k ≠ j)
 end
 
-function __shape_functions_symbolic(quadrule::AbstractQuadratureRule, ::Type{T}) where {T}
+function __shape_functions_symbolic(
+    quadrule::Bcube.AbstractQuadratureRule,
+    ::Type{T},
+) where {T}
     nodes = get_nodes(quadrule)
-    @variables ξ::eltype(T)
-    l = [_lagrange_poly(j, ξ, nodes) for j in eachindex(nodes)]
-    expr_l = Symbolics.toexpr.((l))
+    ξ = :ξ
+    expr_l = map(eachindex(nodes)) do j
+        coef = 1.0 / prod((nodes[j] - nodes[k]) for k in eachindex(nodes) if k ≠ j)
+        terms = [:(ξ - $(nodes[k])) for k in eachindex(nodes) if k ≠ j]
+        if isempty(terms)
+            prod_expr = 1.0
+        else
+            prod_expr = foldl((x, y) -> :($x * $y), terms)
+        end
+        :($coef * $prod_expr)
+    end
     return :(SA[$(expr_l...)])
 end
 
