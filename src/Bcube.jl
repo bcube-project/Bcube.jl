@@ -8,7 +8,6 @@ using FEMQuad
 using FastGaussQuadrature
 using ForwardDiff
 using LinearAlgebra
-using Symbolics # used for generation of Lagrange shape functions
 using NearestNeighbors
 
 const MAX_LENGTH_STATICARRAY = (10^6)

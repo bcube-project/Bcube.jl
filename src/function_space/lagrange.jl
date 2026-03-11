@@ -49,7 +49,13 @@ basis_functions_style(::FunctionSpace{<:Lagrange}) = NodalBasisFunctionsStyle()
 
 function _lagrange_poly(j, ξ, nodes)
     coef = 1.0 / prod((nodes[j] - nodes[k]) for k in eachindex(nodes) if k ≠ j)
-    return coef * prod((ξ - nodes[k]) for k in eachindex(nodes) if k ≠ j)
+    terms = [:($ξ - $(nodes[k])) for k in eachindex(nodes) if k ≠ j]
+    if isempty(terms)
+        prod_expr = 1.0
+    else
+        prod_expr = foldl((x, y) -> :($x * $y), terms)
+    end
+    return :($coef * $prod_expr)
 end
 
 function __shape_functions_symbolic(
@@ -57,17 +63,7 @@ function __shape_functions_symbolic(
     ::Type{T},
 ) where {T}
     nodes = get_nodes(quadrule)
-    ξ = :ξ
-    expr_l = map(eachindex(nodes)) do j
-        coef = 1.0 / prod((nodes[j] - nodes[k]) for k in eachindex(nodes) if k ≠ j)
-        terms = [:(ξ - $(nodes[k])) for k in eachindex(nodes) if k ≠ j]
-        if isempty(terms)
-            prod_expr = 1.0
-        else
-            prod_expr = foldl((x, y) -> :($x * $y), terms)
-        end
-        :($coef * $prod_expr)
-    end
+    expr_l = map(j -> _lagrange_poly(j, :ξ, nodes), eachindex(nodes))
     return :(SA[$(expr_l...)])
 end
 
@@ -134,38 +130,6 @@ function shape_functions_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Cube, ξ) 
         return vec([i * j * k for i in _l1, j in _l2, k in _l3])
     end
 end
-
-# ######### NOT USED ##########
-function __∂λξ_∂ξ_symbolic(
-    ::Line,
-    ::Val{D},
-    qt::AbstractQuadratureType,
-    ::Type{T},
-) where {D, T}
-    quadrule = QuadratureRule(Line(), Quadrature(qt, Val(D)))
-    nodes = get_nodes(quadrule)
-    @variables ξ::eltype(T)
-    l = [_lagrange_poly(j, ξ, nodes) for j in eachindex(nodes)]
-    Diff = Differential(ξ)
-    dl = expand_derivatives.(Diff.(l))
-    expr_l = Symbolics.toexpr.(simplify.(dl))
-    return :(SA[$(expr_l...)])
-end
-
-@generated function _∂λξ_∂ξ_symbolic(
-    ::Line,
-    ::Val{D},
-    qt::AbstractQuadratureType,
-    ξ::T,
-) where {D, T}
-    __∂λξ_∂ξ_symbolic(Line(), Val(D), qt, T)
-end
-
-function ∂λξ_∂ξ_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Line, ξ) where {D}
-    quadtype = lagrange_quadrature_type(fs)
-    _∂λξ_∂ξ_symbolic(Line(), Val(D), quadtype, ξ)
-end
-# #############################
 
 function get_ndofs(fs::FunctionSpace{<:Lagrange, D}, shape::AbstractShape) where {D}
     quadtype = lagrange_quadrature_type(fs)
