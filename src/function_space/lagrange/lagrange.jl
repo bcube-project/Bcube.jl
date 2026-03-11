@@ -313,34 +313,6 @@ function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Cube, ξ)
     SA[_zero _zero _zero]
 end
 
-# Pyramid
-_scalar_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Pyramid, ξ) = SA[one(eltype(ξ))]
-get_ndofs(::FunctionSpace{<:Lagrange, 0}, ::Pyramid) = 1
-
-function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Pyramid, ξ)
-    _zero = zero(eltype(ξ))
-    SA[_zero _zero _zero]
-end
-
-function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Pyramid, ξηζ)
-    ξ = ξηζ[1]
-    η = ξηζ[2]
-    ζ = ξηζ[3]
-
-    # to avoid a singularity in z = 1, we replace (1-ζ) (which is always a
-    # positive quantity), by (1 + ε - ζ).
-    ε = eps()
-    return SA[
-        (1 - ξ - ζ) * (1 - η - ζ) / (4 * (1 + ε - ζ))
-        (1 + ξ - ζ) * (1 - η - ζ) / (4 * (1 + ε - ζ))
-        (1 + ξ - ζ) * (1 + η - ζ) / (4 * (1 + ε - ζ))
-        (1 - ξ - ζ) * (1 + η - ζ) / (4 * (1 + ε - ζ))
-        ζ
-    ]
-end
-
-get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Pyramid) = 5
-
 # bmxam/remark : I first tried to write "generic" functions covering multiple case. But it's easy to
 # forget some case and think they are already covered. In the end, it's easier to write them all explicitely,
 # except for the one I wrote that are very intuitive (at least for me).
@@ -352,7 +324,7 @@ get_ndofs(::FunctionSpace{<:Lagrange, 1}, ::Pyramid) = 5
 
 # Generic rule 1 : no dof per vertex, edge or face for any Lagrange element of degree 0
 # Rq: proceeding with "@eval" rather than using `AbstractShape` helps solving ambiguities
-for S in (:Line, :Square, :Cube, :Pyramid)
+for S in (:Line, :Square, :Cube)
     @eval idof_by_vertex(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
         ntuple(i -> SA[], nvertices(shape))
     @eval idof_by_edge(::FunctionSpace{<:Lagrange, 0}, shape::$S) =
@@ -543,29 +515,11 @@ end
     return _idof_by_face_with_bounds(fs(), shape())
 end
 
-# Pyramid
-function idof_by_edge(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid)
-    ntuple(i -> SA[], nedges(shape))
-end
-function idof_by_edge_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid)
-    (SA[1, 2], SA[2, 3], SA[3, 4], SA[4, 1], SA[1, 5], SA[2, 5], SA[3, 5], SA[4, 5])
-end
-
-function idof_by_face(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid)
-    ntuple(i -> SA[], nfaces(shape))
-end
-function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 1}, shape::Pyramid)
-    (SA[1, 4, 3, 2], SA[1, 2, 5], SA[2, 3, 5], SA[3, 4, 5], SA[4, 1, 5])
-end
-
 # get_coords
 # Generic versions for Lagrange 0 and 1
 # Rq: proceeding with "@eval" rather than using `AbstractShape` helps solving ambiguities
-for S in (:Line, :Square, :Cube, :Pyramid)
+for S in (:Line, :Square, :Cube)
     @eval get_coords(::FunctionSpace{<:Lagrange, 0}, shape::$S) = (center(shape),)
-end
-for S in (:Pyramid,) # rq : ordering for tensorial elements is different, not treated here
-    @eval get_coords(::FunctionSpace{<:Lagrange, 1}, shape::$S) = get_coords(shape)
 end
 
 # Line, Square, Cube
