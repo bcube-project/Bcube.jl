@@ -126,9 +126,9 @@ get_coords(::FunctionSpace{<:Lagrange, 1}, shape::Triangle) = get_coords(shape)
 function get_coords(::FunctionSpace{<:Lagrange, 2}, shape::Triangle)
     (
         get_coords(shape)...,
-        sum(get_coords(shape, [1, 2])) / 2,
-        sum(get_coords(shape, [2, 3])) / 2,
-        sum(get_coords(shape, [3, 1])) / 2,
+        sum(get_coords(shape, (1, 2))) / 2,
+        sum(get_coords(shape, (2, 3))) / 2,
+        sum(get_coords(shape, (3, 1))) / 2,
     )
 end
 
