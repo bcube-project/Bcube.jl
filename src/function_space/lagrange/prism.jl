@@ -75,23 +75,32 @@ end
 # Note : recall that the Prism is obtained by cartesian product between Triangle and Line.
 # Every inner dof on the "edge" of a Triangle becomes a dof of a side-face of the Prism, excluding the
 # one lying on the bottom and top edges.
-# WARNING : only Triangle WITHOUT INSIDE NODE are supported
-# TODO : use `idof_by_volume`
 function idof_by_face(fs::FunctionSpace{<:Lagrange, N}, ::Prism) where {N}
-    idof_edge_tri = idof_by_edge(fs, Triangle())
-    ndofs_tri = get_ndofs(fs, Triangle())
+    tri = Triangle()
+    idof_edge_tri = idof_by_edge(fs, tri)
+    idof_vol_tri = idof_by_volume(fs, tri)
+    ndofs_tri = get_ndofs(fs, tri)
     ndofs_line = get_ndofs(fs, Line()) # >=3 (ensured by multi-dispatch on N)
     ndofs_line_inner = ndofs_line - 2 # exclude bottom and top edges
 
     #  Re "(i+1)" because "i" starts at "1" whereas the first element is "2"
     # Ideally, we would write vcat(ntuple(i -> idof_edge_tri[1] .+ (i - 1) * ndofs_tri, 2:ndofs_line_inner-1)...)
-    return (
+    idofs = (
         vcat(ntuple(i -> idof_edge_tri[1] .+ (i + 1 - 1) * ndofs_tri, ndofs_line_inner)...),
         vcat(ntuple(i -> idof_edge_tri[2] .+ (i + 1 - 1) * ndofs_tri, ndofs_line_inner)...),
         vcat(ntuple(i -> idof_edge_tri[3] .+ (i + 1 - 1) * ndofs_tri, ndofs_line_inner)...),
-        SA[], # bottom face (z=zmin)
-        SA[], # top face (z=zmax)
+        idof_vol_tri, # bottom face (z=zmin)
+        # top face (z=zmax) -> treated below
     )
+
+    # For the last face, z=zmax, the dof of the triangle face must be offset by `ndofs_tri * (ndofs_line - 1)`
+    # But if there are no "inside" node in this triangle, then `idof_vol_tri` is empty and we cannot "offset"
+    # it.
+    return if isempty(idof_vol_tri)
+        (idofs..., SA[])
+    else
+        (idofs..., idof_vol_tri .+ (ndofs_tri * (ndofs_line - 1)))
+    end
 end
 
 # idof_by_face_with_bounds
@@ -102,7 +111,6 @@ end
 # Note : recall that the Prism is obtained by cartesian product between Triangle and Line.
 # Every dof on the "edge" of a Triangle becomes a dof of a side-face of the Prism. Additionnaly,
 # every dof of the Triangle becomes a dof of the bottom and top faces of the Prism.
-# TODO : use `idof_by_volume`
 function idof_by_face_with_bounds(fs::FunctionSpace{<:Lagrange, N}, ::Prism) where {N}
     idof_edge_tri = idof_by_edge_with_bounds(fs, Triangle())
     ndofs_tri = get_ndofs(fs, Triangle())
