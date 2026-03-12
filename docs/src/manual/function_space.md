@@ -5,12 +5,12 @@
 In Bcube, a `FunctionSpace` is defined by a type (nodal Lagrange polynomials, modal Taylor expansion, etc) and a degree. For each implemented `FunctionSpace`, a list of shape functions is associated on a given `Shape`. For instance, one can get the shape functions associated to the Lagrange polynomials or order 3 on a `Square`. Note that for "tensor" elements such as `Line`, `Square` or `Cube`; the Lagrange polynomials are available at any order; being computed symbolically.
 
 ```julia
-fs = FunctionSpae(:Lagrange, 2)
+fs = FunctionSpace(:Lagrange, 2)
 ```
 
 ### `AbstractFESpace`
 
-Then, an `FESpace` (more precisely `SingleFESpace`) is a function space associated to a numbering of the degrees of freedom. Note that the numbering may depend on the continuous or discontinuous feature of the space. Hence a `SingleFESpace` takes basically four input to be built : a `FunctionSpace`, the number of components of this space (scalar or vector), an indicator of the continuous/discontinuous characteristic, and the mesh. The dof numbering is built by combining the mesh numberings (nodes, cells, faces) and the function space. Note that the degree of the `FunctionSpace` can differ from the "degree" of the mesh elements : it is possible to build a `SingleFESpace` with P2 polynomials on a mesh only containing straight lines (defined by only two nodes, `Bar2_t`). 
+Then, an `FESpace` (more precisely `SingleFESpace`) is a function space associated to a numbering of the degrees of freedom. Note that the numbering may depend on the continuous or discontinuous feature of the space. Hence a `SingleFESpace` takes basically four input to be built : a `FunctionSpace`, the number of components of this space (scalar or vector), an indicator of the continuous/discontinuous characteristic, and the mesh. The dof numbering is built by combining the mesh numberings (nodes, cells, faces) and the function space. Note that the degree of the `FunctionSpace` can differ from the "degree" of the mesh elements : it is possible to build a `SingleFESpace` with P2 polynomials on a mesh only containing straight lines (defined by only two nodes, `Bar2_t`).
 
 For more clarity, the `SingleFESpace` is actually declined in two flavors : `TrialFESpace` and `TestFESpace`. These are the ones exposed to the API. The naming convention should be clear to the user familiar to the FE (and/or GD) method. Optionaly, a `TrialFESpace` can also contain the tags of the boundaries where Dirichlet condition(s) applies.
 

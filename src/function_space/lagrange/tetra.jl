@@ -11,13 +11,13 @@ function _scalar_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Tetra, ξηζ
     ]
 end
 
-# grad_shape_functions
-function grad_shape_functions(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Tetra, ξ)
+# ∂λξ_∂ξ
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 0}, ::Val{1}, ::Tetra, ξ)
     _zero = zero(eltype(ξ))
     return SA[_zero _zero _zero]
 end
 
-function grad_shape_functions(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Tetra, ξηζ)
+function ∂λξ_∂ξ(::FunctionSpace{<:Lagrange, 1}, ::Val{1}, ::Tetra, ξηζ)
     return SA[
         -1 -1 -1
         1 0 0
