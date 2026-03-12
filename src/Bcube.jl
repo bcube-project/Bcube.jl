@@ -70,6 +70,7 @@ include("./function_space/function_space.jl")
 export FunctionSpace, get_degree
 
 include("./function_space/lagrange/lagrange.jl")
+include("./function_space/lagrange/hypercube.jl")
 include("./function_space/lagrange/triangle.jl")
 include("./function_space/lagrange/tetra.jl")
 include("./function_space/lagrange/prism.jl")
