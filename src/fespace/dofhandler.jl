@@ -90,14 +90,14 @@ function DofHandler(
             ct = celltypes[icell]
             s = shape(ct)
 
-            # Cell edges, defined by tuples of absolute number indices
+            # Cell edges, defined by tuples of vertex absolute indices
             # @ghislainb the second line should be improved, I just want to map the "local indices"
             # tuple of tuple ((1,2), (3,4)) into global indices array of arrays [[23,109],[948, 653]]
             # (arrays instead of tuples because your function "oriented_cell_side" need arrays)
             _e2n = edges2nodes(ct)
             e2n_g = [[inodes_g[i] for i in edge] for edge in _e2n]
 
-            # Cell faces, defined by tuples of absolute number indices
+            # Cell faces, defined by tuples of vertex absolute indices
             _f2n = faces2nodes(ct)
             f2n_g = [[inodes_g[i] for i in face] for face in _f2n]
 
@@ -254,12 +254,13 @@ function _deal_with_dofs_on_edges!(
     # Exit prematurely if there are no dof on any edge of the shape
     length(idofs_array_l[1]) > 0 || return
 
-    etypes = edgetypes(celltypes[icell])
-
     # Loop over the cell edges
-    for iedge in 1:nedges(s)
-        inodes_g = e2n_g[iedge] # This is a Tuple of Int (global indices of nodes defining the edge)
-        idofs_l = idofs_array_l[iedge] # This is an Array of Int (local indices of dofs of edge 'i')
+    # inodes_g is a Tuple of Int (global indices of nodes defining the edge)
+    # idofs_l is an Array of Int (local indices of dofs of edge 'i')
+    for (inodes_g, idofs_l) in zip(e2n_g, idofs_array_l)
+
+        # Skip the face if no dof is lying on it
+        length(idofs_l) == 0 && continue
 
         key = (kvar, Set(inodes_g))
 
@@ -316,10 +317,13 @@ function _deal_with_dofs_on_faces!(
     sum(length.(idofs_array_l)) > 0 || return
 
     # Loop over cell faces
-    for iface_l in 1:nfaces(s)
+    # iface_nodes_g is a Tuple of Int (global indices of nodes defining the face)
+    # idofs_l is an Array of Int (local indices of dofs of face 'i')
+    for (iface_nodes_g, idofs_l) in zip(f2n_g, idofs_array_l)
         ne = nedges(s)
-        iface_nodes_g = f2n_g[iface_l] # This is a Tuple of Int (global indices of nodes defining the face)
-        idofs_l = idofs_array_l[iface_l] # This is an Array of Int (local indices of dofs of face 'i')
+
+        # Skip the face if no dof is lying on it
+        length(idofs_l) == 0 && continue
 
         # Create a Set from the global indices of the face nodes to "tag" the face.
         key = (kvar, Set(iface_nodes_g))
@@ -376,7 +380,7 @@ function _deal_with_dofs_on_faces!(
             end
 
             # Copy global indices
-            for d in 1:length(jdofs_reordered_g)
+            for d in eachindex(jdofs_reordered_g)
                 iglob[offset[icell, kvar] + idofs_l[d]] = jdofs_reordered_g[d]
             end
 
@@ -388,23 +392,6 @@ function _deal_with_dofs_on_faces!(
         end
     end
 end
-
-# """
-#     _max_ndofs(mesh, var)
-
-# Count maximum number of dofs per cell.
-
-# # Warning
-# Only working for an array of SCALAR vars
-# """
-# function _max_ndofs(mesh, var)
-#     @assert size(var) == 1 "Only SCALAR vars are supported"
-#     max_ndofs = 0
-#     for cell in cells(mesh)
-#         max_ndofs = max(max_ndofs, get_ndofs(function_space(var), shape(cell)))
-#     end
-#     return max_ndofs
-# end
 
 """
     max_ndofs(dhl::DofHandler)

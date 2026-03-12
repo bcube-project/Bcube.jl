@@ -591,14 +591,14 @@ function __ordered_lagrange_shape_fns(::Type{Bcube.Quad16_t})
         3 3 # 15
         2 3 # 16
     ]
-    @variables ξ[1:2]
-    _ξ = ξ[1]
-    _η = ξ[2]
-    _λs = [
-        _lagrange_poly(I_to_ij[k, 1], _ξ, refCoords) *
-        _lagrange_poly(I_to_ij[k, 2], _η, refCoords) for k in 1:16
+    _ξ = :(ξ[1])
+    _η = :(ξ[2])
+    expr_λs = [
+        :(
+            $(_lagrange_poly(I_to_ij[k, 1], _ξ, refCoords)) *
+            $(_lagrange_poly(I_to_ij[k, 2], _η, refCoords))
+        ) for k in 1:16
     ]
-    expr_λs = Symbolics.toexpr.((_λs))
     return :(SA[$(expr_λs...)])
 end
 
