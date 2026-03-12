@@ -360,7 +360,7 @@ end
             @test Set(_idofs) == Set(_ref_idofs)
         end
 
-        # Lagrange 2 - idof_by_face, idof_by_face_with_bounds
+        # Lagrange 2 - idof_by_face, idof_by_face_with_bounds, get_coords
         fs = FunctionSpace(:Lagrange, 2)
         idofs = Bcube.idof_by_face_with_bounds(fs, Bcube.Prism())
         ref_idofs = (
@@ -379,8 +379,8 @@ end
         @test idofs[2][1] == 11
         @test idofs[3][1] == 12
         @test length(idofs[4]) == 0
+        @test length(idofs[5]) == 0
 
-        # Get coords
         @test Bcube.get_coords(FunctionSpace(:Lagrange, 2), Bcube.Prism()) == (
             SA[0.0, 0.0, -1.0],
             SA[1.0, 0.0, -1.0],
@@ -401,5 +401,19 @@ end
             SA[0.5, 0.5, 1.0],
             SA[0.0, 0.5, 1.0],
         )
+
+        # Lagrange 3 - idof_by_face, idof_by_face_with_bounds (checked graphically)
+        fs = FunctionSpace(:Lagrange, 3)
+        idofs = Bcube.idof_by_face_with_bounds(fs, Bcube.Prism())
+        @test idofs == (
+            [1, 2, 4, 5, 11, 12, 14, 15, 21, 22, 24, 25, 31, 32, 34, 35],
+            [2, 3, 6, 7, 12, 13, 16, 17, 22, 23, 26, 27, 32, 33, 36, 37],
+            [3, 1, 8, 9, 13, 11, 18, 19, 23, 21, 28, 29, 33, 31, 38, 39],
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            [31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
+        )
+
+        idofs = Bcube.idof_by_face(fs, Bcube.Prism())
+        @test idofs == ([14, 15, 24, 25], [16, 17, 26, 27], [18, 19, 28, 29], [10], [40])
     end
 end
