@@ -155,10 +155,14 @@ function _minmax_cells!(minval, maxval, v, dω)
 end
 
 function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractCellDomain})
-    dΓ = Measure(InteriorFaceDomain(get_mesh(get_domain(dω))), get_quadrature(dω))
+    mesh = get_mesh(get_domain(dω))
+    dΓ = Measure(InteriorFaceDomain(mesh), get_quadrature(dω))
     _minmax_faces!(minval, maxval, v, dΓ)
-    dΓb = Measure(BoundaryFaceDomain(get_mesh(get_domain(dω))), get_quadrature(dω))
-    _minmax_faces!(minval, maxval, v, dΓb)
+    bc_labels = values(boundary_names(mesh))
+    if length(bc_labels) > 1
+        dΓb = Measure(BoundaryFaceDomain(mesh, bc_labels), get_quadrature(dω))
+        _minmax_faces!(minval, maxval, v, dΓb)
+    end
 end
 
 function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractFaceDomain})
