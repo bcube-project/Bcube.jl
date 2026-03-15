@@ -159,7 +159,7 @@ function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractCellDo
     dΓ = Measure(InteriorFaceDomain(mesh), get_quadrature(dω))
     _minmax_faces!(minval, maxval, v, dΓ)
     bc_labels = values(boundary_names(mesh))
-    if length(bc_labels) > 1
+    if length(bc_labels) > 0
         dΓb = Measure(BoundaryFaceDomain(mesh, bc_labels), get_quadrature(dω))
         _minmax_faces!(minval, maxval, v, dΓb)
     end
