@@ -435,7 +435,7 @@ end
 BoundaryFaceDomain(mesh::AbstractMesh, label::String) = BoundaryFaceDomain(mesh, (label,))
 function BoundaryFaceDomain(mesh::AbstractMesh)
     labels = values(boundary_names(mesh))
-    @assert length(labels) > 1 "The mesh must include at least one boundary name in order to create a BoundaryFaceDomain."
+    @assert length(labels) > 0 "The mesh must include at least one boundary name in order to create a BoundaryFaceDomain."
     BoundaryFaceDomain(mesh, labels)
 end
 function BoundaryFaceDomain(mesh::AbstractMesh, args...; kwargs...)
