@@ -434,7 +434,9 @@ function BoundaryFaceDomain(mesh::AbstractMesh, labels::Tuple{String, Vararg{Str
 end
 BoundaryFaceDomain(mesh::AbstractMesh, label::String) = BoundaryFaceDomain(mesh, (label,))
 function BoundaryFaceDomain(mesh::AbstractMesh)
-    BoundaryFaceDomain(mesh, values(boundary_names(mesh)))
+    labels = values(boundary_names(mesh))
+    @assert length(labels) > 0 "The mesh must include at least one boundary name in order to create a BoundaryFaceDomain."
+    BoundaryFaceDomain(mesh, labels)
 end
 function BoundaryFaceDomain(mesh::AbstractMesh, args...; kwargs...)
     BoundaryFaceDomain(parent(mesh), args...; kwargs...)
