@@ -22,7 +22,7 @@ function run_covo()
 
     suite["integral_volume"]  = @benchmarkable Covo.Bcube.assemble_linear!($b_vol, $l_vol, $V)
     suite["integral_surface"] = @benchmarkable Covo.Bcube.assemble_linear!($b_fac, $l_Γ, $V)
-    suite["explicit_step"]    = @benchmarkable Covo.forward_euler($_u, $_rhs, 0.0, $Δt)
+    suite["explicit_step"]    = @benchmarkable Covo.forward_euler($u, $_rhs, 0.0, $Δt)
 
     return suite
 end
