@@ -104,5 +104,13 @@
             expr_c1 = Bcube.materialize(expr, c1)
             @test all(Base.materialize(expr_c1, p1) .≈ (2.0 .* up1_ref .+ 1))
         end
+
+        u3 = FEFunction(U, [1.0, 2.0, 3.0])
+        f3(u, ∇u) = @. 2 * u + ∇u ⋅ SA[10.0]
+        expr3 = f3 ∘ (u3, ∇(u3))
+        expr3_c1 = Bcube.materialize(expr3, c1)
+        val3 = Base.materialize(expr3_c1, p1)
+        val3_ref = (2.0 .* (1.5, 3) .+ (SA[0.5], SA[0.0]) .⋅ SA[10.0])
+        @test all(val3 .≈ val3_ref)
     end
 end
