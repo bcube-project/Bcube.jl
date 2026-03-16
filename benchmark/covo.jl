@@ -11,8 +11,7 @@ using InteractiveUtils
 using BenchmarkTools
 using UnPack
 
-function compute_residual(_u, V, params, cache)
-    u = get_fe_functions(_u)
+function compute_residual(u, V, params, cache)
 
     # alias on measures
     @unpack dΩ, dΓ, dΓ_perio_x, dΓ_perio_y = params

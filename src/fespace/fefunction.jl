@@ -264,3 +264,18 @@ Base.iterate(mfeFunc::MultiFieldFEFunction) = iterate(get_fe_functions(mfeFunc))
 function Base.iterate(mfeFunc::MultiFieldFEFunction, state)
     iterate(get_fe_functions(mfeFunc), state)
 end
+
+"""
+    LazyOperators.materialize(f::MultiFieldFEFunction, i::CellInfo)
+    LazyOperators.materialize(f::MultiFieldFEFunction, side::AbstractSide)
+
+Implement function `materialize` of the `AbstractLazy` interface.
+Function `materialize` is applied to each `FEFunction` of the `MultiFieldFEFunction`
+and the result is gather in a `LazyWrap`-ped `Tuple`
+"""
+function LazyOperators.materialize(f::MultiFieldFEFunction, i::CellInfo)
+    return materialize(get_fe_functions(f), i)
+end
+function LazyOperators.materialize(f::MultiFieldFEFunction, side::AbstractSide)
+    return materialize(get_fe_functions(f), side)
+end
