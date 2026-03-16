@@ -236,6 +236,15 @@ function LazyOperators.materialize(
 end
 
 function LazyOperators.materialize(
+    lOp::Gradient{O, <:Tuple{AbstractLazyWrap}},
+    cPoint::CellPoint,
+) where {O}
+    f = get_args(get_args(lOp)...)
+    grad(a) = gradient(a, cPoint, gradient_style(lOp))
+    map(grad, f)
+end
+
+function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple},
     sideInfo::AbstractSide,
 ) where {O}
