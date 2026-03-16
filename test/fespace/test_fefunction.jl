@@ -89,5 +89,20 @@
 
         @test all(Bcube.get_dof_type(u) .== (ComplexF64, ComplexF64))
         @test all(get_dof_values(u) .== vals)
+
+        c1 = Bcube.CellInfo(mesh, 1)
+        p1 = Bcube.CellPoint(SA[0.0], c1, Bcube.ReferenceDomain())
+        up1_ref = (1.5, 3 * im)
+
+        uc1 = Bcube.materialize(u, c1)
+        @test uc1 isa Bcube.LazyWrap{<:NTuple{2, Bcube.AbstractCellFunction}}
+        @test all(Base.materialize(uc1, p1) .≈ up1_ref)
+
+        expr1 = 2 .* (u...,) .+ 1
+        expr2 = ((u...) -> 2 .* u .+ 1) ∘ u
+        for expr in (expr1, expr2)
+            expr_c1 = Bcube.materialize(expr, c1)
+            @test all(Base.materialize(expr_c1, p1) .≈ (2.0 .* up1_ref .+ 1))
+        end
     end
 end
