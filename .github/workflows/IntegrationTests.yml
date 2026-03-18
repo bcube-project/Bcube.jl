@@ -38,7 +38,7 @@ jobs:
           lfs: "true"
       - name: Load this and run the downstream tests
         env:
-          BCUBE_BRANCH: ${{ github.ref_name }}
+          BCUBE_BRANCH: ${{ github.head_ref }}
         shell: julia --color=yes --project=downstream {0}
         run: |
           using Pkg
