@@ -1,6 +1,6 @@
 name = "Bcube"
 uuid = "cf06320b-b7f3-4748-8003-81a6b6979792"
-version = "0.4.0"
+version = "0.3.10"
 authors = ["Ghislain Blanchard, Lokman Bennani and Maxime Bouyges"]
 
 [deps]
