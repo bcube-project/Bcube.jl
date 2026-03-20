@@ -8,7 +8,6 @@ using FEMQuad
 using FastGaussQuadrature
 using ForwardDiff
 using LinearAlgebra
-using Symbolics # used for generation of Lagrange shape functions
 using NearestNeighbors
 
 const MAX_LENGTH_STATICARRAY = (10^6)
@@ -70,7 +69,12 @@ export QuadratureLobatto, QuadratureLegendre, QuadratureUniform, Quadrature, Qua
 include("./function_space/function_space.jl")
 export FunctionSpace, get_degree
 
-include("./function_space/lagrange.jl")
+include("./function_space/lagrange/lagrange.jl")
+include("./function_space/lagrange/hypercube.jl")
+include("./function_space/lagrange/triangle.jl")
+include("./function_space/lagrange/tetra.jl")
+include("./function_space/lagrange/prism.jl")
+include("./function_space/lagrange/pyramid.jl")
 include("./function_space/taylor.jl")
 
 include("./mapping/mapping.jl")
