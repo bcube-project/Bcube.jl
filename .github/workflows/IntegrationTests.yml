@@ -38,7 +38,7 @@ jobs:
           lfs: "true"
       - name: Load this and run the downstream tests
         env:
-          BCUBE_BRANCH: ${{ github.head_ref }}
+          BCUBE_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
         shell: julia --color=yes --project=downstream {0}
         run: |
           using Pkg
