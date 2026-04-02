@@ -6,7 +6,10 @@
         @test !Bcube.is_discontinuous(U)
         @test Bcube.get_ncomponents(U) == 2
         bctag = first(Bcube.get_dirichlet_boundary_tags(U))
-        @test Bcube.get_dirichlet_values(U, bctag)(0.0, 0.0) == 3.0
+        cInfo = Bcube.CellInfo(mesh, 1)
+        cPoint = Bcube.CellPoint([0.0], cInfo, Bcube.ReferenceDomain())
+        f_diri_t = Bcube.get_dirichlet_values(U, bctag)(0.0)
+        @test Bcube.materialize(f_diri_t, cPoint) == 3.0
     end
 
     @testset "Sparsity pattern" begin
