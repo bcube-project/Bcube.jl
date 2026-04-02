@@ -282,7 +282,7 @@ function TrialFESpace(
             return v
         elseif v isa AbstractLazy
             return t -> v
-        elseif v isa Number
+        elseif v isa Union{Number, AbstractVector}
             return t -> PhysicalFunction(x -> v)
         else
             error(
