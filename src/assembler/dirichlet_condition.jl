@@ -1,4 +1,3 @@
-
 """
 Assemble a vector of zeros dofs except on boundary dofs where they take the Dirichlet values.
 """
@@ -230,22 +229,34 @@ function _apply_dirichlet!(
 
     # Loop over the boundaries
     for bndTag in get_dirichlet_boundary_tags(U)
-        # Function to apply, giving the Dirichlet value(s) on each node
-        f = get_dirichlet_values(U, bndTag)
-        f_t = Base.Fix2(f, t)
+        # Function to apply, giving the AbstractLazy for time t
+        # f_t_lazy is an AbstractLazy (e.g., PhysicalFunction)
+        f_t_lazy = get_dirichlet_values(U, bndTag)(t)
 
-        # Loop over the face of the boundary
-        for kface in boundary_faces(_mesh, bndTag)
-            _apply_dirichlet_on_face!(arrays, callbacks, kface, _mesh, fs_V, dhl_V, m, f_t)
+        # Build BoundaryFaceDomain for this boundary tag
+        bndDomain = BoundaryFaceDomain(_mesh, String(bndTag))
+
+        # Loop over the faces of the boundary using foreach_element
+        foreach_element(bndDomain) do fInfo::FaceInfo, _, _
+            _apply_dirichlet_on_face!(
+                arrays,
+                callbacks,
+                fInfo,
+                _mesh,
+                fs_V,
+                dhl_V,
+                m,
+                f_t_lazy,
+            )
         end
     end
 end
 
 """
-Apply dirichlet condition on `kface`.
+Apply dirichlet condition on a face given by `fInfo`.
 
 `m` is the dof mapping to obtain global dof id (in case of MultiFESpace)
-`f_t` is the Dirichlet function evaluated in `t`: f_t = x -> f(x,t)
+`f_t_lazy` is the AbstractLazy representing the Dirichlet value at time t
 `callbacks` is the Tuple of functions of (array, idof_glo, icomp, values) that
 must be applied to each array of `arrays`
 
@@ -255,37 +266,45 @@ must be applied to each array of `arrays`
 function _apply_dirichlet_on_face!(
     arrays::Tuple{Vararg{AbstractVecOrMat, N}},
     callbacks::NTuple{N, Function},
-    kface::Int,
+    fInfo::FaceInfo,
     mesh::Mesh,
     fs_V::AbstractFunctionSpace,
     dhl_V::DofHandler,
     m::Vector{Int},
-    f_t::Function,
+    f_t_lazy::AbstractLazy,
 ) where {N}
     # Alias
     sizeV = get_ncomponents(dhl_V)
-    c2n = connectivities_indices(mesh, :c2n)
-    f2n = connectivities_indices(mesh, :f2n)
-    f2c = connectivities_indices(mesh, :f2c)
-    cellTypes = cells(mesh)
 
-    # Interior cell
-    icell = f2c[kface][1]
-    ctype = cellTypes[icell]
-    _c2n = c2n[icell]
-    cnodes = get_nodes(mesh, _c2n)
-    side = cell_side(ctype, c2n[icell], f2n[kface])
+    # Get cell info on the negative side of the face
+    cInfo = get_cellinfo_n(fInfo)
+    icell = cellindex(cInfo)
+    ctype = celltype(cInfo)
+
+    # Get face info
+    kside = get_cell_side_n(fInfo)
+    _f2n = get_nodes_index(fInfo)
+
+    # Shape function space and reference coordinates on the face
     cshape = shape(ctype)
     ξcell = get_coords(fs_V, cshape) # ref coordinates of the FunctionSpace in the cell
-    F = mapping(ctype, cnodes)
 
     # local indices of dofs lying on the face (assuming scalar FE)
-    idofs_loc = idof_by_face_with_bounds(fs_V, shape(ctype))[side]
+    idofs_loc = idof_by_face_with_bounds(fs_V, cshape)[kside]
+
+    # Materialize the AbstractLazy on the cell info
+    # This gives us a function that can be evaluated at CellPoint
+    f_materialized = materialize(f_t_lazy, cInfo)
 
     # Loop over the dofs concerned by the Dirichlet condition
     for idof_loc in idofs_loc
         ξ = ξcell[idof_loc]
-        values = f_t(F(ξ)) # dirichlet value(s)
+
+        # Create a CellPoint at the reference coordinate ξ
+        cPoint = CellPoint(ξ, cInfo, ReferenceDomain())
+
+        # Evaluate the materialized lazy at the cell point
+        values = materialize(f_materialized, cPoint)
 
         # Loop over components
         for icomp in 1:sizeV

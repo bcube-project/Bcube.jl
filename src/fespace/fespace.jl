@@ -283,7 +283,7 @@ function TrialFESpace(
         elseif v isa AbstractLazy
             return t -> v
         elseif v isa Number
-            return t -> PhysicalFunction(v)
+            return t -> PhysicalFunction(x -> v)
         else
             error(
                 "Dirichlet value must be <: Union{Function, Number, AbstractLazy}, but is $(typeof(v))",
