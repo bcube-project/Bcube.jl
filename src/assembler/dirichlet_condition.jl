@@ -1,14 +1,35 @@
 """
+    assemble_dirichlet_vector(
+        U,
+        V,
+        mesh::AbstractMesh,
+        t::Number = 0.0;
+        dt_derivative_order::Int = 0,
+    )
+    assemble_dirichlet_sparse_vector(
+        U,
+        V,
+        mesh::AbstractMesh,
+        t::Number = 0.0;
+        dt_derivative_order::Int = 0,
+    )
+
 Assemble a vector of zeros dofs except on boundary dofs where they take the Dirichlet values.
+
+To obtain a sparse vector, use assemble_dirichlet_sparse_vector.
 """
-function assemble_dirichlet_vector(
+function assemble_dirichlet_vector(args...; kwargs...)
+    return Vector(assemble_dirichlet_sparse_vector(args...; kwargs...))
+end
+
+function assemble_dirichlet_sparse_vector(
     U,
     V,
     mesh::AbstractMesh,
     t::Number = 0.0;
     dt_derivative_order::Int = 0,
 )
-    d = allocate_dofs(U)
+    d = spzeros(get_ndofs(U))
     apply_dirichlet_to_vector!(d, U, V, mesh, t; dt_derivative_order)
     return d
 end
