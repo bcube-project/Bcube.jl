@@ -131,3 +131,22 @@
         0.03125,
     ]
 end
+
+@testset "Dirichlet with FEFunction" begin
+    mesh = rectangle_mesh(4, 3)
+    fSpace = FunctionSpace(:Lagrange, 1)
+    u = FEFunction(TrialFESpace(fSpace, mesh), mesh, PhysicalFunction(x -> x[2] + 1))
+    U = TrialFESpace(fSpace, mesh, Dict("xmin" => t -> u))
+    V = TestFESpace(U)
+    x = Bcube.assemble_dirichlet_sparse_vector(U, V, mesh, 0.0)
+    @test x == sparsevec([1, 3, 9], [1.0, 1.5, 2.0], 12)
+end
+
+@testset "Sparse dirichlet" begin
+    mesh = rectangle_mesh(4, 3)
+    fSpace = FunctionSpace(:Lagrange, 1)
+    U = TrialFESpace(fSpace, mesh, Dict("xmin" => PhysicalFunction(x -> x[2])))
+    V = TestFESpace(U)
+    x = Bcube.assemble_dirichlet_sparse_vector(U, V, mesh)
+    @test x == sparsevec([3, 9], [0.5, 1.0], 12)
+end
