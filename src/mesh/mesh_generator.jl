@@ -232,11 +232,13 @@ function rectangle_mesh(
 ) where {T <: Union{Nothing, AbstractVector}}
     @assert (nx > 1 && ny > 1) "`nx` and `ny`, the number of nodes, must be greater than 1 (nx=$nx, ny=$ny)"
 
+    _xmin, _xmax, _ymin, _ymax = promote(xmin, xmax, ymin, ymax)
+
     if (P00 == P10 == P11 == P01 == nothing)
-        P00 = SA[xmin, ymin]
-        P10 = SA[xmax, ymin]
-        P11 = SA[xmax, ymax]
-        P01 = SA[xmin, ymax]
+        P00 = SA[_xmin, _ymin]
+        P10 = SA[_xmax, _ymin]
+        P11 = SA[_xmax, _ymax]
+        P01 = SA[_xmin, _ymax]
     end
 
     if (type == :quad)
