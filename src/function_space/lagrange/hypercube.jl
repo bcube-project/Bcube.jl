@@ -309,8 +309,13 @@ end
 
 function idof_by_face_with_bounds(
     ::FunctionSpace{<:Lagrange, 0},
-    shape::Union{Line, Square, Cube},
-)
+    shape::S,
+) where {S <: Union{Line, Square}}
+    ntuple(i -> SA[], nfaces(shape))
+end
+
+# disambiguity
+function idof_by_face_with_bounds(::FunctionSpace{<:Lagrange, 0}, shape::Cube)
     ntuple(i -> SA[], nfaces(shape))
 end
 
