@@ -27,9 +27,10 @@ function assemble_dirichlet_sparse_vector(
     V,
     mesh::AbstractMesh,
     t::Number = 0.0;
+    T = Float64,
     dt_derivative_order::Int = 0,
 )
-    d = spzeros(get_ndofs(U))
+    d = allocate_sparse_dofs(U, T)
     apply_dirichlet_to_vector!(d, U, V, mesh, t; dt_derivative_order)
     return d
 end
@@ -258,7 +259,7 @@ function _apply_dirichlet!(
         bndDomain = BoundaryFaceDomain(_mesh, String(bndTag))
 
         # Loop over the faces of the boundary using foreach_element
-        foreach_element(bndDomain) do fInfo::FaceInfo, _, _
+        foreach_element(bndDomain) do fInfo, _, _
             _apply_dirichlet_on_face!(
                 arrays,
                 callbacks,

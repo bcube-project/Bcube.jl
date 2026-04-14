@@ -92,12 +92,16 @@ end
 
 """
     allocate_dofs(feSpace::AbstractFESpace, T = Float64)
+    allocate_sparse_dofs(feSpace::AbstractFESpace, T = Float64)
 
-Allocate a vector with a size equal to the number of dof of the FESpace, with the type `T`.
+Allocate a (sparse) vector with a size equal to the number of dof of the FESpace, with the type `T`.
 For a MultiFESpace, a vector of the total size of the space is returned (and not a Tuple of vectors)
 """
 function allocate_dofs(feSpace::AbstractFESpace, T = Float64)
     allocate_dofs(parent(feSpace), T)
+end
+function allocate_sparse_dofs(feSpace::AbstractFESpace, T = Float64)
+    allocate_sparse_dofs(parent(feSpace), T)
 end
 
 abstract type AbstractSingleFESpace{S, FS} <: AbstractFESpace{S} end
@@ -204,6 +208,8 @@ function SingleFESpace(
 end
 
 @inline allocate_dofs(feSpace::SingleFESpace, T = Float64) = zeros(T, get_ndofs(feSpace))
+@inline allocate_sparse_dofs(feSpace::SingleFESpace, T = Float64) =
+    spzeros(T, get_ndofs(feSpace))
 
 """
 A TrialFESpace is basically a SingleFESpace plus other attributes (related to boundary conditions)
@@ -732,6 +738,7 @@ function _build_jacobian_sparsity_pattern_SoA(::MultiFESpace, mesh)
 end
 
 allocate_dofs(mfeSpace::MultiFESpace, T = Float64) = zeros(T, get_ndofs(mfeSpace))
+allocate_sparse_dofs(mfeSpace::MultiFESpace, T = Float64) = spzeros(T, get_ndofs(mfeSpace))
 
 # WIP
 # """
