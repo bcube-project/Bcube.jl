@@ -190,13 +190,13 @@ function _deal_with_dofs_on_vertices!(
     # Local indices of the dofs on each vertex of the shape
     idofs_array_l = idof_by_vertex(fs, s)
 
-    # Exit prematurely if there are no dof on any vertex of the shape
-    length(idofs_array_l[1]) > 0 || return
-
     # Loop over shape vertices
-    for i in 1:nvertices(s)
-        inode_g = inodes_g[i] # This is an Int
-        idofs_l = idofs_array_l[i] # This is an Array of Int (local indices of dofs of node 'i')
+    # ivertex is an Int
+    # idofs_l is an Array of Int (local indices of dofs of ith node)
+    for (inode_g, idofs_l) in zip(inodes_g, idofs_array_l)
+
+        # Skip the vertex if no dof is lying on it
+        length(idofs_l) == 0 && continue
 
         key = (kvar, inode_g)
 
@@ -206,7 +206,7 @@ function _deal_with_dofs_on_vertices!(
         #   global indices of `icell` dofs (`jcell` is useless here actually...)
         if haskey(dict, key)
             jcell, jdofs_g = dict[key]
-            for d in 1:length(jdofs_g)
+            for d in eachindex(jdofs_g)
                 iglob[offset[icell, kvar] + idofs_l[d]] = jdofs_g[d]
             end
 
@@ -250,9 +250,6 @@ function _deal_with_dofs_on_edges!(
 )
     # Local indices of the dofs on each edges of the shape
     idofs_array_l = idof_by_edge(fs, s)
-
-    # Exit prematurely if there are no dof on any edge of the shape
-    length(idofs_array_l[1]) > 0 || return
 
     # Loop over the cell edges
     # inodes_g is a Tuple of Int (global indices of nodes defining the edge)
@@ -313,12 +310,9 @@ function _deal_with_dofs_on_faces!(
     # Local indices of the dofs on each face of the shape, excluding the boundary (nodes and/or edges)
     idofs_array_l = idof_by_face(fs, s) # This is a Tuple of Vector{Int}
 
-    # Exit prematurely if there are no dof on any face of the shape
-    sum(length.(idofs_array_l)) > 0 || return
-
     # Loop over cell faces
     # iface_nodes_g is a Tuple of Int (global indices of nodes defining the face)
-    # idofs_l is an Array of Int (local indices of dofs of face 'i')
+    # idofs_l is an Array of Int (local indices of dofs of ith face)
     for (iface_nodes_g, idofs_l) in zip(f2n_g, idofs_array_l)
         ne = nedges(s)
 

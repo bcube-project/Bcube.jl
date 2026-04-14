@@ -109,6 +109,11 @@ end
         fs = FunctionSpace(:Lagrange, 1)
         ∇λ = x -> ∂λξ_∂x(fs, Val(1), ctype, cnodes, Finv(x))
         @test ∇λ(0.5) ≈ reshape([-1.0, 1.0], (2, 1))
+
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0), Line()) == SA[1]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Line()) == SA[]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 2), Line()) == SA[2]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 3), Line()) == SA[2, 3]
     end
 
     @testset "Triangle" begin
@@ -223,6 +228,11 @@ end
         @test ∇λ([0, 0])[1, :] ≈ (0.5 / vol) * ([S2[2] - S3[2], S3[1] - S2[1]])
         @test ∇λ([0, 0])[2, :] ≈ (0.5 / vol) * ([S3[2] - S1[2], S1[1] - S3[1]])
         @test ∇λ([0, 0])[3, :] ≈ (0.5 / vol) * ([S1[2] - S2[2], S2[1] - S1[1]])
+
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0), Triangle()) == SA[1]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Triangle()) == SA[]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 2), Triangle()) == SA[]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 3), Triangle()) == SA[10]
     end
 
     @testset "Square" begin
@@ -307,19 +317,27 @@ end
 
         @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0), Square()) == SA[1]
         @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Square()) == SA[]
-        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 2), Square()) == SA[5]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 2), Square()) ==
+              SA[6, 7, 10, 11]
     end
 
     @testset "Cube" begin
         for deg in 0:2
             test_lagrange_shape_function(Cube(), deg)
         end
+
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0), Cube()) == SA[1]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Cube()) == SA[]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 2), Cube()) == SA[14]
     end
 
     @testset "Tetra" begin
         for deg in 0:1
             test_lagrange_shape_function(Tetra(), deg)
         end
+
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0), Tetra()) == SA[1]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Tetra()) == SA[]
     end
 
     @testset "Prism" begin
@@ -332,47 +350,38 @@ end
         # Lagrange 1 - idof_by_edge_with_bounds
         fs = FunctionSpace(:Lagrange, 1)
         idofs = Bcube.idof_by_edge_with_bounds(fs, Bcube.Prism())
-        ref_idofs = ((1, 2), (2, 3), (3, 1), (1, 4), (2, 5), (3, 6), (4, 5), (5, 6), (6, 4))
-        for (_idofs, _ref_idofs) in zip(idofs, ref_idofs)
-            @test Set(_idofs) == Set(_ref_idofs)
-        end
+        @test idofs ==
+              ([1, 2], [2, 3], [3, 1], [1, 4], [2, 5], [3, 6], [4, 5], [5, 6], [6, 4])
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Bcube.Prism()) == SA[]
 
         # Lagrange 2 - idof_by_edge, idof_by_edge_with_bounds
         fs = FunctionSpace(:Lagrange, 2)
         idofs = Bcube.idof_by_edge(fs, Bcube.Prism())
-        ref_idofs = ((4,), (5,), (6,), (7,), (8,), (9,), (16,), (17,), (18,))
-        for (_idofs, _ref_idofs) in zip(idofs, ref_idofs)
-            @test Set(_idofs) == Set(_ref_idofs)
-        end
+        @test idofs == ([4], [5], [6], [7], [8], [9], [16], [17], [18])
         idofs = Bcube.idof_by_edge_with_bounds(fs, Bcube.Prism())
-        ref_idofs = (
-            (1, 2, 4),
-            (2, 3, 5),
-            (3, 1, 6),
-            (1, 7, 13),
-            (2, 8, 14),
-            (3, 9, 15),
-            (13, 14, 16),
-            (14, 15, 17),
-            (15, 13, 18),
+        @test idofs == (
+            [1, 2, 4],
+            [2, 3, 5],
+            [3, 1, 6],
+            [1, 7, 13],
+            [2, 8, 14],
+            [3, 9, 15],
+            [13, 14, 16],
+            [14, 15, 17],
+            [15, 13, 18],
         )
-        for (_idofs, _ref_idofs) in zip(idofs, ref_idofs)
-            @test Set(_idofs) == Set(_ref_idofs)
-        end
+        @test Bcube.idof_by_volume(fs, Bcube.Prism()) == SA[]
 
         # Lagrange 2 - idof_by_face, idof_by_face_with_bounds, get_coords
         fs = FunctionSpace(:Lagrange, 2)
         idofs = Bcube.idof_by_face_with_bounds(fs, Bcube.Prism())
-        ref_idofs = (
+        @test idofs == (
             [1, 2, 4, 7, 8, 10, 13, 14, 16],
             [2, 3, 5, 8, 9, 11, 14, 15, 17],
             [3, 1, 6, 9, 7, 12, 15, 13, 18],
             [1, 2, 3, 4, 5, 6],
             [13, 14, 15, 16, 17, 18],
         )
-        for (_idofs, _ref_idofs) in zip(idofs, ref_idofs)
-            @test Set(_idofs) == Set(_ref_idofs)
-        end
 
         idofs = Bcube.idof_by_face(fs, Bcube.Prism())
         @test idofs[1][1] == 10

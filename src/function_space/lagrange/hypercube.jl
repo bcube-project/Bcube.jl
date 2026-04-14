@@ -41,7 +41,7 @@ end
     ∂λξ_∂ξ_symbolic(fs::FunctionSpace{<:Lagrange, D}, ::Shape, ξ) where {D, Shape<:Line}
 
 # Implementation
-Based on `Symbolic.jl`. First tests show that this version is slower than the implementation based on `meta`
+Based on generated Lagrange polynomials. First tests show that this version is slower than the implementation based on `meta`
 when `D` is greater. Further investigations are needed to understand this behavior.
 
 `shape_functions_symbolic` uses a "generated" function named `_shape_functions_symbolic`. The core of the
