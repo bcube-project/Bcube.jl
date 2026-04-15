@@ -8,6 +8,12 @@ on:
     tags: [v*]
   pull_request:
   workflow_dispatch:
+    inputs:
+      tutorials_branch:
+        description: 'Branch of BcubeTutorials.jl to test against (default: main or matching branch)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   test:
@@ -30,12 +36,47 @@ jobs:
           version: ${{ matrix.julia-version }}
           arch: x64
       - uses: julia-actions/julia-buildpkg@latest
+      - name: Determine BcubeTutorials branch
+        id: tutorials_branch
+        shell: bash
+        run: |
+          # Priority order for determining the branch:
+          # 1. workflow_dispatch input (if provided)
+          # 2. Matching branch name in BcubeTutorials (if exists)
+          # 3. main (default)
+
+          TUTORIALS_BRANCH=""
+
+          # Check for workflow_dispatch input
+          if [ -n "${{ github.event.inputs.tutorials_branch }}" ]; then
+            TUTORIALS_BRANCH="${{ github.event.inputs.tutorials_branch }}"
+            echo "Using branch from workflow_dispatch input: $TUTORIALS_BRANCH"
+          # Try matching branch name for PRs
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH_NAME="${{ github.head_ref }}"
+            # Check if matching branch exists in BcubeTutorials
+            if curl -sf "https://api.github.com/repos/bcube-project/BcubeTutorials.jl/branches/$BRANCH_NAME" > /dev/null 2>&1; then
+              TUTORIALS_BRANCH="$BRANCH_NAME"
+              echo "Using matching branch: $TUTORIALS_BRANCH"
+            else
+              TUTORIALS_BRANCH="main"
+              echo "No matching branch found, using: $TUTORIALS_BRANCH"
+            fi
+          else
+            TUTORIALS_BRANCH="main"
+            echo "Using default branch: $TUTORIALS_BRANCH"
+          fi
+
+          echo "branch=$TUTORIALS_BRANCH" >> $GITHUB_OUTPUT
+
       - name: Clone Downstream
         uses: actions/checkout@v6
         with:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
+          ref: ${{ steps.tutorials_branch.outputs.branch }}
           lfs: "true"
+
       - name: Load this and run the downstream tests
         env:
           BCUBE_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
@@ -44,7 +85,7 @@ jobs:
           using Pkg
           Pkg.test(coverage=true)  # resolver may fail with test time deps
       - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: lcov.info

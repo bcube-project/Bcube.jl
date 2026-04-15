@@ -92,12 +92,16 @@ end
 
 """
     allocate_dofs(feSpace::AbstractFESpace, T = Float64)
+    allocate_sparse_dofs(feSpace::AbstractFESpace, T = Float64)
 
-Allocate a vector with a size equal to the number of dof of the FESpace, with the type `T`.
+Allocate a (sparse) vector with a size equal to the number of dof of the FESpace, with the type `T`.
 For a MultiFESpace, a vector of the total size of the space is returned (and not a Tuple of vectors)
 """
 function allocate_dofs(feSpace::AbstractFESpace, T = Float64)
     allocate_dofs(parent(feSpace), T)
+end
+function allocate_sparse_dofs(feSpace::AbstractFESpace, T = Float64)
+    allocate_sparse_dofs(parent(feSpace), T)
 end
 
 abstract type AbstractSingleFESpace{S, FS} <: AbstractFESpace{S} end
@@ -204,16 +208,22 @@ function SingleFESpace(
 end
 
 @inline allocate_dofs(feSpace::SingleFESpace, T = Float64) = zeros(T, get_ndofs(feSpace))
+@inline allocate_sparse_dofs(feSpace::SingleFESpace, T = Float64) =
+    spzeros(T, get_ndofs(feSpace))
 
 """
 A TrialFESpace is basically a SingleFESpace plus other attributes (related to boundary conditions)
+
+`dirichletValues` is a NamedTuple whose keys are the boundary names (as symbols) and values are
+functions of time such that `t -> AbstractLazy`
+
 
 # Dev notes
 * we cannot directly store Dirichlet values on dofs because the Dirichlet values needs "time" to apply
 """
 struct TrialFESpace{S, FE <: AbstractSingleFESpace, D} <: AbstractFESpace{S}
     feSpace::FE
-    dirichletValues::D # <boundary name (as a Symbol)> => <dirichlet value (function of x, t)>
+    dirichletValues::D
 end
 
 """
@@ -242,9 +252,10 @@ See [`SingleFESpace`](@ref) for hints about the function arguments. Only argumen
 
 # Arguments
 - `dirichlet::Dict{String} = Dict{String, Any}()` : dictionnary specifying the Dirichlet
-    valued-function (or function) associated to each mesh boundary label. The function `f(x,t)`
-    to apply is expressed in the physical coordinate system. Alternatively, a constant value
-    can be provided instead of a function.
+    valued-function (or function) associated to each mesh boundary label. The function `f(t)`
+    to apply must return an `AbstractLazy` (for instance, a `PhysicalFunction`). Alternatively:
+    - a constant `value` can be provided, it will be translated as `t -> PhysicalFunction(x -> value)`
+    - an `AbstractLazy` `g` can be provided, it will be translated as `t -> g`
 - `type::Symbol` : `:continuous` or `:discontinuous`
 
 # Warning
@@ -256,7 +267,7 @@ julia> mesh = one_cell_mesh(:line)
 julia> fSpace = FunctionSpace(:Lagrange, 2)
 julia> U = TrialFESpace(fSpace, mesh)
 julia> V = TrialFESpace(fSpace, mesh, :discontinuous; size = 3)
-julia> W = TrialFESpace(fSpace, mesh, Dict("North" => 3., "South" => (x,t) -> t .* x))
+julia> W = TrialFESpace(fSpace, mesh, Dict("North" => 3., "South" => t -> PhysicalFunction(x -> t .* x)))
 ```
 
 """
@@ -271,8 +282,21 @@ function TrialFESpace(
     # Build FESpace
     feSpace = SingleFESpace(fSpace, mesh, keys(dirichlet); size, isContinuous, kwargs...)
 
-    # Transform any constant value into a function of (x,t)
-    d = Dict(Symbol(k) => (v isa Function ? v : (x, t) -> v) for (k, v) in dirichlet)
+    # Transform any constant value into a function of t->PhysicalFunction() or any AbstractLazy into t->lazy
+    function diri_val_to_time_func(v)
+        if v isa Function
+            return v
+        elseif v isa AbstractLazy
+            return t -> v
+        elseif v isa Union{Number, AbstractVector}
+            return t -> PhysicalFunction(x -> v)
+        else
+            error(
+                "Dirichlet value must be <: Union{Function, Number, AbstractLazy}, but is $(typeof(v))",
+            )
+        end
+    end
+    d = Dict(Symbol(k) => diri_val_to_time_func(v) for (k, v) in dirichlet)
 
     # Transform the dict into a NamedTuple (for GPU compatibility)
     dirichletValues = (; zip(keys(d), values(d))...)
@@ -714,6 +738,7 @@ function _build_jacobian_sparsity_pattern_SoA(::MultiFESpace, mesh)
 end
 
 allocate_dofs(mfeSpace::MultiFESpace, T = Float64) = zeros(T, get_ndofs(mfeSpace))
+allocate_sparse_dofs(mfeSpace::MultiFESpace, T = Float64) = spzeros(T, get_ndofs(mfeSpace))
 
 # WIP
 # """
