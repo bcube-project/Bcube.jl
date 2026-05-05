@@ -327,7 +327,8 @@ end
             test_lagrange_shape_function(Cube(), deg)
         end
 
-        @test Bcube.idof_by_face(FunctionSpace(:Lagrange, 0), Cube()) == SA[]
+        @test Bcube.idof_by_face(FunctionSpace(:Lagrange, 0), Cube()) ==
+              (SA[], SA[], SA[], SA[], SA[], SA[])
 
         @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0), Cube()) == SA[1]
         @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Cube()) == SA[]
