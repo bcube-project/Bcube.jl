@@ -285,11 +285,18 @@ function _idof_by_face(fs::FunctionSpace{<:Lagrange, degree}, shape::Cube) where
     return :(tuple($(expr...)))
 end
 
-function idof_by_face(::FunctionSpace{<:Lagrange, 0}, shape::Union{Line, Square, Cube})
+# Do not use `Union{Line,Square,Cube}` because it leads to ambiguities with `idof_by_face(fs::FunctionSpace{<:Lagrange}, shape::Cube)`
+function idof_by_face(::FunctionSpace{<:Lagrange, 0}, shape::Line)
+    ntuple(i -> SA[], nfaces(shape))
+end
+function idof_by_face(::FunctionSpace{<:Lagrange, 0}, shape::Square)
+    ntuple(i -> SA[], nfaces(shape))
+end
+function idof_by_face(::FunctionSpace{<:Lagrange, 0}, shape::Cube)
     ntuple(i -> SA[], nfaces(shape))
 end
 
-@generated function idof_by_face(fs::FunctionSpace{<:Lagrange}, shape::Union{Cube})
+@generated function idof_by_face(fs::FunctionSpace{<:Lagrange}, shape::Cube)
     return _idof_by_face(fs(), shape())
 end
 
