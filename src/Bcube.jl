@@ -76,6 +76,7 @@ include("./function_space/lagrange/tetra.jl")
 include("./function_space/lagrange/prism.jl")
 include("./function_space/lagrange/pyramid.jl")
 include("./function_space/taylor.jl")
+include("./function_space/shape_function_generator.jl")
 
 include("./mapping/mapping.jl")
 
