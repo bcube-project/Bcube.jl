@@ -23,6 +23,8 @@ function topodim(::AbstractMesh{topoDim}, label::Symbol) where {topoDim}
 end
 
 @inline boundary_tag(mesh::AbstractMesh, name) = boundary_tag(parent(mesh), name)
+@inline get_nodes(mesh::AbstractMesh) = get_nodes(parent(mesh))
+@inline ncells(mesh::AbstractMesh) = ncells(parent(mesh))
 
 abstract type AbstractMeshConnectivity end
 
