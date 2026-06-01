@@ -39,6 +39,7 @@ makedocs(;
             "api/integration/integration.md",
             # "api/operator/operator.md",
             "api/dof/dof.md",
+            "api/cellfunction/meshdata.md",
             "api/io/io_interface.md",
         ],
         "How to... (FAQ)" => "howto/howto.md",
