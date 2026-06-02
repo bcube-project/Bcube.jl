@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Linear transport (DG) · Bcube</title><meta name="title" content="Linear transport (DG) · Bcube"/><meta property="og:title" content="Linear transport (DG) · Bcube"/><meta property="twitter:title" content="Linear transport (DG) · Bcube"/><meta name="description" content="Documentation for Bcube."/><meta property="og:description" content="Documentation for Bcube."/><meta property="twitter:description" content="Documentation for Bcube."/><meta property="og:url" content="https://bcube-project.github.io/Bcube.jl/tutorial/linear_transport/"/><meta property="twitter:url" content="https://bcube-project.github.io/Bcube.jl/tutorial/linear_transport/"/><link rel="canonical" href="https://bcube-project.github.io/Bcube.jl/tutorial/linear_transport/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.jpg" alt="Bcube logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Bcube</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../helmholtz/">Helmholtz equation (FE)</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation (FE)</a></li><li class="is-active"><a class="tocitem" href>Linear transport (DG)</a><ul class="internal"><li class="toplevel"><a class="tocitem" href="#Theory"><span>Theory</span></a></li><li class="toplevel"><a class="tocitem" href="#Commented-code"><span>Commented code</span></a></li></ul></li><li><a class="tocitem" href="../phase_field_supercooled/">Phase field model - solidification of a liquid in supercooled state</a></li></ul></li><li><span class="tocitem">Advanced examples</span><ul><li><a class="tocitem" href="../../example/covo/">Euler equations - covo</a></li><li><a class="tocitem" href="../../example/euler_naca_steady/">Euler equations on a NACA0012</a></li><li><a class="tocitem" href="../../example/linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../../example/linear_thermoelasticity/">Linear thermo-elasticity</a></li></ul></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/geometry/">Geometry and mesh</a></li><li><a class="tocitem" href="../../manual/integration/">Integration</a></li><li><a class="tocitem" href="../../manual/cellfunction/">Cell function</a></li><li><a class="tocitem" href="../../manual/function_space/">Function and FE spaces</a></li><li><a class="tocitem" href="../../manual/operator/">LazyOperators</a></li></ul></li><li><a class="tocitem" href="../../howto/howto/">How to...</a></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../api/mesh/mesh/">Mesh</a></li><li><a class="tocitem" href="../../api/mesh/gmsh_utils/">GMSH</a></li><li><a class="tocitem" href="../../api/mesh/mesh_generator/">Mesh generator</a></li><li><a class="tocitem" href="../../api/interpolation/shape/">Reference shape</a></li><li><a class="tocitem" href="../../api/interpolation/function_space/">Function spaces</a></li><li><a class="tocitem" href="../../api/interpolation/spaces/">Available spaces</a></li><li><a class="tocitem" href="../../api/interpolation/fespace/">Finite element spaces</a></li><li><a class="tocitem" href="../../api/mapping/mapping/">Mapping</a></li><li><a class="tocitem" href="../../api/integration/integration/">Integration</a></li><li><a class="tocitem" href="../../api/dof/dof/">Degree of freedom</a></li><li><a class="tocitem" href="../../api/output/vtk/">VTK</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Linear transport (DG)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Linear transport (DG)</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/bcube-project/Bcube.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/bcube-project/Bcube.jl/blob/main/docs/src/tutorial/linear_transport.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Linear-transport-(DG)"><a class="docs-heading-anchor" href="#Linear-transport-(DG)">Linear transport (DG)</a><a id="Linear-transport-(DG)-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-transport-(DG)" title="Permalink"></a></h1><p>In this tutorial, we show how to solve a linear transport equation using a discontinuous-Galerkin framework with Bcube.</p><h1 id="Theory"><a class="docs-heading-anchor" href="#Theory">Theory</a><a id="Theory-1"></a><a class="docs-heading-anchor-permalink" href="#Theory" title="Permalink"></a></h1><p>In this example, we solve the following linear transport equation using discontinuous elements:</p><p class="math-container">\[\frac{\partial \phi}{\partial t} + \nabla \cdot (c \phi) = 0\]</p><p>where <span>$c$</span> is a constant velocity. Using an explicit time scheme, one obtains:</p><p class="math-container">\[\phi^{n+1} = \phi^n - \Delta t \nabla \cdot (c \phi^n)\]</p><p>The corresponding weak form of this equation is:</p><p class="math-container">\[\int_\Omega \phi^{n+1} v \mathrm{\,d}\Omega = \int_\Omega \phi^n v \mathrm{\,d}\Omega + \Delta t \left[
+\int_\Omega c \phi^n \cdot \nabla v \mathrm{\,d}\Omega - \oint_\Gamma \left( c \phi \cdot n \right) v \mathrm{\,d}\Gamma
+\right]\]</p><p>where <span>$\Gamma = \delta \Omega$</span>. Adopting the discontinuous Galerkin framework, this equation is written in every mesh cell <span>$\Omega_i$</span>. The cell boundary term involves discontinuous quantities and is replaced by a &quot;numerical flux&quot;, leading to the expression:</p><p class="math-container">\[\int_{\Omega_i} \phi^{n+1} v \mathrm{\,d}\Omega_i = \int_{\Omega_i} \phi^n v \mathrm{\,d}\Omega_i + \Delta t \left[
+\int_{\Omega_i} c \phi^n \cdot \nabla v \mathrm{\,d}\Omega_i - \oint_{\Gamma_i} F^*(\phi) v \mathrm{\,d} \Gamma_i
+\right]\]</p><p>For this example, an upwind flux will be used for <span>$F^*$</span>. Using a matrix formulation, the above equation can be written as:</p><p class="math-container">\[\phi^{n+1} = \phi^n + M^{-1}(f_\Omega - f_\Gamma)\]</p><p>where <span>$M^{-1}$</span> is the inverse of the mass matrix, <span>$f_\Omega$</span> the volumic flux term and <span>$f_\Gamma$</span> the surfacic flux term.</p><h1 id="Commented-code"><a class="docs-heading-anchor" href="#Commented-code">Commented code</a><a id="Commented-code-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-code" title="Permalink"></a></h1><p>Start by importing the necessary packages: Load the necessary packages</p><pre><code class="language-julia hljs">using Bcube
+using LinearAlgebra
+using WriteVTK</code></pre><p>Before all, to ease to ease the solution VTK output we will write a structure to store the vtk filename and the number of iteration; and a function that exports the solution on demand. Note the use of <code>var_on_nodes_discontinuous</code> to export the solution on the mesh nodes, respecting the discontinuous feature of the solution.</p><pre><code class="language-julia hljs">mutable struct VtkHandler
+    basename::Any
+    ite::Any
+    mesh::Any
+    VtkHandler(basename, mesh) = new(basename, 0, mesh)
+end
+
+function append_vtk(vtk, u::Bcube.AbstractFEFunction, t)
+    # Values on center
+    values = var_on_nodes_discontinuous(u, vtk.mesh)
+
+    # Write
+    Bcube.write_vtk_discontinuous(
+        vtk.basename,
+        vtk.ite,
+        t,
+        vtk.mesh,
+        Dict(&quot;u&quot; =&gt; (values, VTKPointData())),
+        1;
+        append = vtk.ite &gt; 0,
+    )
+
+    # Update counter
+    vtk.ite += 1
+end</code></pre><p>First, we define some physical and numerical constant parameters</p><pre><code class="language-julia hljs">const degree = 0 # Function-space degree (Taylor(0) = first order Finite Volume)
+const c = [1.0, 0.0] # Convection velocity (must be a vector)
+const nite = 100 # Number of time iteration(s)
+const CFL = 1 # 0.1 for degree 1
+const nx = 41 # Number of nodes in the x-direction
+const ny = 41 # Number of nodes in the y-direction
+const lx = 2.0 # Domain width
+const ly = 2.0 # Domain height
+const Δt = CFL * min(lx / nx, ly / ny) / norm(c) # Time step</code></pre><p>Then generate the mesh of a rectangle using Gmsh and read it</p><pre><code class="language-julia hljs">tmp_path = &quot;tmp.msh&quot;
+gen_rectangle_mesh(tmp_path, :quad; nx = nx, ny = ny, lx = lx, ly = ly, xc = 0.0, yc = 0.0)
+mesh = read_msh(tmp_path)
+rm(tmp_path)</code></pre><p>We can now init our <code>VtkHandler</code></p><pre><code class="language-julia hljs">out_dir = joinpath(@__DIR__, &quot;../myout&quot;)
+vtk = VtkHandler(joinpath(out_dir, &quot;linear_transport&quot;), mesh)</code></pre><p>As seen in the previous tutorial, the definition of trial and test spaces needs a mesh and a function space. Here, we select Taylor space, and build discontinuous FE spaces with it. Then an FEFunction, that will represent our solution, is created.</p><pre><code class="language-julia hljs">fs = FunctionSpace(:Taylor, degree)
+U = TrialFESpace(fs, mesh, :discontinuous)
+V = TestFESpace(U)
+u = FEFunction(U)</code></pre><p>Define measures for cell and interior face integrations</p><pre><code class="language-julia hljs">Γ = InteriorFaceDomain(mesh)
+Γ_in = BoundaryFaceDomain(mesh, &quot;West&quot;)
+Γ_out = BoundaryFaceDomain(mesh, (&quot;North&quot;, &quot;East&quot;, &quot;South&quot;))
+
+dΩ = Measure(CellDomain(mesh), 2 * degree + 1)
+dΓ = Measure(Γ, 2 * degree + 1)
+dΓ_in = Measure(Γ_in, 2 * degree + 1)
+dΓ_out = Measure(Γ_out, 2 * degree + 1)</code></pre><p>We will also need the face normals associated to the different face domains. Note that this operation is lazy, <code>nΓ</code> is just an abstract representation on face normals of <code>Γ</code>.</p><pre><code class="language-julia hljs">nΓ = get_face_normals(Γ)
+nΓ_in = get_face_normals(Γ_in)
+nΓ_out = get_face_normals(Γ_out)</code></pre><p>Let&#39;s move on to the bilinear and linear forms. First, the two easiest ones:</p><pre><code class="language-julia hljs">m(u, v) = ∫(u ⋅ v)dΩ # Mass matrix
+l_Ω(v) = ∫((c * u) ⋅ ∇(v))dΩ # Volumic convective term</code></pre><p>For the flux term, we first need to define a numerical flux. It is convenient to define it separately in a dedicated function. Here is the definition of simple upwind flux.</p><pre><code class="language-julia hljs">function upwind(ui, uj, nij)
+    cij = c ⋅ nij
+    if cij &gt; zero(cij)
+        flux = cij * ui
+    else
+        flux = cij * uj
+    end
+    flux
+end</code></pre><p>We then define the &quot;flux&quot; as the composition of the upwind function and the needed entries: namely the solution on the negative side of the face, the solution on the positive face, and the face normal. The orientation negative/positive is arbitrary, the only convention is that the face normals are oriented from the negative side to the positive side.</p><pre><code class="language-julia hljs">flux = upwind ∘ (side⁻(u), side⁺(u), side⁻(nΓ))
+l_Γ(v) = ∫(flux * jump(v))dΓ</code></pre><p>Finally, we define what to perform on the &quot;two&quot; boundaries : inlet / oulet. On the inlet, we directly impose the flux with a user defined function that depends on the time (the input is an oscillating wave). On the outlet, we keep our upwind flux but we impose the ghost cell value.</p><pre><code class="language-julia hljs">bc_in = t -&gt; PhysicalFunction(x -&gt; c .* cos(3 * x[2]) * sin(4 * t)) # flux
+l_Γ_in(v, t) = ∫(side⁻(bc_in(t)) ⋅ side⁻(nΓ_in) * side⁻(v))dΓ_in
+flux_out = upwind ∘ (side⁻(u), 0.0, side⁻(nΓ_out))
+l_Γ_out(v) = ∫(flux_out * side⁻(v))dΓ_out</code></pre><p>Assemble the (constant) mass matrix. The returned matrix is a sparse matrix. To simplify the tutorial, we will directly compute the inverse mass matrix. But note that way more performant strategies should be employed to solve such a problem (since we don&#39;t need the inverse, only the matrix-vector product).</p><pre><code class="language-julia hljs">M = assemble_bilinear(m, U, V)
+invM = inv(Matrix(M)) #WARNING : really expensive !!!</code></pre><p>Let&#39;s also create three vectors to avoid allocating them at each time step</p><pre><code class="language-julia hljs">nd = get_ndofs(V)
+b_vol = zeros(nd)
+b_fac = similar(b_vol)
+rhs = similar(b_vol)</code></pre><p>The time loop is trivial : at each time step we compute the linear forms using the <code>assemble_</code> methods, we complete the rhs, perform an explicit step and write the solution.</p><pre><code class="language-julia hljs">t = 0.0
+for i in 1:nite
+    global t
+
+    # Reset pre-allocated vectors
+    b_vol .= 0.0
+    b_fac .= 0.0
+
+    # Compute linear forms
+    assemble_linear!(b_vol, l_Ω, V)
+    assemble_linear!(b_fac, l_Γ, V)
+    assemble_linear!(b_fac, v -&gt; l_Γ_in(v, t), V)
+    assemble_linear!(b_fac, l_Γ_out, V)
+
+    # Assemble rhs
+    rhs .= Δt .* invM * (b_vol - b_fac)
+
+    # Update solution
+    u.dofValues .+= rhs
+
+    # Update time
+    t += Δt
+
+    # Write to file
+    append_vtk(vtk, u, t)
+end</code></pre><p>And here is an animation of the result:</p><img src="../assets/linear_transport.gif" alt="drawing" width="700"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../heat_equation/">« Heat equation (FE)</a><a class="docs-footer-nextpage" href="../phase_field_supercooled/">Phase field model - solidification of a liquid in supercooled state »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.1.2 on <span class="colophon-date" title="Saturday 18 November 2023 15:33">Saturday 18 November 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
