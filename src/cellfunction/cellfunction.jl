@@ -270,6 +270,8 @@ end
 ## TEMPORARY : should be moved in files where each function space is defined !
 DomainStyle(fs::FunctionSpace{<:Lagrange}) = ReferenceDomain()
 DomainStyle(fs::FunctionSpace{<:Taylor}) = ReferenceDomain()
+DomainStyle(fs::FunctionSpace{<:LagrangeGenerated}) = ReferenceDomain()
+DomainStyle(fs::FunctionSpace{<:HermiteGenerated}) = ReferenceDomain()
 
 #specific rules:
 LazyOperators.materialize(a::LazyMapOver{<:AbstractCellShapeFunctions}, x::CellInfo) = a
