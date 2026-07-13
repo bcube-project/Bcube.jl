@@ -640,4 +640,131 @@
         b = compute(∫(g)dΩ)
         @test b[1] ≈ 0.5
     end
+
+    @testset "Integrand" begin
+        import Bcube: Integrand, get_function
+
+        # Single function
+        f = x -> x[1]
+        integ = Integrand(f)
+        @test get_function(integ) === f
+
+        # Tuple of functions
+        f1 = x -> x[1]
+        f2 = x -> x[2]
+        integ2 = Integrand((f1, f2))
+        @test get_function(integ2) === (f1, f2)
+
+        # Unary plus on Integrand
+        pos_integ = +integ
+        @test pos_integ === integ
+
+        # Unary minus on numeric Integrand
+        num_integ = Integrand(5)
+        neg_integ = -num_integ
+        @test get_function(neg_integ) == -5
+
+        # ∫ alias
+        @test ∫(f) isa Integrand
+    end
+
+    @testset "Integration operators" begin
+        import Bcube: Integration, Integrand, get_integrand, get_measure, get_bcube_backend
+
+        mesh = one_cell_mesh(:line)
+        dΩ = Measure(CellDomain(mesh), 2)
+        g = PhysicalFunction(x -> 1.0)
+        integ = ∫(g)
+        integration = integ * dΩ
+
+        @test integration isa Integration
+        @test get_integrand(integration) === integ
+        @test get_measure(integration) === dΩ
+        @test get_bcube_backend(integration) == get_bcube_backend(dΩ)
+
+        # Unary minus and plus
+        neg_int = -integration
+        @test neg_int isa Integration
+        @test +integration === integration
+
+        # Multiplication by number
+        dbl_int = 2 * integration
+        @test dbl_int isa Integration
+        triple_int = integration * 3
+        @test triple_int isa Integration
+    end
+
+    @testset "MultiIntegration" begin
+        import Bcube: MultiIntegration, Integration, Integrand
+
+        mesh = one_cell_mesh(:line)
+        dΩ = Measure(CellDomain(mesh), 2)
+        g1 = PhysicalFunction(x -> 1.0)
+        g2 = PhysicalFunction(x -> 2.0)
+
+        i1 = ∫(g1) * dΩ
+        i2 = ∫(g2) * dΩ
+
+        # Addition of two Integrations -> MultiIntegration
+        mi = i1 + i2
+        @test mi isa MultiIntegration
+
+        # getindex with Val
+        @test mi[Val(1)] === i1
+        @test mi[Val(2)] === i2
+
+        # get_measure returns tuple
+        measures = get_measure(mi)
+        @test measures == (dΩ, dΩ)
+
+        # get_bcube_backend
+        @test get_bcube_backend(mi) == get_bcube_backend(i1)
+
+        # Addition: Integration + MultiIntegration
+        mi2 = i1 + mi
+        @test mi2 isa MultiIntegration
+
+        # Addition: MultiIntegration + MultiIntegration
+        mi3 = mi + mi
+        @test mi3 isa MultiIntegration
+
+        # Unary plus
+        @test (+mi) === mi
+
+        # Unary minus
+        neg_mi = -mi
+        @test neg_mi isa MultiIntegration
+
+        # Subtraction
+        diff = i1 - i2
+        @test diff isa MultiIntegration
+        diff2 = mi - i1
+        @test diff2 isa MultiIntegration
+        diff3 = i1 - mi
+        @test diff3 isa MultiIntegration
+        diff4 = mi - mi
+        @test diff4 isa MultiIntegration
+    end
+
+    @testset "Measure API" begin
+        mesh = one_cell_mesh(:line)
+        Ω = CellDomain(mesh)
+        dΩ = Measure(Ω, 2)
+
+        # Basic getters
+        @test get_domain(dΩ) === Ω
+        @test Bcube.get_quadrature(dΩ) isa Bcube.AbstractQuadrature
+        @test get_bcube_backend(dΩ) == get_bcube_backend(Ω)
+
+        # Measure with Val degree
+        dΩ2 = Measure(Ω, Val(3))
+        @test dΩ2 isa Measure
+
+        # Boundary face domain measure
+        Γ = BoundaryFaceDomain(mesh)
+        dΓ = Measure(Γ, 2)
+        @test get_domain(dΓ) === Γ
+        face_normals = get_face_normals(dΓ)
+        @test face_normals isa Bcube.FaceNormal
+    end
 end
