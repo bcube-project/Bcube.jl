@@ -178,6 +178,7 @@ tempdir = mktempdir()
     custom_include("./interpolation/test_projection.jl")
     custom_include("./integration/test_integration.jl")
     # custom_include("./dof/test_variable.jl")  #TODO : update with new API
+    custom_include("./quadrature/test_quadrature.jl")
     custom_include("./interpolation/test_shapefunctions.jl")
     custom_include("./interpolation/test_limiter.jl")
     custom_include("./interpolation/test_cellfunction.jl")
