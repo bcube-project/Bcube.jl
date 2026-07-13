@@ -428,7 +428,7 @@ end
 @inline function edges2nodes(::Type{Pyra5_t})
     ((1, 2), (2, 3), (3, 4), (4, 1), (1, 5), (2, 5), (3, 5), (4, 5))
 end
-@inline edgetypes(::Type{Pyra5_t}) = ntuple(Bar2_t(), nedges(Pyra5_t()))
+@inline edgetypes(::Type{Pyra5_t}) = ntuple(x -> Bar2_t(), nedges(Pyra5_t()))
 @inline nfaces(::Type{Pyra5_t}) = 5
 @inline function faces2nodes(::Type{Pyra5_t})
     ((1, 4, 3, 2), (1, 2, 5), (2, 3, 5), (3, 4, 5), (4, 1, 5))

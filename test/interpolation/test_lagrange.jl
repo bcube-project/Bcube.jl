@@ -342,6 +342,50 @@ end
 
         @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0), Tetra()) == SA[1]
         @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Tetra()) == SA[]
+
+        # get_coords
+        fs = FunctionSpace(:Lagrange, 0)
+        @test Bcube.get_coords(fs, Tetra()) ≈ (center(Tetra()),)
+        fs = FunctionSpace(:Lagrange, 1)
+        @test Bcube.get_coords(fs, Tetra()) == get_coords(Tetra())
+
+        # get_ndofs
+        @test get_ndofs(FunctionSpace(:Lagrange, 0), Tetra()) == 1
+        @test get_ndofs(FunctionSpace(:Lagrange, 1), Tetra()) == 4
+
+        # idof_by_vertex
+        @test Bcube.idof_by_vertex(FunctionSpace(:Lagrange, 0), Tetra()) ==
+              ntuple(i -> SA[], nvertices(Tetra()))
+        @test Bcube.idof_by_vertex(FunctionSpace(:Lagrange, 1), Tetra()) ==
+              (SA[1], SA[2], SA[3], SA[4])
+
+        # idof_by_edge, idof_by_edge_with_bounds
+        @test Bcube.idof_by_edge(FunctionSpace(:Lagrange, 0), Tetra()) ==
+              ntuple(i -> SA[], nedges(Tetra()))
+        @test Bcube.idof_by_edge(FunctionSpace(:Lagrange, 1), Tetra()) ==
+              ntuple(i -> SA[], nedges(Tetra()))
+        @test Bcube.idof_by_edge_with_bounds(FunctionSpace(:Lagrange, 0), Tetra()) ==
+              ntuple(i -> SA[], nedges(Tetra()))
+        @test Bcube.idof_by_edge_with_bounds(FunctionSpace(:Lagrange, 1), Tetra()) ==
+              (SA[1, 2], SA[2, 3], SA[3, 1], SA[1, 4], SA[2, 4], SA[3, 4])
+
+        # idof_by_face, idof_by_face_with_bounds
+        @test Bcube.idof_by_face(FunctionSpace(:Lagrange, 0), Tetra()) ==
+              ntuple(i -> SA[], nfaces(Tetra()))
+        @test Bcube.idof_by_face(FunctionSpace(:Lagrange, 1), Tetra()) ==
+              ntuple(i -> SA[], nfaces(Tetra()))
+        @test Bcube.idof_by_face_with_bounds(FunctionSpace(:Lagrange, 0), Tetra()) ==
+              ntuple(i -> SA[], nfaces(Tetra()))
+        @test Bcube.idof_by_face_with_bounds(FunctionSpace(:Lagrange, 1), Tetra()) ==
+              (SA[1, 3, 2], SA[1, 2, 4], SA[2, 3, 4], SA[3, 1, 4])
+
+        # ∂λξ_∂ξ
+        fs = FunctionSpace(:Lagrange, 0)
+        ∇λ = ∂λξ_∂ξ(fs, Tetra(), SA[0.1, 0.1, 0.1])
+        @test ∇λ ≈ [0.0 0.0 0.0]
+        fs = FunctionSpace(:Lagrange, 1)
+        ∇λ = ∂λξ_∂ξ(fs, Tetra(), SA[0.0, 0.0, 0.0])
+        @test ∇λ ≈ [-1 -1 -1; 1 0 0; 0 1 0; 0 0 1]
     end
 
     @testset "Prism" begin
@@ -428,5 +472,78 @@ end
 
         idofs = Bcube.idof_by_face(fs, Bcube.Prism())
         @test idofs == ([14, 15, 24, 25], [16, 17, 26, 27], [18, 19, 28, 29], [10], [40])
+    end
+
+    @testset "Pyramid" begin
+        # get_ndofs
+        @test get_ndofs(FunctionSpace(:Lagrange, 0), Pyramid()) == 1
+        @test get_ndofs(FunctionSpace(:Lagrange, 1), Pyramid()) == 5
+
+        # shape functions degree 0
+        fs = FunctionSpace(:Lagrange, 0)
+        @test shape_functions(fs, Pyramid(), SA[0.1, 0.1, 0.1]) == [1.0]
+
+        # shape functions degree 1 - test at vertices
+        fs = FunctionSpace(:Lagrange, 1)
+        for (i, ξ) in enumerate(Bcube.get_coords(fs, Pyramid()))
+            result = shape_functions(fs, Pyramid(), ξ)
+            expected = zeros(5)
+            expected[i] = 1.0
+            @test isapprox(result, expected; atol = 5eps())
+        end
+        @test isapprox(
+            sum(shape_functions(fs, Pyramid(), SA[0.1, 0.2, 0.3])),
+            1.0;
+            atol = 5eps(),
+        )
+
+        # ∂λξ_∂ξ degree 0
+        fs = FunctionSpace(:Lagrange, 0)
+        ∇λ = ∂λξ_∂ξ(fs, Pyramid(), SA[0.1, 0.1, 0.1])
+        @test ∇λ ≈ [0.0 0.0 0.0]
+
+        # get_coords
+        fs = FunctionSpace(:Lagrange, 0)
+        @test Bcube.get_coords(fs, Pyramid()) ≈ (center(Pyramid()),)
+        fs = FunctionSpace(:Lagrange, 1)
+        @test Bcube.get_coords(fs, Pyramid()) == get_coords(Pyramid())
+
+        # idof_by_vertex
+        @test Bcube.idof_by_vertex(FunctionSpace(:Lagrange, 0), Pyramid()) ==
+              ntuple(i -> SA[], nvertices(Pyramid()))
+        @test Bcube.idof_by_vertex(FunctionSpace(:Lagrange, 1), Pyramid()) ==
+              (SA[1], SA[2], SA[3], SA[4], SA[5])
+
+        # idof_by_edge, idof_by_edge_with_bounds
+        @test Bcube.idof_by_edge(FunctionSpace(:Lagrange, 0), Pyramid()) ==
+              ntuple(i -> SA[], nedges(Pyramid()))
+        @test Bcube.idof_by_edge(FunctionSpace(:Lagrange, 1), Pyramid()) ==
+              ntuple(i -> SA[], nedges(Pyramid()))
+        @test Bcube.idof_by_edge_with_bounds(FunctionSpace(:Lagrange, 0), Pyramid()) ==
+              ntuple(i -> SA[], nedges(Pyramid()))
+        @test Bcube.idof_by_edge_with_bounds(FunctionSpace(:Lagrange, 1), Pyramid()) == (
+            SA[1, 2],
+            SA[2, 3],
+            SA[3, 4],
+            SA[4, 1],
+            SA[1, 5],
+            SA[2, 5],
+            SA[3, 5],
+            SA[4, 5],
+        )
+
+        # idof_by_face, idof_by_face_with_bounds
+        @test Bcube.idof_by_face(FunctionSpace(:Lagrange, 0), Pyramid()) ==
+              ntuple(i -> SA[], nfaces(Pyramid()))
+        @test Bcube.idof_by_face(FunctionSpace(:Lagrange, 1), Pyramid()) ==
+              ntuple(i -> SA[], nfaces(Pyramid()))
+        @test Bcube.idof_by_face_with_bounds(FunctionSpace(:Lagrange, 0), Pyramid()) ==
+              ntuple(i -> SA[], nfaces(Pyramid()))
+        @test Bcube.idof_by_face_with_bounds(FunctionSpace(:Lagrange, 1), Pyramid()) ==
+              (SA[1, 4, 3, 2], SA[1, 2, 5], SA[2, 3, 5], SA[3, 4, 5], SA[4, 1, 5])
+
+        # Bcube.idof_by_volume
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 0), Pyramid()) == SA[1]
+        @test Bcube.idof_by_volume(FunctionSpace(:Lagrange, 1), Pyramid()) == SA[]
     end
 end
