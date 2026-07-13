@@ -100,6 +100,44 @@
         @test ncells(mesh) == _count_cell
     end
 
+    @testset "var_on_nodes_discontinuous" begin
+        # 1D mesh: line_mesh(3) -> 2 cells, 3 nodes at x=0,1,2
+        mesh = line_mesh(3; xmin = 0.0, xmax = 2.0)
+        f = PhysicalFunction(x -> x[1]^2)
+
+        # degree 1 -> 2 nodes per cell, 2 cells -> 4 values
+        values = var_on_nodes_discontinuous(f, mesh, 1)
+        @test length(values) == 4
+        # Cell 1: nodes at x=0, x=1 -> f=0, f=1
+        # Cell 2: nodes at x=1, x=2 -> f=1, f=4
+        @test isapprox(values[1], 0.0; atol = 1e-12)
+        @test isapprox(values[2], 1.0; atol = 1e-12)
+        @test isapprox(values[3], 1.0; atol = 1e-12)
+        @test isapprox(values[4], 4.0; atol = 1e-12)
+
+        # Test with FEFunction
+        fs = FunctionSpace(:Lagrange, 1)
+        U = TrialFESpace(fs, mesh, :discontinuous)
+        u = FEFunction(U)
+        f = PhysicalFunction(x -> x[1])
+        projection_l2!(u, f, Measure(CellDomain(mesh), 2))
+        values2 = var_on_nodes_discontinuous(u, mesh)
+        @test isapprox_arrays(values2, [0.0, 1.0, 1.0, 2.0]; rtol = 1e-12)
+    end
+
+    @testset "var_on_bnd_nodes_discontinuous" begin
+        mesh = line_mesh(3; xmin = 0.0, xmax = 2.0)
+        f = PhysicalFunction(x -> x[1])
+
+        bnd = BoundaryFaceDomain(mesh)
+        values = var_on_bnd_nodes_discontinuous(f, bnd, 1)
+        # 2 boundary faces with 1 node each
+        @test length(values) == 2
+        # Values at x=0 and x=2 (order may vary)
+        @test isapprox(min(values[1], values[2]), 0.0; atol = 1e-12)
+        @test isapprox(max(values[1], values[2]), 2.0; atol = 1e-12)
+    end
+
     @testset "misc" begin
         mesh = one_cell_mesh(:quad)
         T, N = Bcube.get_return_type_and_codim(PhysicalFunction(x -> x[1]), mesh)
