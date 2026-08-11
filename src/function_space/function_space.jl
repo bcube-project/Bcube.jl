@@ -319,7 +319,7 @@ end
 
 get_quadrature(fs::AbstractFunctionSpace) = get_quadrature(basis_functions_style(fs), fs)
 function get_quadrature(::ModalBasisFunctionsStyle, fs::AbstractFunctionSpace)
-    error("'get_quadrature' is not invalid for modal basis functions")
+    error("'get_quadrature' is not valid for modal basis functions")
 end
 function get_quadrature(::NodalBasisFunctionsStyle, fs::AbstractFunctionSpace)
     error("'get_quadrature' is not defined for type : $(typeof(fs))")

@@ -97,9 +97,7 @@ end
                     vc = var_on_centers(v)
                     @test length(v̅) === 1
                     @test size(vc) === (1, 2)
-                    @test v̅[1] ≈
-                          vc[1, :] ≈
-                          [f[1]([Lx / 2, Ly / 2]), f[2]([Lx / 2, Ly / 2])]
+                    @test v̅[1] ≈ vc[1, :] ≈ [f[1]([Lx / 2, Ly / 2]), f[2]([Lx / 2, Ly / 2])]
                 end
             end
 

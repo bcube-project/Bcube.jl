@@ -3,6 +3,7 @@ message: "If you use this software, please cite it as below."
 authors:
 - family-names: "Blanchard"
   given-names: "Ghislain"
+  orcid: "https://orcid.org/0000-0002-3951-4071"
 - family-names: "Bennani"
   given-names: "Lokman"
 - family-names: "Bouyges"

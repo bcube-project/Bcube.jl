@@ -35,7 +35,7 @@ function change_domain(a, target_domain::DomainStyle)
 end
 change_domain(a, input_domain::T, target_domain::T) where {T <: DomainStyle} = a
 function change_domain(a, input_domain::DomainStyle, target_domain::DomainStyle)
-    error("`change_domain` is not defined for $(typeof(f))")
+    error("`change_domain` is not defined for $(typeof(a))")
 end
 
 """

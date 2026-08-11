@@ -66,6 +66,8 @@ import Bcube:
     DofHandler,
     DomainIterator,
     edges2nodes,
+    edgetypes,
+    facetypes,
     FaceInfo,
     FacePoint,
     faces,
@@ -127,9 +129,30 @@ import Bcube:
     ∂λξ_∂ξ,
     ∂λξ_∂x,
     Bar2_t,
+    Bar3_t,
+    Bar4_t,
+    Bar5_t,
     Tri3_t,
+    Tri6_t,
+    Tri9_t,
+    Tri10_t,
+    Tri12_t,
     Quad4_t,
+    Quad8_t,
     Quad9_t,
+    Quad16_t,
+    Point,
+    Pyramid,
+    measure,
+    entity,
+    is_point_in_shape,
+    Tetra4_t,
+    Tetra10_t,
+    Hexa8_t,
+    Hexa27_t,
+    Penta6_t,
+    Pyra5_t,
+    Node_t,
     foreach_element
 
 # This dir will be removed at the end of the tests
@@ -155,6 +178,7 @@ tempdir = mktempdir()
     custom_include("./interpolation/test_projection.jl")
     custom_include("./integration/test_integration.jl")
     # custom_include("./dof/test_variable.jl")  #TODO : update with new API
+    custom_include("./quadrature/test_quadrature.jl")
     custom_include("./interpolation/test_shapefunctions.jl")
     custom_include("./interpolation/test_limiter.jl")
     custom_include("./interpolation/test_cellfunction.jl")

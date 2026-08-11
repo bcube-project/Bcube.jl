@@ -56,4 +56,18 @@
 
         @test Bcube.idof_by_volume(FunctionSpace(:Taylor, 0), Square()) == SA[1]
     end
+
+    @testset "Triangle" begin
+        shape = Triangle()
+
+        fs = FunctionSpace(:Taylor, 0)
+        λ = ξ -> shape_functions(fs, shape, ξ)
+        ∇λ = ξ -> ∂λξ_∂ξ(fs, shape, ξ)
+        @test λ(rand(2))[1] ≈ 1.0
+        @test ∇λ(rand(2)) ≈ [0.0 0.0]
+
+        @test get_ndofs(FunctionSpace(:Taylor, 0), Triangle()) == 1
+        @test get_ndofs(FunctionSpace(:Taylor, 1), Triangle()) == 3
+        @test Bcube.idof_by_volume(FunctionSpace(:Taylor, 0), Triangle()) == SA[1]
+    end
 end

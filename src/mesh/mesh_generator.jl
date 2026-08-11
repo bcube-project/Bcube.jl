@@ -818,7 +818,7 @@ function circle_mesh(n; radius = 1.0, order = 1)
         cell2node[3 * n - 1] = 1
         cell2node[3 * n]     = i + 1
 
-        # Number of nodes of each cell : always 2
+        # Number of nodes of each cell : always 3
         cell2nnodes = 3 * ones(Int, n)
 
         # Mesh
@@ -854,11 +854,11 @@ function _two_cubes_mesh(; zmin = 0, zmax = 1)
         Node(SA[1.0, 0.1, zmin]),
         Node(SA[2.0, 0.1, zmin]),
         Node(SA[0.0, 0.0, zmax]),
-        Node(SA[1.0, 0.0, zmin]),
-        Node(SA[2.0, 0.0, zmin]),
+        Node(SA[1.0, 0.0, zmax]),
+        Node(SA[2.0, 0.0, zmax]),
         Node(SA[0.0, 0.1, zmax]),
-        Node(SA[1.0, 0.1, zmin]),
-        Node(SA[2.0, 0.1, zmin]),
+        Node(SA[1.0, 0.1, zmax]),
+        Node(SA[2.0, 0.1, zmax]),
     ]
 
     celltypes = [Hexa8_t(), Hexa8_t()]
@@ -922,8 +922,9 @@ function _cube_pile_mesh()
         Node(SA[2.0, 1.0, 1.0]),
         Node(SA[1.0, 2.0, 1.0]),
         Node(SA[2.0, 2.0, 1.0]),
+        Node(SA[1.0, 0.0, 3.0]),
+        Node(SA[2.0, 0.0, 3.0]),
         Node(SA[1.0, 1.0, 3.0]),
-        Node(SA[2.0, 1.0, 3.0]),
         Node(SA[2.0, 1.0, 3.0]),
     ]
 

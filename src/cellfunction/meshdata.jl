@@ -4,6 +4,8 @@ struct FaceData <: AbstractMeshDataLocation end
 struct PointData <: AbstractMeshDataLocation end
 
 """
+    MeshData{L <: AbstractMeshDataLocation, T <: AbstractVector} <: AbstractLazy
+
 Represent a data whose values are known inside each cell/node/face of the mesh.
 
 Note that the "values" can be anything : an vector of scalar (conductivity by cell), an array
@@ -12,9 +14,10 @@ of functions, etc.
 # Example
 ```julia
 n = 10
-mesh = line_mesh(n)
-data = MeshCellData(rand(n))
-data = MeshCellData([PhysicalFunction(x -> i*x) for i in 1:n])
+mesh = line_mesh(10)
+cell_data = MeshCellData(rand(ncells(mesh)))
+cell_data = MeshCellData([PhysicalFunction(x -> i*x) for i in 1:ncells(mesh)])
+node_data = MeshPointData(rand(nnodes(mesh)))
 ```
 """
 struct MeshData{L <: AbstractMeshDataLocation, T <: AbstractVector} <: AbstractLazy
