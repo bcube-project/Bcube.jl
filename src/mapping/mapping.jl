@@ -367,7 +367,7 @@ function mapping_jacobian(::Bar2_t, cnodes, ξ)
 end
 
 function mapping_jacobian_inv(::Bar2_t, cnodes, ξ)
-    @SMatrix[2.0 / (cnodes[2].x[1] .- cnodes[1].x[1])]
+    @SMatrix[2.0 / (cnodes[2].x[1] - cnodes[1].x[1])]
 end
 
 mapping_inv_jacobian(::Bar2_t, cnodes, x) = 2.0 / (cnodes[2].x[1] - cnodes[1].x[1])

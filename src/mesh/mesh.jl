@@ -70,7 +70,7 @@ end
 @inline nlayers(c::MeshConnectivity) = c.nLayers
 @inline indices(c::MeshConnectivity) = c.indices
 
-Base.eltype(::MeshConnectivity{C}) where {C <: AbstractConnectivity} = eltype{C}
+Base.eltype(::MeshConnectivity{C}) where {C <: AbstractConnectivity} = eltype(C)
 function Base.iterate(c::MeshConnectivity{C}, i = 1) where {C <: AbstractConnectivity}
     return iterate(indices(c); i = 1)
 end
@@ -429,7 +429,6 @@ function _build_boundary_faces!(f2n::MeshConnectivity, f2c::MeshConnectivity, bc
         f2bc_indices = indices(f2bc)
         #bc2f_indices = [[i for (i,bc) in enumerate(indices(f2bc)) if length(bc)>0 && bc[1]==bctag] for bctag in keys(bc_names)]
         #bc_faces = (;zip(Symbol.(keys(bc_names)), bc2f_indices)...)
-        bc_faces = Dict{Int, Vector{Int}}()
         bc_faces = (;
             zip(
                 keys(bc_nodes),
@@ -448,7 +447,6 @@ end
 
 """ Note : this function isn't actually used anywhere, see  _build_boundary_faces! instead"""
 function build_boundary_faces!(mesh::Mesh)
-    @assert (mesh.bc_names ≠ nothing && mesh.bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
     @assert (mesh.bc_names ≠ nothing && mesh.bc_nodes ≠ nothing) "bc_names and bc_nodes must be defined"
     @assert has_faces(mesh) "face entities must be created first"
     @assert has_connectivities(mesh, :f2n) "face->node connectivity must be defined"
