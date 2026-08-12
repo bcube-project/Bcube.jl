@@ -257,7 +257,7 @@ function FEFunction(mfeSpace::AbstractMultiFESpace, args...)
     return MultiFieldFEFunction(feFunctions, mfeSpace)
 end
 
-function FEFunction(mfeSpace::AbstractMultiFESpace, mesh, f::Tuple{Vararg{<:AbstractLazy}})
+function FEFunction(mfeSpace::AbstractMultiFESpace, mesh, f::Tuple{Vararg{AbstractLazy}})
     feFunctions = ntuple(
         iSpace -> FEFunction(get_fespace(mfeSpace, iSpace), mesh, f[iSpace]),
         get_n_fespace(mfeSpace),
