@@ -149,8 +149,8 @@ A `CellDomain` is a representation of the cells of a mesh. It's primary
 purpose is to represent a domain to integrate over.
 
 # Constructors
-CellDomain(mesh::Mesh)
-CellDomain(mesh::Mesh, indices)
+* `CellDomain(mesh::Mesh)`
+* `CellDomain(mesh::Mesh, indices)`
 
 # Examples
 ```julia-repl
@@ -159,6 +159,10 @@ julia> Ω_all = CellDomain(mesh)
 julia> selectedCells = [1,3,5,6]
 julia> Ω_selected = CellDomain(mesh, selectedCells)
 ```
+
+!!! tip
+    To create a `CellDomain` from a geometrical criterion, use first [`identify_cells`](@ref)
+    to obtain the corresponding indices.
 """
 struct CellDomain{M, SD, T} <: AbstractCellDomain{M, I}
     mesh::M
@@ -447,7 +451,7 @@ end
 
 # Devs notes
 All subtypes should implement the following functions:
-- get_element_type(::AbstractDomainIndex)
+- `get_element_type(::AbstractDomainIndex)`
 """
 abstract type AbstractDomainIndex end
 

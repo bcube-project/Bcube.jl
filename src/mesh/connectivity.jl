@@ -117,7 +117,6 @@ n2c, keys = inverse_connectivity(c2n)
 ```
 Here, 'n2c' is the node->cell graph of connectivity and,
 'n2c[i]' contains the indices of the cells connected to the node of index 'keys[i]'.
-If 'c2n' is dense, 'keys' is not necessary (because keys[i]==i, ∀i)
 """
 function inverse_connectivity(c::Connectivity{T}) where {T}
     dict = Dict{T, Vector{T}}()

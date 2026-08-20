@@ -534,8 +534,13 @@ struct isVolumic <: TopologyStyle end
     topology_style(::AbstractEntityType{topoDim}, ::Node{spaceDim, T}) where {topoDim, spaceDim, T}
     topology_style(::AbstractEntityType{topoDim}, ::AbstractArray{Node{spaceDim, T}, N}) where {spaceDim, T, N, topoDim}
 
-
 Indicate the `TopologyStyle` of an entity of topology `topoDim` living in space of dimension `spaceDim`.
+
+For instance:
+```julia-repl
+julia> topology_style(::AbstractEntityType{1}, ::Node{2, T}) where {T} = isCurvilinear()
+julia> topology_style(::AbstractEntityType{2}, ::Node{2, T}) where {T} = isVolumic()
+```
 """
 @inline topology_style(
     ::AbstractEntityType{topoDim},
