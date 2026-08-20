@@ -682,7 +682,7 @@ get_face_normals(::AbstractFaceDomain) = FaceNormal()
     get_cell_normals(::AbstractCellDomain)
     get_cell_normals(::Measure{<:AbstractCellDomain})
 
-Return a LazyOperator representing a cell normal in the context of hypersurfaces (see [`cell_normal`]@ref for more details)
+Return a LazyOperator representing a cell normal in the context of hypersurfaces (see [`cell_normal`](@ref) for more details)
 
 """
 function get_cell_normals(domain::AbstractCellDomain)
