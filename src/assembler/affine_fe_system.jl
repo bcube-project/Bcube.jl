@@ -45,7 +45,7 @@ For now, `U` and `V` must be defined with the same FESpace(s) ("Petrov-Galerkin"
 function AffineFESystem(a, l, U, V, linsolve! = default_linsolve!)
     # Preliminary check to ensure same FESpace
     if U isa MultiFESpace
-        @assert all((_U, _V) -> parent(_U) isa typeof(parent(_V)), zip(U, V)) "U and V must be defined on same FEspace"
+        @assert all(((_U, _V),) -> parent(_U) isa typeof(parent(_V)), zip(U, V)) "U and V must be defined on same FEspace"
     else
         @assert parent(U) isa typeof(parent(V))
     end
