@@ -47,15 +47,15 @@ rawcat(x::Vector{T}) where {T} = x
 """
     matrix_2_vector_of_SA(a)
 
-"Reshape" a matrix of size (m,n) into a `Vector` (of size n) of `StaticVector`` (of size m)
+"Reshape" a matrix of size (m,n) into a `Vector` (of size n) of `StaticVector` (of size m)
 """
 matrix_2_vector_of_SA(a) = vec(reinterpret(SVector{size(a, 1), eltype(a)}, a))
 
 """
     convert_to_vector_of_union(a::Vector{T}) where T
 
-Convert a vector 'a', whose the element type is abstract, to
-a vector whose the element type is a 'Union' of concrete types (if it is possible)
+Convert a vector `a`, whose element type is abstract, to
+a vector whose element type is a `Union` of concrete types (if it is possible)
 """
 function convert_to_vector_of_union(a::Vector{T}) where {T}
     if !isconcretetype(T)
@@ -162,13 +162,13 @@ julia> map(x -> x * 2, [1, 2, [3,4]])
 # Implementation
 
 When `f` is applied to one element of `c`, the result
-is wrapped in a type `WrapAsUnion` on which specific
+is wrapped in a type `WiddenAsUnion` on which specific
 `promote_typejoin` rules are applied.
 When `map_and_widden_as_union` is applied
 to collections of heterogeneous elements, these rules
-help  to infer the type of the resulting collection
+help to infer the type of the resulting collection
 as a `Union` of different types instead of a
-widder (abstract) type.
+wider (abstract) type.
 """
 function map_and_widden_as_union(f, c...)
     g(x...) = WiddenAsUnion(f(x...))
@@ -214,7 +214,7 @@ end
     cumsum_exclusive(a::AbstractVector)
     cumsum_exclusive(a::Tuple)
 
-Return the cumlative sum, excluding the current element.
+Return the cumulative sum, excluding the current element.
 """
 function cumsum_exclusive(a::AbstractVector)
     b = cumsum(a)[1:(end - 1)]

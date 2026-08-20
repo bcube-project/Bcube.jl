@@ -1,5 +1,5 @@
 """
-The `GradientStyle` helps distinguishing between "classic" gradient and a tangentiel gradient.
+The `GradientStyle` helps distinguishing between "classic" gradient and a tangential gradient.
 
 # Implementation
 Note that the whole point of the `GradientStyle` is to allow two distinct symbols (∇ and ∇ₛ) for
@@ -39,11 +39,11 @@ The user writes mathematical expressions in the PhysicalDomain. So the gradient 
 with respect to the physical domain spatial coordinates, even if evaluated on a point expressed in the ReferenceDomain.
 
 The current Gradient implementation consists in applying ForwardDiff on the given operator 'u', on a point in the
-ReferenceDomain. That is to say, we compute ForwarDiff.derivative(ξ -> u ∘ F, ξ) (where F is the identity if u is defined
-is the ReferenceDomain). This gives ∇(u ∘ F)(ξ) = t∇(F)(ξ) * ∇(u)(F(x)).
+ReferenceDomain. That is to say, we compute ForwardDiff.derivative(ξ -> u ∘ F, ξ) (where F is the identity if u is defined
+in the ReferenceDomain). This gives ∇(u ∘ F)(ξ) = t∇(F)(ξ) * ∇(u)(F(x)).
 However, we only want ∇(u)(F(x)) : that's why a multiplication by the transpose of the inverse mapping jacobian is needed.
 
-An alternative approach would be to apply ForwardDiff in the PhysicalDomain : ForwarDiff.derivative(x -> u ∘ F^-1, x). The
+An alternative approach would be to apply ForwardDiff in the PhysicalDomain : ForwardDiff.derivative(x -> u ∘ F^-1, x). The
 problem is that the inverse mapping F^-1 is not always defined.
 
 # Maths notes
@@ -54,7 +54,7 @@ That being said:
     - if λ is a scalar function, then ∇λ = transpose(J^(-1)) ̂∇̂λ
     - if λ is a vector function, then ∇λ = ̂∇̂λ J^(-1)
 
-Rq : note that the two formulae are different because we decided to break our own convention by writing, for a scalar function,
+Note: the two formulae are different because we decided to break our own convention by writing, for a scalar function,
 ∇f as a column vector instead of a row vector.
 
 ## Proof (to be also written in Latex)
@@ -64,10 +64,10 @@ To compute an integral such as ∫g(x)dx, we map the integral on a ref element:
 
 
 1) vector case : λ is a vector function
-if g(x) = ∇λ(x); i.e g(x) = ∂λi/∂xj, then we are looking for ∂λi/∂xj ∘ F. We now that λi = ̂λi ∘ F^-1,
+if g(x) = ∇λ(x); i.e g(x) = ∂λi/∂xj, then we are looking for ∂λi/∂xj ∘ F. We know that λi = ̂λi ∘ F^-1,
 so (∂λi/∂xj)(x) = (∂(̂λi∘F^-1)/∂xj)(x) = (∂Fk^-1/∂xj)(x)*(∂̂λi/∂Xk)(X), hence
 ∂λi/∂xj = (∂Fk^-1/∂xj) * (∂̂λi/∂Xk ∘ F^-1)
-So if we compose with `F` to obtain the seeked term:
+So if we compose with `F` to obtain the sought term:
 (∂λi/∂xj) ∘ F = [(∂Fk^-1/∂xj) ∘ F] * (∂̂λi/∂Xk)
 Now, we define (J^-1)_kj as [(∂Fk^-1/∂xj) ∘ F]. Note that J^-1 is a function of X, whereas ∂Fk^-1/∂xj is
 a function of x...
@@ -92,7 +92,7 @@ to perform a matrix-(column-vector) product, we need to transpose J^-1:
 # Dev notes
 * The signature used to be `lOp::Gradient{O,<:Tuple{AbstractCellFunction{ReferenceDomain}}}`, but for some
 reason I don't understand, it didn't work for vector-valued shape functions.
-* We have an `if` because the formulae is sligthly different for a scalar function or a vector function (see maths section)
+* We have an `if` because the formula is slightly different for a scalar function or a vector function (see maths section)
 
 TODO:
 * improve formulae with a reshape

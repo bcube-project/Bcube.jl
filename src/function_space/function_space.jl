@@ -3,7 +3,7 @@
 Abstract structure for the different types of function space, for
 instance the Lagrange function space, the Taylor function space etc.
 
-# Devs notes
+# Dev notes
 All subtypes should implement the following functions:
 * `get_ndofs(::AbstractFunctionSpace, ::AbstractShape)`
 * `_scalar_shape_functions(::AbstractFunctionSpace, ::AbstractShape, ξ)`
@@ -25,7 +25,7 @@ Getter for the `type` of the `AbstractFunctionSpace`
 get_type(::AbstractFunctionSpace{type}) where {type} = type
 
 """
-    get_degree(::AbstractFunctionSpace{type, degree}) where{type, degree}
+    get_degree(::AbstractFunctionSpace{type, degree}) where {type, degree}
 
 Return the `degree` associated to the `AbstractFunctionSpace`.
 """
@@ -61,10 +61,10 @@ of the finite element space (default: `N=1` if the argument is not provided).
 The result is a vector of all the shape functions evaluated at position ξ, and not a
 tuple of the different shape functions. This choice is optimal for performance.
 
-Note : `λ = ξ -> shape_functions(fs, shape, ξ); λ(ξ)[i]` is faster than `λ =shape_functions(fs, shape); λ[i](ξ)`
+Note: `λ = ξ -> shape_functions(fs, shape, ξ); λ(ξ)[i]` is faster than `λ = shape_functions(fs, shape); λ[i](ξ)`
 
 # Implementation
-Default version, should be overriden for each concrete FunctionSpace.
+Default version, should be overridden for each concrete FunctionSpace.
 """
 function shape_functions(::AbstractFunctionSpace, ::Val{N}, ::AbstractShape, ξ) where {N}
     error("Function 'shape_functions' not implemented")
@@ -87,9 +87,9 @@ end
 """
     shape_functions_vec(fs::AbstractFunctionSpace, ::Val{N}, shape::AbstractShape, ξ) where {N}
 
-Return all the shape functions of FunctionSpace on a Shape evaluated in ξ as a vector.
+Return all the shape functions of a FunctionSpace on a Shape evaluated in ξ as a vector.
 
-`N` is the the size (number of components) of the finite element space.
+`N` is the size (number of components) of the finite element space.
 
 ---
 
@@ -98,7 +98,7 @@ Return all the shape functions of FunctionSpace on a Shape evaluated in ξ as a 
 The shape functions are returned as a vector of functions.
 
 # Implementation
-This is implementation is not always valid, but it is for Lagrange and Taylor spaces (the only
+This implementation is not always valid, but it is for Lagrange and Taylor spaces (the only
 two spaces available up to 20/01/23).
 """
 function shape_functions_vec(
