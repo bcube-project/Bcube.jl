@@ -35,10 +35,10 @@ Quadrature(d::Integer) = Quadrature(Val(d))
 Abstract type representing a quadrature rule for a shape `S`
 and quadrature `Q`.
 
-Derived types must implement the following method:
-    - [`get_weights(qr::AbstractQuadratureRule)`]
-    - [`get_nodes(qr::AbstractQuadratureRule)`]
-    - [`Base.length(qr::AbstractQuadratureRule)`]
+Derived types must implement the following methods:
+    - [`get_weights(qr::AbstractQuadratureRule)`](@ref)
+    - [`get_nodes(qr::AbstractQuadratureRule)`](@ref)
+    - [`Base.length(qr::AbstractQuadratureRule)`](@ref)
 """
 abstract type AbstractQuadratureRule{S, Q} end
 get_shape(::AbstractQuadratureRule{S, Q}) where {S, Q} = S
@@ -74,7 +74,7 @@ end
 """
     QuadratureRule{S,Q}
 
-Abstract type representing a quadrature rule for a shape `S`
+Type representing a quadrature rule for a shape `S`
 and quadrature `Q`
 """
 struct QuadratureRule{S, Q, N, W <: AbstractArray, X <: AbstractArray} <:
@@ -90,7 +90,7 @@ Base.length(::QuadratureRule{S, Q, N}) where {S, Q, N} = N
     QuadratureRule(shape::AbstractShape, q::AbstractQuadrature)
 
 Return the quadrature rule corresponding to the given `Shape` according to
-the selected quadrature 'q'.
+the selected quadrature `q`.
 """
 function QuadratureRule(shape::AbstractShape, q::AbstractQuadrature)
     w, x = quadrature_rule(shape, Val(get_degree(q)), get_quadtype(q))
