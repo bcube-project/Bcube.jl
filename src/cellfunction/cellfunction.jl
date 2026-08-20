@@ -50,7 +50,7 @@ end
 
 """
 When a CellFunction is directly applied on a `FacePoint`, (i.e without the use of the
-`side_n` or `side_p` operators), it means that the side of the face does matter (for
+`side_n` or `side_p` operators), it means that the side of the face does not matter (for
 instance for a PhysicalFunction).
 
 Hence we just convert the FacePoint into a CellPoint (of the negative side of the face)
@@ -83,17 +83,17 @@ of the codomain (i.e `S=length(λ(x))`) and `FS` is the type of `FunctionSpace`.
 Subtypes should implement `AbstractCellFunction`:
 * `get_function(f::AbstractShapeFunction)`
 
-and its own specitic interface: [empty]
+and its own specific interface: `get_function_space`
 """
 abstract type AbstractShapeFunction{DS, S, FS} <: AbstractCellFunction{DS, S} end
 
 get_function_space(::AbstractShapeFunction{DS, S, FS}) where {DS, S, FS} = FS()
 
 """
-    ShapeFunction{DS,S,F<:Function} <: AbstractShapeFunction{DS,S}
+    ShapeFunction{DS,S,FS,F<:Function} <: AbstractShapeFunction{DS,S,FS}
 
 Subtype of [`AbstractShapeFunction`](@ref) used to wrap a function
-defined on a domain of style` `DS` in the cell
+defined on a domain of style `DS` in the cell
 """
 struct ShapeFunction{DS, S, FS, F <: Function} <: AbstractShapeFunction{DS, S, FS}
     f::F
