@@ -93,7 +93,7 @@ Return all the shape functions of a FunctionSpace on a Shape evaluated in ξ as 
 
 ---
 
-    shape_functions_vec(fs::AbstractFunctionSpace{T,D}, n::Val{N}, shape::AbstractShape) where {T,D, N}
+    shape_functions_vec(fs::AbstractFunctionSpace, n::Val{N}, shape::AbstractShape) where {N}
 
 The shape functions are returned as a vector of functions.
 
@@ -182,7 +182,7 @@ Return the local indices of the dofs lying on each face of the `Shape`.
 
 Dofs lying on the face edges are excluded, only "face-interior" dofs are considered.
 
-The result is a Tuple of arrays of integers. Arrays maybe be empty. See `Lagrange`
+The result is a Tuple of arrays of integers. Arrays may be empty. See `Lagrange`
 interpolation for simple examples.
 """
 function idof_by_face(::AbstractFunctionSpace, ::AbstractShape)
@@ -196,7 +196,7 @@ Return the local indices of the dofs lying on each face of the `Shape`.
 
 Dofs lying on the face edges are included
 
-The result is a Tuple of arrays of integers. Arrays maybe be empty. See `Lagrange`
+The result is a Tuple of arrays of integers. Arrays may be empty. See `Lagrange`
 interpolation for simple examples.
 """
 function idof_by_face_with_bounds(::AbstractFunctionSpace, ::AbstractShape)
@@ -227,7 +227,7 @@ Return the local indices of the dofs lying on each edge of the `Shape`.
 
 Dofs lying on the edge vertices are excluded.
 
-The result is a Tuple of arrays of integers. Arrays maybe be empty.
+The result is a Tuple of arrays of integers. Arrays may be empty.
 See `Lagrange` interpolation for simple examples.
 """
 function idof_by_edge(::AbstractFunctionSpace, ::AbstractShape)
@@ -241,7 +241,7 @@ Return the local indices of the dofs lying on each edge of the `Shape`.
 
 Dofs lying on the edge vertices are included.
 
-The result is a Tuple of arrays of integers. Arrays maybe be empty.
+The result is a Tuple of arrays of integers. Arrays may be empty.
 See `Lagrange` interpolation for simple examples.
 """
 function idof_by_edge_with_bounds(::AbstractFunctionSpace, ::AbstractShape)
