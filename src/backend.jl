@@ -1,5 +1,5 @@
 """
-Abstract structure intended to wrap KernelAbstractions to avoid having it as a dependence
+Abstract structure intended to wrap KernelAbstractions to avoid having it as a dependency
 """
 abstract type AbstractBcubeBackend end
 

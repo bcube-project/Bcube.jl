@@ -167,8 +167,8 @@ Reorder `nodes` of a given `entity` from the Gmsh format to CGNS format.
 See https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering
 
 # Implementation
-By default, same numbering between CGNS and Gmsh is applied. Specialized the function
-`nodes_gmsh2cgns(e::Type{<:T}) where {T <: Bcube.AbstractEntityType}` to secify a
+By default, same numbering between CGNS and Gmsh is applied. Specialize the function
+`nodes_gmsh2cgns(e::Type{<:T}) where {T <: Bcube.AbstractEntityType}` to specify a
 different numbering
 """
 function nodes_gmsh2cgns(entity::Bcube.AbstractEntityType, nodes::AbstractArray)
@@ -214,7 +214,7 @@ end
 
 """
 Convert a cell->node connectivity with gmsh numbering convention to a cell->node connectivity
-with CGNs numbering convention.
+with CGNS numbering convention.
 """
 function _c2n_gmsh2cgns(celltypes, c2n_gmsh)
     n = Int[]

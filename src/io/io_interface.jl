@@ -16,7 +16,7 @@ Read the mesh and associated data in the given file.
 
 Returns a NamedTuple with the following keys:
 * mesh -> the Bcube mesh
-* data -> dictionnary of FlowSolutionName => (dictionnary of VariableName => MeshData)
+* data -> dictionary of FlowSolutionName => (dictionary of VariableName => MeshData)
 
 If `domains` is an empty list/array, all the domains found will be read and merged. Otherwise, `domains` can be
 a filtered list/array of the domain names to retain.
@@ -25,7 +25,7 @@ If `varnames` is set to `nothing`, no variables will be read, which is the behav
 variables, `varnames` must be set to `"*"`.
 
 The argument `topodim` can be used to force and/or select the elements of this topological dimension to be interpreted as
-"volumic". Leave it to `0` to let the reader determines the topological dimension automatically. The same goes for `spacedim`.
+"volumic". Leave it to `0` to let the reader determine the topological dimension automatically. The same goes for `spacedim`.
 
 # Example
 ```julia

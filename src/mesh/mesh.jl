@@ -37,7 +37,8 @@ Type parameters details:
 * `B::Union{Symbol,Nothing}` is a symbol (or Nothing) standing for "by"
 * `L::Union{Int,Nothing}` is nLayers type
 
-Dev notes: `from`, `to`, `by` were previously structure properties (of type Symbol) but
+# Dev notes
+`from`, `to`, `by` were previously structure properties (of type Symbol) but
 were moved to type parameter for GPU compatibility
 """
 struct MeshConnectivity{C, F, T, B, L} <: AbstractMeshConnectivity
@@ -134,9 +135,50 @@ end
 @inline get_elt_loc_to_glob(metadata::ParentMeshMetaData) = metadata.elt_l2g
 
 """
-`bc_names` : <boundary tag> => <boundary names>
-`bc_nodes` : <boundary tag> => <boundary nodes tags>
-`bc_faces` : <boundary tag> => <boundary faces tags>
+The standard implementation of `AbstractMesh` for Bcube.
+
+# High-level constructor:
+```
+Mesh(
+    nodes,
+    celltypes::E,
+    cell2nodes::C;
+    bc_names::Dict{Int, String} = Dict{Int, String}(),
+    bc_nodes::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),
+) where {E <: AbstractVector{<:AbstractEntityType}, C <: AbstractConnectivity}
+```
+
+Note that the only mandatory arguments are an array of `Node`, an array of `AbstractEntityType` giving the type of each cell,
+and the cell-to-nodes connectivity.
+
+Additionnaly, one may specify boundary conditions using `bc_names` and `bc_nodes`; those two inputs being dictionnaries where
+boundary tags are associated to names and nodes indices respectively:
+* `bc_names` : <boundary tag> => <boundary names>
+* `bc_nodes` : <boundary tag> => <boundary nodes tags>
+
+# Example
+Example to build the mesh of one quad and a triangle
+```julia-repl
+julia> nodes = [Node([1., 0.]), Node([2., 0.]), Node([3., 0.]), Node([1., 1.]), Node([2., 1.])]
+julia> celltypes = [Quad4_t(), Tri3_t()]
+julia> cell2node = Connectivity([4, 3], [1, 2, 5, 3, 2, 3, 5])
+julia> bc_names = Dict(tag => name for (tag, name) in enumerate(("South", "West")))
+julia> bc_nodes = Dict(1 => [1, 3, 3], 2 => [1, 4])
+julia> mesh = Mesh(nodes, celltypes, cell2node; bc_names, bc_nodes)
+```
+
+The constructor contains actually more arguments that the one exposed above, checkout the source files to get more information.
+
+# Inspecting the mesh
+A few methods help inspecting the mesh, the more common being:
+* `get_nodes(mesh::Mesh)`
+* `cells(mesh::Mesh)`
+* `boundary_names(mesh::Mesh)`
+* `boundary_nodes(mesh::Mesh)`
+
+# Dev notes
+For GPU compatibility, boundary tags internally correspond to the `Symbol` obtained from the original name (a `String`).
+
 """
 struct Mesh{topoDim, spaceDim, N, E, C, BCn, BCf, ANi, ACi, M, Ba} <:
        AbstractMesh{topoDim, spaceDim}

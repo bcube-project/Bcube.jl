@@ -68,7 +68,7 @@ Subtypes must implement:
 and optionally:
 - `unwrap(a::AbstractLazyWrap)`
 - `pretty_name(a::AbstractLazyWrap)`
-- `pretty_name_style(::AbstractLazyWrap) `
+- `pretty_name_style(::AbstractLazyWrap)`
 - `show_lazy_operator(a::AbstractLazyWrap; level=1, indent=4, islast=(true,))`
 """
 abstract type AbstractLazyWrap{A} <: AbstractLazy end
@@ -122,7 +122,7 @@ pretty_name(::LazyWrap) = "LazyWrap"
 Subtypes must implement:
 - `get_args(op::AbstractLazyOperator)`
 - `get_operator(op::AbstractLazyOperator)`
-- `materialize(Op::AbstractLazyOperator, x)`
+- `materialize(op::AbstractLazyOperator, x)`
 
 Subtypes can implement:
 - `show_lazy_op`

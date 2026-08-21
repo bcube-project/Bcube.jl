@@ -5,15 +5,15 @@ LazyOperators.pretty_name(a::DomainStyle) = string(typeof(a))
 """
     ReferenceDomain()
 
-Subtype of [`DomainStyle`](@ref) used to describe function that are
-defined on reference shape of the corresponding cell.
+Subtype of [`DomainStyle`](@ref) used to describe functions that are
+defined on the reference shape of the corresponding cell.
 """
 struct ReferenceDomain <: DomainStyle end
 
 """
     PhysicalDomain()
 
-Subtype of [`DomainStyle`](@ref) used to describe function that are
+Subtype of [`DomainStyle`](@ref) used to describe functions that are
 defined on the physical cell.
 """
 struct PhysicalDomain <: DomainStyle end
@@ -21,7 +21,7 @@ struct PhysicalDomain <: DomainStyle end
 """
     DomainStyle(a)
 
-Return the domain style of `a` (reference or local)
+Return the domain style of `a` (reference or physical)
 """
 function DomainStyle(a)
     error("`DomainStyle` is not defined for $(typeof(a))")
@@ -51,7 +51,7 @@ same_domain(a::DomainStyle, b::DomainStyle) = Val(false)
 """
     common_target_domain(a, b)
 
-Return a commom target `DomainStyle` for `a` and `b`.
+Return a common target `DomainStyle` for `a` and `b`.
 """
 common_target_domain(a, b) = common_target_domain(DomainStyle(a), DomainStyle(b))
 common_target_domain(a::DS, b::DS) where {DS <: DomainStyle} = DS()
@@ -90,7 +90,7 @@ end
 """
     CellPoint(x, c::CellInfo, ds::DomainStyle)
 
-Subtype of [`AbstractCellPoint`](@ref) used to defined of point in a cell.
+Subtype of [`AbstractCellPoint`](@ref) used to define a point in a cell.
 An `AbstractCellFunction` can be easily and efficiently evaluated at a `CellPoint`.
 
 `x` can be a tuple or an array of several coordinates of points.
@@ -117,7 +117,7 @@ function change_domain(p::CellPoint{PhysicalDomain}, target_domain::ReferenceDom
 end
 
 """
-Apply mapping function `f` on a coordinates of a point or on a tuple/array of
+Apply mapping function `f` on the coordinates of a point or on a tuple/array of
 several coordinates `x`.
 """
 _apply_mapping(f, x) = f(x)
@@ -130,9 +130,9 @@ _evaluate_at_cellpoint(f, x::AbstractArray{<:AbstractArray}) = map(f, x)
 _evaluate_at_cellpoint(f, x::Tuple{Vararg{AbstractArray}}) = map(f, x)
 
 """
-A `FacePoint` represent a point on a face. A face is a interface between two cells (except on the boundary).
+A `FacePoint` represents a point on a face. A face is an interface between two cells (except on the boundary).
 
-A `FacePoint` is a `CellPoint` is the sense that its coordinates can always be expressed in the reference
+A `FacePoint` is an `AbstractCellPoint` in the sense that its coordinates can always be expressed in the reference
 coordinate of one of its adjacent cells.
 """
 struct FacePoint{DS, T, F} <: AbstractCellPoint{DS}
@@ -239,9 +239,9 @@ Return a `CellPoint` (or a `FacePoint` depending on the
 type of `elementInfo`) whose coordinates are equals
 to the center of the reference shape of the element.
 
-For a `domain` argument, the point is built from its firt element.
+For a `domain` argument, the point is built from its first element.
 
-# Devs notes:
+# Dev notes:
 These utility functions can be used to easily materialize
 a `CellFunction` and get the type of the result for example.
 """
