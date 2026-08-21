@@ -96,18 +96,18 @@ function DofHandler(
             inodes_g = c2n[icell]
 
             # Cell type and shape
-            ct = celltypes[icell]
-            s = shape(ct)
+            ctype = celltypes[icell]
+            cshape = shape(ctype)
 
             # Cell edges, defined by tuples of vertex absolute indices
             # @ghislainb the second line should be improved, I just want to map the "local indices"
             # tuple of tuple ((1,2), (3,4)) into global indices array of arrays [[23,109],[948, 653]]
             # (arrays instead of tuples because your function "oriented_cell_side" need arrays)
-            _e2n = edges2nodes(ct)
+            _e2n = edges2nodes(ctype)
             e2n_g = [[inodes_g[i] for i in edge] for edge in _e2n]
 
             # Cell faces, defined by tuples of vertex absolute indices
-            _f2n = faces2nodes(ct)
+            _f2n = faces2nodes(ctype)
             f2n_g = [[inodes_g[i] for i in face] for face in _f2n]
 
             # Loop over the variables
@@ -124,7 +124,7 @@ function DofHandler(
                         offset,
                         icell,
                         inodes_g,
-                        s,
+                        cshape,
                         icomp,
                         fSpace,
                     )
@@ -139,7 +139,6 @@ function DofHandler(
                             celltypes,
                             icell,
                             e2n_g,
-                            s,
                             icomp,
                             fSpace,
                         )
@@ -154,7 +153,7 @@ function DofHandler(
                             offset,
                             icell,
                             inodes_g,
-                            s,
+                            cshape,
                             icomp,
                             fSpace,
                         )
@@ -168,7 +167,6 @@ function DofHandler(
                             celltypes,
                             icell,
                             e2n_g,
-                            s,
                             icomp,
                             fSpace,
                         )
@@ -182,7 +180,6 @@ function DofHandler(
                             celltypes,
                             icell,
                             f2n_g,
-                            s,
                             fSpace,
                             icomp,
                         )
@@ -197,7 +194,6 @@ function DofHandler(
                             celltypes,
                             icell,
                             f2n_g,
-                            s,
                             fs = fSpace,
                             icomp,
                             with_bounds = true,
@@ -314,7 +310,6 @@ Function dealing with dofs shared by different cell through an edge connection (
 - `celltypes` : mesh cell types
 - `icell` : cell index
 - `e2n_g` : edge to nodes connectivity for this cell
-- `s`: shape of `icell`-th cell
 - `icomp` : component index
 - `fs` : FunctionSpace
 
@@ -329,12 +324,14 @@ function _deal_with_dofs_on_edges!(
     celltypes,
     icell::Int,
     e2n_g,
-    s::AbstractShape,
     icomp::Int,
     fs::AbstractFunctionSpace,
 )
+    ict = celltypes[icell]
+    is = shape(ict)
+
     # Local indices of the dofs on each edges of the shape
-    idofs_array_l = idof_by_edge(fs, s)
+    idofs_array_l = idof_by_edge(fs, is)
 
     # Loop over the cell edges
     # inodes_g is a Tuple of Int (global indices of nodes defining the edge)
@@ -386,7 +383,6 @@ end
         celltypes,
         icell::Int,
         f2n_g::Vector{Vector{Int}},
-        s::AbstractShape,
         fs::AbstractFunctionSpace,
         icomp::Int,
     )
@@ -401,7 +397,6 @@ Topological identification of dofs lying on faces of cell `icell`.
 - `celltypes` : mesh cell types
 - `icell` : cell index
 - `f2n_g`` : local face index -> global nodes indices
-- `s`: shape of `icell`-th cell
 - `fs` : FunctionSpace
 - `icomp` : component index
 
@@ -416,18 +411,20 @@ function _deal_with_dofs_on_faces_topological!(
     celltypes,
     icell::Int,
     f2n_g::Vector{Vector{Int}},
-    s::AbstractShape,
     fs::AbstractFunctionSpace,
     icomp::Int,
 )
+    ict = celltypes[icell]
+    is = shape(ict)
+
     # Local indices of the dofs on each face of the shape, excluding the boundary (nodes and/or edges)
-    idofs_array_l = idof_by_face(fs, s) # This is a Tuple of Vector{Int}
+    idofs_array_l = idof_by_face(fs, is) # This is a Tuple of Vector{Int}
 
     # Loop over cell faces
     # iface_nodes_g is a Tuple of Int (global indices of nodes defining the face)
     # idofs_l is an Array of Int (local indices of dofs of ith face)
     for (iface_nodes_g, idofs_l) in zip(f2n_g, idofs_array_l)
-        ne = nedges(s)
+        ne = nedges(is)
 
         # Skip the face if no dof is lying on it
         length(idofs_l) == 0 && continue
@@ -510,7 +507,6 @@ end
         celltypes,
         icell::Int,
         f2n_g::Vector{Vector{Int}},
-        s::AbstractShape,
         fs::AbstractFunctionSpace,
         icomp::Int,
         with_bounds::Bool,
@@ -526,7 +522,6 @@ Geometrical identification of dofs lying on faces of cell `icell`.
 - `celltypes` : mesh cell types
 - `icell` : cell index
 - `f2n_g`` : local face index -> global nodes indices
-- `s`: shape of `icell`-th cell
 - `fs` : FunctionSpace
 - `icomp` : component index
 - `with_bounds` : indicates if the identification should concerns only interior dofs (`with_bounds = false`) or all face dofs
@@ -548,7 +543,6 @@ function _deal_with_dofs_on_faces_geometrical!(;
     celltypes,
     icell::Int,
     f2n_g::Vector{Vector{Int}},
-    s::AbstractShape,
     fs::AbstractFunctionSpace,
     icomp::Int,
     with_bounds::Bool,
@@ -558,15 +552,16 @@ function _deal_with_dofs_on_faces_geometrical!(;
     icell_node_idx_g = c2n[icell]
     icell_nodes = mesh_nodes[icell_node_idx_g]
     ict = celltypes[icell]
+    is = shape(ict)
 
     # Local indices of the dofs on each face of the shape, excluding the boundary (nodes and/or edges)
-    # `dofs_by_face` is a Tuple of Vector{Int}
-    dofs_by_face = with_bounds ? idof_by_face_with_bounds(fs, s) : idof_by_face(fs, s)
+    # `idofs_by_face` is a Tuple of Vector{Int}
+    idofs_by_face = with_bounds ? idof_by_face_with_bounds(fs, is) : idof_by_face(fs, is)
 
     # Loop over cell faces
     # iface_nodes_g is a Tuple of Int (global indices of nodes defining the face)
     # idofs_l is an Array of Int (local indices of dofs of ith face)
-    for (iface_nodes_g, idofs_l) in zip(f2n_g, dofs_by_face)
+    for (iface_nodes_g, idofs_l) in zip(f2n_g, idofs_by_face)
         # Skip the face if no dof is lying on it
         length(idofs_l) == 0 && continue
 
@@ -586,17 +581,20 @@ function _deal_with_dofs_on_faces_geometrical!(;
             jcell_node_idx_g = c2n[jcell]
             jcell_nodes = mesh_nodes[jcell_node_idx_g]
             jct = celltypes[jcell]
+            js = shape(jct)
 
             # Retrieve local index of the face in jcell
             jside = oriented_cell_side(jct, jcell_node_idx_g, iface_nodes_g)
             jface_l = abs(jside) # local index of the face of `jcell` corresponding to `iface`
 
             # Local indices of the dofs on jface (in cell j)
-            jdofs_l = dofs_by_face[jface_l]
+            jdofs_by_face =
+                with_bounds ? idof_by_face_with_bounds(fs, js) : idof_by_face(fs, js)
+            jdofs_l = jdofs_by_face[jface_l]
 
             # Get ref coordinates of dofs of each face
-            iface_ξ = get_coords(fs, s)[idofs_l]
-            jface_ξ = get_coords(fs, s)[jdofs_l]
+            iface_ξ = get_coords(fs, is)[idofs_l]
+            jface_ξ = get_coords(fs, js)[jdofs_l]
 
             # Map into physical space
             iface_x = [mapping(ict, icell_nodes, ξ) for ξ in iface_ξ]
