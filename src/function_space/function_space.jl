@@ -231,7 +231,7 @@ The result is a Tuple of arrays of integers. Arrays maybe be empty.
 See `Lagrange` interpolation for simple examples.
 
 # Dev notes
-On edges, dofs must always be numbered incrementally from on extremity
+On edges in 2D, dofs must always be numbered incrementally from on extremity
 of the edge to the other. In other words, the "middle dof" (if any), is
 always in the middle of the edge-dof numbering.
 """

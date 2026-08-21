@@ -181,6 +181,8 @@ Build a finite element space (scalar or vector) from a `FunctionSpace` and a `Me
 - `size::Int = 1` : the number of components of the `FESpace`
 - `isContinuous::Bool = true` : if `true`, a continuous dof numbering is created. Otherwise, dof lying
 on cell nodes or cell faces are duplicated, not shared (discontinuous dof numbering)
+- (advanced) `geom_factor = 1.` : in 3D, for function spaces with degree ≥ 3, a geometrical identification is performed
+to build the dof numbering. This `geom_factor` can help this geometrical identification
 - `kwargs` : for things such as parallel cache (internal/dev usage only)
 """
 function SingleFESpace(
@@ -189,9 +191,10 @@ function SingleFESpace(
     dirichletBndNames = String[];
     size::Int = 1,
     isContinuous::Bool = true,
+    geom_factor = 1.0,
     kwargs...,
 )
-    dhl = DofHandler(mesh, fSpace, size, isContinuous)
+    dhl = DofHandler(mesh, fSpace, size, isContinuous, geom_factor)
 
     # Convert String -> Symbols and ensure that every input boundary name is known in the mesh
     dirichletBndSymbols = Symbol.(dirichletBndNames)
