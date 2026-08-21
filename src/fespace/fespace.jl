@@ -81,7 +81,7 @@ is_continuous(feSpace::AbstractFESpace) = is_continuous(parent(feSpace))
 is_discontinuous(feSpace::AbstractFESpace) = !is_continuous(feSpace)
 
 _get_dof_handler(feSpace::AbstractFESpace) = _get_dof_handler(parent(feSpace))
-_get_dhl(feSpace::AbstractFESpace) = _get_dof_handler(feSpace)
+get_dhl(feSpace::AbstractFESpace) = _get_dof_handler(feSpace)
 
 """
 Return the boundary tags where a Dirichlet condition applies
@@ -156,7 +156,7 @@ get_dofs(feSpace::SingleFESpace, icell::Int) = get_dof(feSpace.dhl, icell)
 function get_dofs(feSpace::SingleFESpace, icell::Int, n::Val{N}) where {N}
     get_dof(feSpace.dhl, icell, n)
 end
-get_ndofs(feSpace::SingleFESpace) = get_ndofs(_get_dhl(feSpace))
+get_ndofs(feSpace::SingleFESpace) = get_ndofs(get_dhl(feSpace))
 
 get_dirichlet_boundary_tags(feSpace::SingleFESpace) = feSpace.dirichletBndTags
 
@@ -181,6 +181,8 @@ Build a finite element space (scalar or vector) from a `FunctionSpace` and a `Me
 - `size::Int = 1` : the number of components of the `FESpace`
 - `isContinuous::Bool = true` : if `true`, a continuous dof numbering is created. Otherwise, dof lying
 on cell nodes or cell faces are duplicated, not shared (discontinuous dof numbering)
+- (advanced) `geom_factor = 1.` : in 3D, for function spaces with degree ≥ 3, a geometrical identification is performed
+to build the dof numbering. This `geom_factor` can help this geometrical identification
 - `kwargs` : for things such as parallel cache (internal/dev usage only)
 """
 function SingleFESpace(
@@ -189,9 +191,10 @@ function SingleFESpace(
     dirichletBndNames = String[];
     size::Int = 1,
     isContinuous::Bool = true,
+    geom_factor = 1.0,
     kwargs...,
 )
-    dhl = DofHandler(mesh, fSpace, size, isContinuous)
+    dhl = DofHandler(mesh, fSpace, size, isContinuous, geom_factor)
 
     # Convert String -> Symbols and ensure that every input boundary name is known in the mesh
     dirichletBndSymbols = Symbol.(dirichletBndNames)
@@ -539,7 +542,7 @@ function _MultiFESpace(
 ) where {N}
     # Trick to avoid providing "mesh" as an argument: we read the number
     # of cells in an array of the DofHandler whose size is this number
-    _get_ncells_from_fespace = feSpace::TrialOrTest -> size(_get_dhl(feSpace).offset, 1) # TODO : use getters
+    _get_ncells_from_fespace = feSpace::TrialOrTest -> size(get_dhl(feSpace).offset, 1) # TODO : use getters
     ncells = _get_ncells_from_fespace(feSpaces[1])
 
     # Ensure all SingleFESpace are define on the "same mesh" (checking
@@ -608,7 +611,7 @@ end
 Build a global numbering using an Array-Of-Struct strategy
 """
 function _build_mapping_AoS(feSpaces::Tuple{Vararg{TrialOrTest}}, ncells::Int)
-    # mapping = ntuple(i -> zeros(Int, get_ndofs(_get_dhl(feSpaces[i]))), length(feSpaces))
+    # mapping = ntuple(i -> zeros(Int, get_ndofs(get_dhl(feSpaces[i]))), length(feSpaces))
     # mapping = ntuple(i -> zeros(Int, get_ndofs(feSpaces[i])), N)
     mapping = ntuple(i -> zeros(Int, get_ndofs(feSpaces[i])), length(feSpaces))
     ndofs = 0
@@ -628,7 +631,7 @@ end
 
 """ Build a global numbering using an Struct-Of-Array strategy """
 function _build_mapping_SoA(feSpaces::Tuple{Vararg{TrialOrTest}}, ncells::Int)
-    # mapping = ntuple(i -> zeros(Int, get_ndofs(_get_dhl(feSpaces[i]))), length(feSpaces))
+    # mapping = ntuple(i -> zeros(Int, get_ndofs(get_dhl(feSpaces[i]))), length(feSpaces))
     # mapping = ntuple(i -> zeros(Int, get_ndofs(feSpaces[i])), N)
     mapping = ntuple(i -> zeros(Int, get_ndofs(feSpaces[i])), length(feSpaces))
     ndofs = 0
@@ -740,113 +743,139 @@ end
 allocate_dofs(mfeSpace::MultiFESpace, T = Float64) = zeros(T, get_ndofs(mfeSpace))
 allocate_sparse_dofs(mfeSpace::MultiFESpace, T = Float64) = spzeros(T, get_ndofs(mfeSpace))
 
-# WIP
-# """
-# Check the `FESpace` `DofHandler` numbering by looking at shared dofs using geometrical criteria.
+"""
+    check_numbering(space::SingleFESpace, mesh::Mesh; rtol=1e-3, verbose=true, exit_on_error=true)
 
-# Only compatible with Lagrange and Taylor elements for now (no Hermite for instance). For a discontinuous
-# variable, simply checks that the dofs are all unique.
+Check the `FESpace` `DofHandler` numbering by looking at shared dofs using geometrical criteria.
 
-# # Example
-# ```julia
-# mesh = rectangle_mesh(4, 4)
-# fes = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh, :continuous)
-# @show Bcube.check_numbering(fes, mesh)
-# ```
-# """
-# function check_numbering(space::SingleFESpace, mesh::Mesh; rtol=1e-3, verbose=true, exit_on_error=true)
-#     # Track number of errors
-#     nerrors = 0
+Only compatible with Lagrange and Taylor elements for now (no Hermite for instance). For a discontinuous
+variable, simply checks that the dofs are all unique.
 
-#     # Cell variable infos
-#     dhl = _get_dhl(space)
-#     fs = get_function_space(space)
+# Example
+```julia
+mesh = rectangle_mesh(4, 4)
+fes = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh, :continuous)
+@show Bcube.check_numbering(fes, mesh)
+```
+"""
+function check_numbering(
+    space::SingleFESpace,
+    mesh::Mesh;
+    rtol = 1e-3,
+    verbose = true,
+    exit_on_error = true,
+)
+    # Track number of errors
+    n_errors = 0
 
-#     # For discontinuous, each dof must be unique
-#     if is_discontinuous(space)
-#         if length(unique(dhl.iglob)) != length(dhl.iglob)
-#             nerrors += 1
-#             verbose && println("ERROR : two dofs share the same identifier whereas it is a discontinuous variable")
-#             exit_on_error && error("DofHandler.check_numbering exited prematurely")
-#         end
+    # Cell variable infos
+    dhl = get_dhl(space)
+    fs = get_function_space(space)
+    ncomps = get_ncomponents(space)
 
-#         # Exit prematurely
-#         return nerrors
-#     end
+    # For discontinuous, each dof must be unique
+    if is_discontinuous(space)
+        if length(unique(dhl.iglob)) != length(dhl.iglob)
+            n_errors += 1
+            verbose && println(
+                "ERROR : two dofs share the same identifier whereas it is a discontinuous variable",
+            )
+            exit_on_error && error("DofHandler.check_numbering exited prematurely")
+        end
 
-#     # Mesh infos
-#     celltypes = cells(mesh)
-#     c2n = connectivities_indices(mesh, :c2n)
-#     c2c = connectivity_cell2cell_by_nodes(mesh)
+        # Exit prematurely
+        return n_errors
+    end
 
-#     # Loop over cell
-#     for icell in 1:ncells(mesh)
-#         # Cell infos
-#         ct_i = celltypes[icell]
-#         cnodes_i = get_nodes(mesh, c2n[icell])
-#         shape_i = shape(ct_i)
+    # Mesh infos
+    celltypes = cells(mesh)
+    c2n = connectivities_indices(mesh, :c2n)
+    c2c = connectivity_cell2cell_by_nodes(mesh)
 
-#         # Check that all the dofs in this cell are unique
-#         iglobs = get_dof(dhl, icell)
-#         if length(unique(iglobs)) != length(iglobs)
-#             nerrors += 1
-#             verbose && println("ERROR : two dofs in the same cell share the same identifier")
-#             exit_on_error && error("DofHandler.check_numbering exited prematurely")
-#         end
+    # Count all dofs, considering a discontinuous space
+    nd_tot = get_ndofs(SingleFESpace(fs, mesh; isContinuous = false))
+    dof_coords = zeros(nd_tot, spacedim(mesh))
+    dof_glob = zeros(Int, nd_tot)
+    idof = 1
 
-#         # Compute tolerance : cell diagonal divided by 100
-#         min_xyz = get_coords(cnodes_i[1])
-#         max_xyz = min_xyz
-#         for node in cnodes_i
-#             max_xyz = max.(max_xyz, get_coords(node))
-#             min_xyz = min.(min_xyz, get_coords(node))
-#         end
-#         atol = norm(max_xyz - min_xyz) * rtol
+    # Loop over cell
+    for icell in 1:ncells(mesh)
+        # Cell infos
+        ct_i = celltypes[icell]
+        cnodes_i = get_nodes(mesh, c2n[icell])
+        shape_i = shape(ct_i)
 
-#         # Coordinates of dofs in cell i for this FunctionSpace
-#         coords_i = [mapping(cnodes_i, ct_i, ξ) for ξ in get_coords(fs, shape_i)]
+        # Check that all the dofs in this cell are unique
+        iglobs = get_dof(dhl, icell)
+        if length(unique(iglobs)) != length(iglobs)
+            n_errors += 1
+            verbose &&
+                println("ERROR : two dofs in the same cell share the same identifier")
+            exit_on_error && error("DofHandler.check_numbering exited prematurely")
+        end
 
-#         # Loop over neighbor cells
-#         for jcell in c2c[icell]
-#             # Cell infos
-#             ct_j = celltypes[jcell]
-#             cnodes_j = get_nodes(mesh, c2n[jcell])
-#             shape_j = shape(ct_j)
+        # Compute tolerance : scaling with cell diagonal
+        min_xyz = get_coords(cnodes_i[1])
+        max_xyz = min_xyz
+        for node in cnodes_i
+            max_xyz = max.(max_xyz, get_coords(node))
+            min_xyz = min.(min_xyz, get_coords(node))
+        end
+        atol = norm(max_xyz - min_xyz) * rtol
 
-#             # Coordinates of dofs in cell j for this FunctionSpace
-#             coords_j = [mapping(cnodes_j, ct_j, ξ) for ξ in get_coords(fs, shape_j)]
+        # Coordinates of dofs in cell i for this FunctionSpace
+        coords_i = [mapping(ct_i, cnodes_i, ξ) for ξ in get_coords(fs, shape_i)]
 
-#             # n-to-n comparison
-#             for (idof_loc, xi) in enumerate(coords_i), (jdof_loc, xj) in enumerate(coords_j)
-#                 coincident = norm(xi - xj) < atol
+        # Append
+        for (idof_g, coord_i) in zip(iglobs, coords_i)
+            dof_coords[idof, :] .= coord_i
+            dof_glob[idof] = idof_g
+            idof+=1
+        end
 
-#                 for kcomp in 1:ncomponents(cv)
-#                     iglob = get_dof(dhl, icell, kcomp, idof_loc)
-#                     jglob = get_dof(dhl, jcell, kcomp, jdof_loc)
+        # Loop over neighbor cells
+        for jcell in c2c[icell]
+            # Cell infos
+            ct_j = celltypes[jcell]
+            cnodes_j = get_nodes(mesh, c2n[jcell])
+            shape_j = shape(ct_j)
 
-#                     msg = ""
+            # Coordinates of dofs in cell j for this FunctionSpace
+            coords_j = [mapping(ct_j, cnodes_j, ξ) for ξ in get_coords(fs, shape_j)]
 
-#                     # Coordinates are identical but dof numbers are different
-#                     if coincident && (iglob != jglob)
-#                         msg = "ERROR : two dofs share the same location but have different identifiers"
+            # n-to-n comparison
+            for (idof_loc, xi) in enumerate(coords_i), (jdof_loc, xj) in enumerate(coords_j)
+                coincident = norm(xi - xj) < atol
 
-#                         # Coordinates are different but dof numbers are the same
-#                     elseif !coincident && (iglob == jglob)
-#                         msg = "ERROR : two dofs share the same number but have different location"
-#                     end
+                for kcomp in 1:ncomps
+                    iglob = get_dof(dhl, icell, kcomp, idof_loc)
+                    jglob = get_dof(dhl, jcell, kcomp, jdof_loc)
 
-#                     # Error encountered?
-#                     if length(msg) > 0
-#                         nerrors += 1
-#                         verbose && println(msg)
-#                         verbose && println("icell=$icell, jcell=$jcell, xi=$xi, xj=$xj, iglob=$iglob, jglob=$jglob")
-#                         exit_on_error && error("DofHandler.check_numbering exited prematurely")
-#                     end
+                    msg = ""
 
-#                 end
-#             end
-#         end # loop on jcells
-#     end # loop on icells
+                    # Coordinates are identical but dof numbers are different
+                    if coincident && (iglob != jglob)
+                        msg = "ERROR : two dofs share the same location but have different identifiers"
 
-#     return nerrors
-# end
+                        # Coordinates are different but dof numbers are the same
+                    elseif !coincident && (iglob == jglob)
+                        msg = "ERROR : two dofs share the same number but have different location"
+                    end
+
+                    # Error encountered?
+                    if length(msg) > 0
+                        n_errors += 1
+                        verbose && println(msg)
+                        verbose && println(
+                            "icell=$icell, jcell=$jcell, xi=$xi, xj=$xj, iglob=$iglob, jglob=$jglob",
+                        )
+                        exit_on_error &&
+                            error("DofHandler.check_numbering exited prematurely")
+                    end
+                end
+            end
+        end # loop on jcells
+    end # loop on icells
+
+    return (; n_errors, dof_coords, dof_glob)
+end

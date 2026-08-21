@@ -1,6 +1,18 @@
 """
 The `DofHandler` handles the degree of freedom numbering. To each degree of freedom
 is associated a unique integer.
+
+# Constructor
+`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool)`
+
+# Notes
+For continuous FESpaces, the `DofHandler` handles the numbering of common dofs between several
+cells (dofs on vertices, on edges, on faces...). In 1D and 2D, this research is performed topologically.
+In 3D, a geometrical research is performed for function spaces with degree greater than 2.
+
+!!! tip
+    See [check_numbering](@ref) to perform a check that all dofs shared by several entities have an unique
+    identifier.
 """
 struct DofHandler{A, B}
     # N : number of components
@@ -29,16 +41,13 @@ struct DofHandler{A, B}
     ndofs_tot::Int
 end
 
-"""
-DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool)
-
-Constructor of a DofHandler for a `SingleFESpace` on a `Mesh`.
-"""
+# TODO: split into sub-functions
 function DofHandler(
     mesh::Mesh,
     fSpace::AbstractFunctionSpace,
     ncomponents::Int,
     isContinuous::Bool,
+    geom_factor = 1.0,
 )
     # Get cell types
     celltypes = cells(mesh)
@@ -87,18 +96,18 @@ function DofHandler(
             inodes_g = c2n[icell]
 
             # Cell type and shape
-            ct = celltypes[icell]
-            s = shape(ct)
+            ctype = celltypes[icell]
+            cshape = shape(ctype)
 
             # Cell edges, defined by tuples of vertex absolute indices
             # @ghislainb the second line should be improved, I just want to map the "local indices"
             # tuple of tuple ((1,2), (3,4)) into global indices array of arrays [[23,109],[948, 653]]
             # (arrays instead of tuples because your function "oriented_cell_side" need arrays)
-            _e2n = edges2nodes(ct)
+            _e2n = edges2nodes(ctype)
             e2n_g = [[inodes_g[i] for i in edge] for edge in _e2n]
 
             # Cell faces, defined by tuples of vertex absolute indices
-            _f2n = faces2nodes(ct)
+            _f2n = faces2nodes(ctype)
             f2n_g = [[inodes_g[i] for i in face] for face in _f2n]
 
             # Loop over the variables
@@ -106,48 +115,95 @@ function DofHandler(
                 # Remark : we need to distinguish vertices, edges, faces because two cells
                 # can share dofs with an edge without having a face in common.
 
-                #--- Deal with dofs on vertices
-                _deal_with_dofs_on_vertices!(
-                    dict_n,
-                    iglob,
-                    offset,
-                    icell,
-                    inodes_g,
-                    s,
-                    icomp,
-                    fSpace,
-                )
+                if topodim(mesh) ≤ 2
 
-                #--- Deal with dofs on edges
-                (topodim(mesh) > 1) && _deal_with_dofs_on_edges!(
-                    dict_e,
-                    iglob,
-                    offset,
-                    c2n,
-                    celltypes,
-                    icell,
-                    e2n_g,
-                    s,
-                    icomp,
-                    fSpace,
-                )
+                    #--- Deal with dofs on vertices
+                    _deal_with_dofs_on_vertices!(
+                        dict_n,
+                        iglob,
+                        offset,
+                        icell,
+                        inodes_g,
+                        cshape,
+                        icomp,
+                        fSpace,
+                    )
 
-                #--- Deal with dofs on faces
-                (topodim(mesh) > 2) && _deal_with_dofs_on_faces!(
-                    dict_f,
-                    iglob,
-                    offset,
-                    c2n,
-                    celltypes,
-                    icell,
-                    f2n_g,
-                    s,
-                    fSpace,
-                    icomp,
-                )
-            end
-        end
-    end
+                    #--- Deal with dofs on edges
+                    if topodim(mesh) > 1
+                        _deal_with_dofs_on_edges!(
+                            dict_e,
+                            iglob,
+                            offset,
+                            c2n,
+                            celltypes,
+                            icell,
+                            e2n_g,
+                            icomp,
+                            fSpace,
+                        )
+                    end
+                else # topodim ≥ 3
+                    # If degree ≤ 2, we perform everything topologically
+                    if get_degree(fSpace) ≤ 2
+                        #--- Deal with dofs on vertices
+                        _deal_with_dofs_on_vertices!(
+                            dict_n,
+                            iglob,
+                            offset,
+                            icell,
+                            inodes_g,
+                            cshape,
+                            icomp,
+                            fSpace,
+                        )
+
+                        #--- Deal with dofs on edges
+                        _deal_with_dofs_on_edges!(
+                            dict_e,
+                            iglob,
+                            offset,
+                            c2n,
+                            celltypes,
+                            icell,
+                            e2n_g,
+                            icomp,
+                            fSpace,
+                        )
+
+                        #--- Deal with dofs on faces
+                        _deal_with_dofs_on_faces_topological!(
+                            dict_f,
+                            iglob,
+                            offset,
+                            c2n,
+                            celltypes,
+                            icell,
+                            f2n_g,
+                            fSpace,
+                            icomp,
+                        )
+                    else
+                        # If degree ≥ 3, we perform everything geometrically
+                        _deal_with_dofs_on_faces_geometrical!(;
+                            dict = dict_f,
+                            iglob,
+                            offset,
+                            mesh_nodes = get_nodes(mesh),
+                            c2n,
+                            celltypes,
+                            icell,
+                            f2n_g,
+                            fs = fSpace,
+                            icomp,
+                            with_bounds = true,
+                            geom_factor,
+                        )
+                    end # if/else degree
+                end # if/else topodim
+            end # loop on icomp
+        end # loop on cells
+    end # if isContinuous
 
     # Create a cell number remapping to ensure a dense numbering
     densify!(iglob)
@@ -161,21 +217,32 @@ end
 @inline get_iglob(dhl::DofHandler) = dhl.iglob
 
 """
-    deal_with_dofs_on_vertices!(dict, iglob, offset, icell::Int, inodes_g, s::AbstractShape, kvar::Int, fs)
+    _deal_with_dofs_on_vertices!(
+        dict::Dict{Tuple{Int, Int}, Tuple{Int, Vector{Int}}},
+        iglob,
+        offset,
+        icell::Int,
+        inodes_g,
+        s::AbstractShape,
+        icomp::Int,
+        fs::AbstractFunctionSpace,
+    )
 
 Function dealing with dofs shared by different cell through a vertex connection.
 
-TODO : remove kvar
 
 # Arguments
 - `dict` may be modified by this routine
 - `iglob` may be modified by this routine
 - `offset` may be modified by this routine
-- `fs` : FunctionSpace of var `kvar`
 - `icell` : cell index
-- `kvar` : var index
-- `s` : shape of `icell`-th cell
 - `inodes_g` : global indices of nodes of `icell`
+- `s` : shape of `icell`-th cell
+- `icomp` : component
+- `fs` : FunctionSpace
+
+# Dev notes
+remove kvar
 """
 function _deal_with_dofs_on_vertices!(
     dict::Dict{Tuple{Int, Int}, Tuple{Int, Vector{Int}}},
@@ -184,7 +251,7 @@ function _deal_with_dofs_on_vertices!(
     icell::Int,
     inodes_g,
     s::AbstractShape,
-    kvar::Int,
+    icomp::Int,
     fs::AbstractFunctionSpace,
 )
     # Local indices of the dofs on each vertex of the shape
@@ -198,7 +265,7 @@ function _deal_with_dofs_on_vertices!(
         # Skip the vertex if no dof is lying on it
         length(idofs_l) == 0 && continue
 
-        key = (kvar, inode_g)
+        key = (icomp, inode_g)
 
         # If the dict already contains the vertex :
         # - we get the neighbour cell index
@@ -207,34 +274,47 @@ function _deal_with_dofs_on_vertices!(
         if haskey(dict, key)
             jcell, jdofs_g = dict[key]
             for d in eachindex(jdofs_g)
-                iglob[offset[icell, kvar] + idofs_l[d]] = jdofs_g[d]
+                iglob[offset[icell, icomp] + idofs_l[d]] = jdofs_g[d]
             end
 
+        else
             # If the dict doesn't contain this vertex, we add the global indices
             # of `icell`
-        else
-            idofs_g = iglob[offset[icell, kvar] .+ idofs_l]
+            idofs_g = iglob[offset[icell, icomp] .+ idofs_l]
             dict[key] = (icell, idofs_g)
         end
     end
 end
 
 """
-    deal_with_dofs_on_edges!(dict, iglob, offset, c2n, celltypes, icell::Int, inodes_g, e2n_g, s::AbstractShape, kvar::Int, fs)
+    _deal_with_dofs_on_edges!(
+        dict::Dict{Tuple{Int, Set{Int}}, Tuple{Int, Vector{Int}}},
+        iglob,
+        offset,
+        c2n,
+        celltypes,
+        icell::Int,
+        e2n_g,
+        s::AbstractShape,
+        icomp::Int,
+        fs::AbstractFunctionSpace,
+    )
 
 Function dealing with dofs shared by different cell through an edge connection (excluding bord vertices).
-
-TODO : remove kvar
 
 # Arguments
 - `dict` may be modified by this routine
 - `iglob` may be modified by this routine
 - `offset` may be modified by this routine
-- `fs` : FunctionSpace of var `kvar`
+- `c2n` : global indices of nodes of `icell`
+- `celltypes` : mesh cell types
 - `icell` : cell index
-- `kvar` : var index
-- `s` : shape of `icell`-th cell
-- `inodes_g` : global indices of nodes of `icell`
+- `e2n_g` : edge to nodes connectivity for this cell
+- `icomp` : component index
+- `fs` : FunctionSpace
+
+# Dev notes
+remove icomp
 """
 function _deal_with_dofs_on_edges!(
     dict::Dict{Tuple{Int, Set{Int}}, Tuple{Int, Vector{Int}}},
@@ -244,12 +324,14 @@ function _deal_with_dofs_on_edges!(
     celltypes,
     icell::Int,
     e2n_g,
-    s::AbstractShape,
-    kvar::Int,
+    icomp::Int,
     fs::AbstractFunctionSpace,
 )
+    ict = celltypes[icell]
+    is = shape(ict)
+
     # Local indices of the dofs on each edges of the shape
-    idofs_array_l = idof_by_edge(fs, s)
+    idofs_array_l = idof_by_edge(fs, is)
 
     # Loop over the cell edges
     # inodes_g is a Tuple of Int (global indices of nodes defining the edge)
@@ -259,7 +341,7 @@ function _deal_with_dofs_on_edges!(
         # Skip the face if no dof is lying on it
         length(idofs_l) == 0 && continue
 
-        key = (kvar, Set(inodes_g))
+        key = (icomp, Set(inodes_g))
 
         # If the dict already contains the edge :
         # - we get the neighbour cell index
@@ -273,29 +355,55 @@ function _deal_with_dofs_on_edges!(
             jside = oriented_cell_side(celltypes[jcell], c2n[jcell], inodes_g)
 
             # Reverse dofs array if jside is negative
+            # Rq: on edges in 2D, the dofs are always numbered incrementally from on extremity
+            # of the edge to the other. In other words, the "middle dof" (if any), is
+            # always in the middle of the edge-dof numbering.
             jdofs_reordered_g = (jside > 0) ? jdofs_g : reverse(jdofs_g)
 
             # Copy global indices
             for d in 1:length(jdofs_g)
-                iglob[offset[icell, kvar] + idofs_l[d]] = jdofs_reordered_g[d]
+                iglob[offset[icell, icomp] + idofs_l[d]] = jdofs_reordered_g[d]
             end
 
+        else
             # If the dict doesn't contain this edge, we add the global indices
             # of `icell`
-        else
-            idofs_g = iglob[offset[icell, kvar] .+ idofs_l]
+            idofs_g = iglob[offset[icell, icomp] .+ idofs_l]
             dict[key] = (icell, idofs_g)
         end
     end
 end
 
 """
-TODO : remove kvar
+    _deal_with_dofs_on_faces_topological!(
+        dict,
+        iglob,
+        offset,
+        c2n,
+        celltypes,
+        icell::Int,
+        f2n_g::Vector{Vector{Int}},
+        fs::AbstractFunctionSpace,
+        icomp::Int,
+    )
+
+Topological identification of dofs lying on faces of cell `icell`.
 
 # Arguments
-- f2n_g : local face index -> global nodes indices
+- `dict` may be modified by this routine
+- `iglob` may be modified by this routine
+- `offset` may be modified by this routine
+- `c2n` : global indices of nodes of `icell`
+- `celltypes` : mesh cell types
+- `icell` : cell index
+- `f2n_g`` : local face index -> global nodes indices
+- `fs` : FunctionSpace
+- `icomp` : component index
+
+# Dev notes
+remove icomp
 """
-function _deal_with_dofs_on_faces!(
+function _deal_with_dofs_on_faces_topological!(
     dict,
     iglob,
     offset,
@@ -303,24 +411,26 @@ function _deal_with_dofs_on_faces!(
     celltypes,
     icell::Int,
     f2n_g::Vector{Vector{Int}},
-    s::AbstractShape,
     fs::AbstractFunctionSpace,
-    kvar::Int,
+    icomp::Int,
 )
+    ict = celltypes[icell]
+    is = shape(ict)
+
     # Local indices of the dofs on each face of the shape, excluding the boundary (nodes and/or edges)
-    idofs_array_l = idof_by_face(fs, s) # This is a Tuple of Vector{Int}
+    idofs_array_l = idof_by_face(fs, is) # This is a Tuple of Vector{Int}
 
     # Loop over cell faces
     # iface_nodes_g is a Tuple of Int (global indices of nodes defining the face)
     # idofs_l is an Array of Int (local indices of dofs of ith face)
     for (iface_nodes_g, idofs_l) in zip(f2n_g, idofs_array_l)
-        ne = nedges(s)
+        ne = nedges(is)
 
         # Skip the face if no dof is lying on it
         length(idofs_l) == 0 && continue
 
         # Create a Set from the global indices of the face nodes to "tag" the face.
-        key = (kvar, Set(iface_nodes_g))
+        key = (icomp, Set(iface_nodes_g))
 
         # If the dict already contains the face :
         # - we get the neighbour cell index
@@ -375,13 +485,156 @@ function _deal_with_dofs_on_faces!(
 
             # Copy global indices
             for d in eachindex(jdofs_reordered_g)
-                iglob[offset[icell, kvar] + idofs_l[d]] = jdofs_reordered_g[d]
+                iglob[offset[icell, icomp] + idofs_l[d]] = jdofs_reordered_g[d]
             end
 
+        else
             # If the dict doesn't contain this face, we add the global indices
             # of `icell`
+            idofs_g = iglob[offset[icell, icomp] .+ idofs_l]
+            dict[key] = (icell, idofs_g)
+        end
+    end
+end
+
+"""
+    _deal_with_dofs_on_faces_geometrical!(;
+        dict,
+        iglob,
+        offset,
+        mesh_nodes,
+        c2n,
+        celltypes,
+        icell::Int,
+        f2n_g::Vector{Vector{Int}},
+        fs::AbstractFunctionSpace,
+        icomp::Int,
+        with_bounds::Bool,
+    )
+
+Geometrical identification of dofs lying on faces of cell `icell`.
+
+# Arguments
+- `dict` may be modified by this routine
+- `iglob` may be modified by this routine
+- `offset` may be modified by this routine
+- `c2n` : global indices of nodes of `icell`
+- `celltypes` : mesh cell types
+- `icell` : cell index
+- `f2n_g`` : local face index -> global nodes indices
+- `fs` : FunctionSpace
+- `icomp` : component index
+- `with_bounds` : indicates if the identification should concerns only interior dofs (`with_bounds = false`) or all face dofs
+- `geom_factor` : a scaling factor to check that dofs distance is below the given tolerance
+
+# Dev notes
+* in the following, we loop over faces of cell `i`, so everything related to this
+face is named with `i`: `iface`, `idofs_l` etc. This face may be in connection to a cell `j`.
+So everything related to `j` designates this neighbor cell or the face (same as before) but
+seen from cell `j`.
+* remove icomp
+"""
+function _deal_with_dofs_on_faces_geometrical!(;
+    dict,
+    iglob,
+    offset,
+    mesh_nodes,
+    c2n,
+    celltypes,
+    icell::Int,
+    f2n_g::Vector{Vector{Int}},
+    fs::AbstractFunctionSpace,
+    icomp::Int,
+    with_bounds::Bool,
+    geom_factor,
+)
+    # Alias
+    icell_node_idx_g = c2n[icell]
+    icell_nodes = mesh_nodes[icell_node_idx_g]
+    ict = celltypes[icell]
+    is = shape(ict)
+
+    # Local indices of the dofs on each face of the shape, excluding the boundary (nodes and/or edges)
+    # `idofs_by_face` is a Tuple of Vector{Int}
+    idofs_by_face = with_bounds ? idof_by_face_with_bounds(fs, is) : idof_by_face(fs, is)
+
+    # Loop over cell faces
+    # iface_nodes_g is a Tuple of Int (global indices of nodes defining the face)
+    # idofs_l is an Array of Int (local indices of dofs of ith face)
+    for (iface_nodes_g, idofs_l) in zip(f2n_g, idofs_by_face)
+        # Skip the face if no dof is lying on it
+        length(idofs_l) == 0 && continue
+
+        # Create a Set from the global indices of the face nodes to "tag" the face.
+        key = (icomp, Set(iface_nodes_g))
+
+        # If the dict already contains the face :
+        # - we get the neighbour cell index
+        # - we find the local index of the shared face in jcell
+        # - we find the permutation between the two faces
+        # - we copy all the global indices of dofs of `jcell` in the corresponding
+        #   global indices of `icell` dofs
+        if haskey(dict, key)
+            jcell, jdofs_g = dict[key]
+
+            # Cell nodes and type
+            jcell_node_idx_g = c2n[jcell]
+            jcell_nodes = mesh_nodes[jcell_node_idx_g]
+            jct = celltypes[jcell]
+            js = shape(jct)
+
+            # Retrieve local index of the face in jcell
+            jside = oriented_cell_side(jct, jcell_node_idx_g, iface_nodes_g)
+            jface_l = abs(jside) # local index of the face of `jcell` corresponding to `iface`
+
+            # Local indices of the dofs on jface (in cell j)
+            jdofs_by_face =
+                with_bounds ? idof_by_face_with_bounds(fs, js) : idof_by_face(fs, js)
+            jdofs_l = jdofs_by_face[jface_l]
+
+            # Get ref coordinates of dofs of each face
+            iface_ξ = get_coords(fs, is)[idofs_l]
+            jface_ξ = get_coords(fs, js)[jdofs_l]
+
+            # Map into physical space
+            iface_x = [mapping(ict, icell_nodes, ξ) for ξ in iface_ξ]
+            jface_x = [mapping(jct, jcell_nodes, ξ) for ξ in jface_ξ]
+
+            # Compute point wise "distances"
+            # TODO: there might be a way to build and SMatrix because the number of dofs
+            # is statically known from the function space and the shape
+            D = zeros(length(iface_x), length(jface_x))
+            for i in eachindex(iface_x)
+                for j in eachindex(jface_x)
+                    d = iface_x[i] - jface_x[j]
+                    D[i, j] = d ⋅ d
+                end
+            end
+
+            # Check the distances
+            # xc = center(jcell_nodes_g)
+            # cell_radius = minimum(x -> norm(x - xc), )
+            extremas = [extrema(@view D[i, :]) for i in axes(D, 1)]
+            max_dist = maximum(last.(extremas))
+            @assert all(first.(extremas) .< max(geom_factor*1e-20*max_dist, 10*eps(0.0)))
+            # @show first.(extremas)
+
+            # Identify the pairs. The array `iface_dof_l_to_jface_dof_l` indicates that for
+            # the `ith` dof of the face (ie idofs_l[i] of the cell), the corresponding dof
+            # of face `j` is `iface_dof_l_to_jface_dof_l[i]`.
+            iface_dof_l_to_jface_dof_l = [argmin(@view D[i, :]) for i in axes(D, 1)]
+
+            # Copy global indices
+            for (iface_dof_l, jface_dof_l) in enumerate(iface_dof_l_to_jface_dof_l)
+                idof_l = idofs_l[iface_dof_l]
+                jdof_g = jdofs_g[jface_dof_l]
+                iglob[offset[icell, icomp] + idof_l] = jdof_g
+            end
+
         else
-            idofs_g = iglob[offset[icell, kvar] .+ idofs_l]
+            # If the dict doesn't contain this face, we add the global indices
+            # of `icell`
+            idofs_g = iglob[offset[icell, icomp] .+ idofs_l]
             dict[key] = (icell, idofs_g)
         end
     end
@@ -396,32 +649,28 @@ Count maximum number of dofs per cell, all components mixed
 max_ndofs(dhl::DofHandler) = maximum(dhl.ndofs)
 
 """
-    get_ndofs(dhl, icell, kvar::Int)
+    get_ndofs(dhl::DofHandler)
+    get_ndofs(dhl::DofHandler, icell)
+    get_ndofs(dhl::DofHandler, icell, icomp::Int)
+    get_ndofs(dhl::DofHandler, icell, icomp::Vector{Int})
 
-Number of dofs for a given variable in a given cell.
 
-# Example
-```julia
-mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show get_ndofs(dhl, 1, 1)
-```
-"""
-@inline get_ndofs(dhl::DofHandler, icell, kvar::Int) = dhl.ndofs[icell, kvar]
+Number of dofs in a given cell (with `icell` or for the whole space).
 
-"""
-    get_ndofs(dhl, icell, icomp::Vector{Int})
-
-Number of dofs for a given set of components in a given cell.
-
+If only `icell` is provided, the total (accross all components) number of
+dofs is returned.
 
 # Example
 ```julia
 mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1); size = 2))
-@show get_ndofs(dhl, 1, [1, 2])
+U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+dhl = Bcube.get_dhl(U)
+@show Bcube.get_ndofs(dhl, 1, 1)
+@show Bcube.get_ndofs(dhl, 1, [1, 2])
 ```
 """
+@inline get_ndofs(dhl::DofHandler, icell, icomp::Int) = dhl.ndofs[icell, icomp]
+
 @inline function get_ndofs(dhl::DofHandler, icell, icomp::AbstractVector{Int})
     sum(dhl.ndofs[icell, icomp])
 end
@@ -429,45 +678,24 @@ end
     sum(view(dhl.ndofs, icell:icell, icomp))
 end
 
-"""
-    get_ndofs(dhl::DofHandler, icell)
-
-Number of dofs for a given cell.
-
-Note that for a vector variable, the total (accross all components) number of dofs is returned.
-
-# Example
-```julia
-mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show get_ndofs(dhl, 1, :u)
-```
-"""
 get_ndofs(dhl::DofHandler, icell) = sum(view(dhl.ndofs, icell, :))
 
-"""
-    get_ndofs(dhl::DofHandler)
-
-Total number of dofs. This function takes into account that dofs can be shared by multiple cells.
-
-# Example
-```julia
-mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show get_ndofs(dhl::DofHandler)
-```
-"""
 get_ndofs(dhl::DofHandler) = dhl.ndofs_tot
 
 """
+    get_dof(dhl::DofHandler, icell)
+    get_dof(dhl::DofHandler, icell, icomp::Int)
     get_dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
 
-Global index of the `idof` local degree of freedom of component `icomp` in cell `icell`.
+Global indices (of index) of the dofs in a given cell `icell`. The dofs relative
+to a specific component can be obtained by precising `icomp`; and a specific dof number
+can be obtained by futher precising the local dof `idof`.
 
 # Example
 ```julia
 mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
+U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+dhl = Bcube.get_dhl(U)
 @show get_dof(dhl, 1, 1, 1)
 ```
 """
@@ -475,18 +703,6 @@ function get_dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
     dhl.iglob[dhl.offset[icell, icomp] + idof]
 end
 
-"""
-    get_dof(dhl::DofHandler, icell, icomp::Int)
-
-Global indices of all the dofs of a given component in a given cell
-
-# Example
-```julia
-mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show get_dof(dhl, 1, 1)
-```
-"""
 function get_dof(dhl::DofHandler, icell, icomp::Int)
     view(dhl.iglob, dhl.offset[icell, icomp] .+ (1:get_ndofs(dhl, icell, icomp)))
 end
@@ -509,6 +725,33 @@ function get_dof(dhl::DofHandler, icell, icomp::Int, ::Val{N}) where {N}
 end
 
 """
+    get_ncomponents(dhl::DofHandler)
+
 Number of components handled by a DofHandler
 """
 get_ncomponents(dhl::DofHandler) = size(dhl.offset, 2)
+
+function apply_periodicity!(
+    dhl::DofHandler,
+    mesh::Mesh,
+    fSpace::AbstractFunctionSpace,
+    isContinuous::Bool,
+    periodicities,
+)
+    # Only continues spaces should be modified
+    isContinuous || return
+
+    for perio_domain in periodicities
+        perio_cache = get_cache(perio_domain)
+
+        foreach_element(perio_domain) do face, iface_l, _
+            f2n = get_nodes_index(face)
+            cell_n = get_cellinfo_n(face)
+            cell_p = get_cellinfo_p(face)
+            side_n = get_cell_side_n(face)
+            side_p = get_cell_side_p(face)
+
+            error("not implemented yet")
+        end
+    end
+end

@@ -17,7 +17,7 @@
             U = MultiFESpace(U_sca, U_sca)
 
             m = get_mapping(U, 2)
-            dhl = Bcube._get_dhl(get_fespace(U)[2])
+            dhl = Bcube.get_dhl(get_fespace(U)[2])
             @test m[get_dofs(U_sca, 1)] == collect(5:8)
             @test m[get_dof(dhl, 1, 1, 3)] == 7
             @test get_ndofs(dhl, 1) == 4
@@ -30,8 +30,8 @@
             m1 = get_mapping(U, 1)
             m2 = get_mapping(U, 2)
 
-            dhl1 = Bcube._get_dhl(get_fespace(U)[1])
-            dhl2 = Bcube._get_dhl(get_fespace(U)[2])
+            dhl1 = Bcube.get_dhl(get_fespace(U)[1])
+            dhl2 = Bcube.get_dhl(get_fespace(U)[2])
 
             @test m1[get_dofs(U1, 1)] == collect(1:9)
             @test m2[get_dofs(U2, 1)] == collect(10:13)
@@ -94,8 +94,8 @@
             m1 = get_mapping(U, 1)
             m2 = get_mapping(U, 2)
 
-            dhl1 = Bcube._get_dhl(get_fespace(U)[1])
-            dhl2 = Bcube._get_dhl(get_fespace(U)[2])
+            dhl1 = Bcube.get_dhl(get_fespace(U)[1])
+            dhl2 = Bcube.get_dhl(get_fespace(U)[2])
 
             @test m1[get_dofs(U1, 1)] == collect(1:9)
             @test m2[get_dofs(U2, 1)] == collect(10:13)
@@ -131,8 +131,8 @@
             m1 = get_mapping(U, 1)
             m2 = get_mapping(U, 2)
 
-            dhl1 = Bcube._get_dhl(get_fespace(U)[1])
-            dhl2 = Bcube._get_dhl(get_fespace(U)[2])
+            dhl1 = Bcube.get_dhl(get_fespace(U)[1])
+            dhl2 = Bcube.get_dhl(get_fespace(U)[2])
 
             @test m1[get_dofs(U1, 1)] == collect(1:9)
             @test m2[get_dofs(U2, 1)] == collect(10:13)
@@ -244,7 +244,7 @@
             U = MultiFESpace(U_sca, U_sca)
 
             m = get_mapping(U, 2)
-            dhl = Bcube._get_dhl(get_fespace(U)[2])
+            dhl = Bcube.get_dhl(get_fespace(U)[2])
 
             @test m[get_dofs(U_sca, 1)] == collect(9:16)
             @test m[get_dof(dhl, 1, 1, 3)] == 11
