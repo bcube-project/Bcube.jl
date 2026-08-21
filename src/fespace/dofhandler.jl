@@ -592,40 +592,20 @@ function _deal_with_dofs_on_faces_geometrical!(;
                 with_bounds ? idof_by_face_with_bounds(fs, js) : idof_by_face(fs, js)
             jdofs_l = jdofs_by_face[jface_l]
 
-            # Get ref coordinates of dofs of each face
-            iface_ξ = get_coords(fs, is)[idofs_l]
-            jface_ξ = get_coords(fs, js)[jdofs_l]
-
-            # Map into physical space
-            iface_x = [mapping(ict, icell_nodes, ξ) for ξ in iface_ξ]
-            jface_x = [mapping(jct, jcell_nodes, ξ) for ξ in jface_ξ]
-
-            # Compute point wise "distances"
-            # TODO: there might be a way to build and SMatrix because the number of dofs
-            # is statically known from the function space and the shape
-            D = zeros(length(iface_x), length(jface_x))
-            for i in eachindex(iface_x)
-                for j in eachindex(jface_x)
-                    d = iface_x[i] - jface_x[j]
-                    D[i, j] = d ⋅ d
-                end
-            end
-
-            # Check the distances
-            # xc = center(jcell_nodes_g)
-            # cell_radius = minimum(x -> norm(x - xc), )
-            extremas = [extrema(@view D[i, :]) for i in axes(D, 1)]
-            max_dist = maximum(last.(extremas))
-            @assert all(first.(extremas) .< max(geom_factor*1e-20*max_dist, 10*eps(0.0)))
-            # @show first.(extremas)
-
-            # Identify the pairs. The array `iface_dof_l_to_jface_dof_l` indicates that for
-            # the `ith` dof of the face (ie idofs_l[i] of the cell), the corresponding dof
-            # of face `j` is `iface_dof_l_to_jface_dof_l[i]`.
-            iface_dof_l_to_jface_dof_l = [argmin(@view D[i, :]) for i in axes(D, 1)]
+            # Identify the pairs. See `identify_face_dofs_from_coords` for the meaning of `i2j`
+            i2j = identify_face_dofs_from_coords(
+                fs,
+                ict,
+                icell_nodes,
+                idofs_l,
+                jct,
+                jcell_nodes,
+                jdofs_l,
+                geom_factor,
+            )
 
             # Copy global indices
-            for (iface_dof_l, jface_dof_l) in enumerate(iface_dof_l_to_jface_dof_l)
+            for (iface_dof_l, jface_dof_l) in enumerate(i2j)
                 idof_l = idofs_l[iface_dof_l]
                 jdof_g = jdofs_g[jface_dof_l]
                 iglob[offset[icell, icomp] + idof_l] = jdof_g
@@ -638,6 +618,73 @@ function _deal_with_dofs_on_faces_geometrical!(;
             dict[key] = (icell, idofs_g)
         end
     end
+end
+
+"""
+    identify_face_dofs_from_coords(fs, ctype_i, cnodes_i, face_dofs_i, ctype_j, cnodes_j, face_dofs_j, geom_factor = 1.)
+
+Identify the correspondence between degrees of freedom (dofs) located on a face
+shared by two neighboring elements by comparing their physical coordinates.
+
+# Arguments
+- `fs::AbstractFunctionSpace`: function space (used to obtain `get_coords`).
+- `ctype_i`, `ctype_j`: element types for elements `i` and `j`.
+- `cnodes_i`, `cnodes_j`: arrays of physical node coordinates for elements `i` and `j`.
+- `face_dofs_i`, `face_dofs_j`: local indices of the face dofs in each element.
+- `geom_factor` is a scaling coefficient to check the maximum admissible distance between two identified dof (leave 1 by default)
+
+# Returns
+- `Vector{Int}`: the output vector `i2j` indicates that for
+the `ith` dof of the face (ie `face_dofs_i[i]` of  cell i), the corresponding dof
+of face `j` is `i2j[i]` (ie `face_dofs_j[i2j]` of cell j).
+"""
+
+function identify_face_dofs_from_coords(
+    fs::AbstractFunctionSpace,
+    ctype_i,
+    cnodes_i,
+    face_dofs_i,
+    ctype_j,
+    cnodes_j,
+    face_dofs_j,
+    geom_factor = 1.0,
+)
+    shape_i = shape(ctype_i)
+    shape_j = shape(ctype_j)
+
+    # Get ref coordinates of dofs of each face
+    iface_ξ = get_coords(fs, shape_i)[face_dofs_i]
+    jface_ξ = get_coords(fs, shape_j)[face_dofs_j]
+
+    # Map into physical space
+    iface_x = [mapping(ctype_i, cnodes_i, ξ) for ξ in iface_ξ]
+    jface_x = [mapping(ctype_j, cnodes_j, ξ) for ξ in jface_ξ]
+
+    # Compute point wise "distances"
+    # TODO: there might be a way to build and SMatrix because the number of dofs
+    # is statically known from the function space and the shape
+    D = zeros(length(iface_x), length(jface_x))
+    for i in eachindex(iface_x)
+        for j in eachindex(jface_x)
+            d = iface_x[i] - jface_x[j]
+            D[i, j] = d ⋅ d
+        end
+    end
+
+    # Check the distances
+    # xc = center(jcell_nodes_g)
+    # cell_radius = minimum(x -> norm(x - xc), )
+    extremas = [extrema(@view D[i, :]) for i in axes(D, 1)]
+    max_dist = maximum(last.(extremas))
+    @assert all(first.(extremas) .< max(geom_factor*1e-20*max_dist, 10*eps(0.0)))
+    # @show first.(extremas)
+
+    # Identify the pairs. The array `i2j` indicates that for
+    # the `ith` dof of the face (ie `face_dofs_i[i]` of  cell i), the corresponding dof
+    # of face `j` is `i2j[i]` (ie `face_dofs_j[i2j]` of cell j).
+    i2j = [argmin(@view D[i, :]) for i in axes(D, 1)]
+
+    return i2j
 end
 
 """
@@ -737,6 +784,7 @@ function apply_periodicity!(
     fSpace::AbstractFunctionSpace,
     isContinuous::Bool,
     periodicities,
+    geom_factor = 1.0,
 )
     # Only continues spaces should be modified
     isContinuous || return
@@ -745,11 +793,40 @@ function apply_periodicity!(
         perio_cache = get_cache(perio_domain)
 
         foreach_element(perio_domain) do face, iface_l, _
+            # Unpack cells infos
             f2n = get_nodes_index(face)
             cell_n = get_cellinfo_n(face)
             cell_p = get_cellinfo_p(face)
-            side_n = get_cell_side_n(face)
-            side_p = get_cell_side_p(face)
+            cnodes_n = nodes(cell_n)
+            cnodes_p = nodes(cell_p)
+            ctype_n = get_element_type(cell_n)
+            ctype_p = get_element_type(cell_p)
+            cshape_n = shape(cell_n)
+            cshape_p = shape(cell_p)
+
+            # Unpack face infos
+            side_n = abs(get_cell_side_n(face))
+            side_p = abs(get_cell_side_p(face))
+
+            # Identify dofs lying on this face on both sides
+            face_dofs_n = idof_by_face_with_bounds(fs, cshape_n)[side_n]
+            face_dofs_p = idof_by_face_with_bounds(fs, cshape_p)[side_p]
+
+            error(
+                "need to apply a transformation on coords in identify_face_dofs_from_coords",
+            )
+            # -> il suffit de passer la transformation en argument, et de laisser l'identité par défaut
+
+            i2j = identify_face_dofs_from_coords(
+                fs,
+                ctype_n,
+                cnodes_n,
+                face_dofs_n,
+                ctype_p,
+                cnodes_p,
+                face_dofs_p,
+                tol,
+            )
 
             error("not implemented yet")
         end
