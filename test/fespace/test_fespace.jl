@@ -53,4 +53,35 @@
         D = J - A
         @test all(D.nzval .> 0.0) # test that non-zeros elements of "A" are included in "J"
     end
+
+    @testset "Dof numbering" begin
+        # Geometrically check that, for a mesh of two hexa side by side, the dof numbering
+        # is correct (up to degree 5). Note that for degree ≤ 2, the numbering is built topologically
+        # only, and for degree ≥ 3 it is built topologically
+        mesh = hexa_mesh(3, 2, 2; xmax = 2, zmax = 0.5)
+        @test all(
+            degree -> begin
+                @show degree
+                fs = FunctionSpace(:Lagrange, degree)
+                U = TrialFESpace(fs, mesh)
+                space = parent(U)
+                res = Bcube.check_numbering(space, mesh; exit_on_error = false)
+                return res.n_errors == 0
+            end,
+            0:5,
+        )
+        # Same but in 2D for the "basic mesh"
+        mesh = Bcube.basic_mesh()
+        @test all(
+            degree -> begin
+                @show degree
+                fs = FunctionSpace(:Lagrange, degree)
+                U = TrialFESpace(fs, mesh)
+                space = parent(U)
+                res = Bcube.check_numbering(space, mesh; exit_on_error = false)
+                return res.n_errors == 0
+            end,
+            0:3,
+        )
+    end
 end
