@@ -1,6 +1,9 @@
 """
 The `DofHandler` handles the degree of freedom numbering. To each degree of freedom
 is associated a unique integer.
+
+# Constructor
+`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool)`
 """
 struct DofHandler{A, B}
     # N : number of components
@@ -29,11 +32,6 @@ struct DofHandler{A, B}
     ndofs_tot::Int
 end
 
-"""
-DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool)
-
-Constructor of a DofHandler for a `SingleFESpace` on a `Mesh`.
-"""
 function DofHandler(
     mesh::Mesh,
     fSpace::AbstractFunctionSpace,
@@ -273,6 +271,9 @@ function _deal_with_dofs_on_edges!(
             jside = oriented_cell_side(celltypes[jcell], c2n[jcell], inodes_g)
 
             # Reverse dofs array if jside is negative
+            # Rq: on edges, the dofs are always numbered incrementally from on extremity
+            # of the edge to the other. In other words, the "middle dof" (if any), is
+            # always in the middle of the edge-dof numbering.
             jdofs_reordered_g = (jside > 0) ? jdofs_g : reverse(jdofs_g)
 
             # Copy global indices
@@ -396,32 +397,28 @@ Count maximum number of dofs per cell, all components mixed
 max_ndofs(dhl::DofHandler) = maximum(dhl.ndofs)
 
 """
-    get_ndofs(dhl, icell, kvar::Int)
+    get_ndofs(dhl::DofHandler)
+    get_ndofs(dhl::DofHandler, icell)
+    get_ndofs(dhl::DofHandler, icell, icomp::Int)
+    get_ndofs(dhl::DofHandler, icell, icomp::Vector{Int})
 
-Number of dofs for a given variable in a given cell.
 
-# Example
-```julia
-mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show get_ndofs(dhl, 1, 1)
-```
-"""
-@inline get_ndofs(dhl::DofHandler, icell, kvar::Int) = dhl.ndofs[icell, kvar]
+Number of dofs in a given cell (with `icell` or for the whole space).
 
-"""
-    get_ndofs(dhl, icell, icomp::Vector{Int})
-
-Number of dofs for a given set of components in a given cell.
-
+If only `icell` is provided, the total (accross all components) number of
+dofs is returned.
 
 # Example
 ```julia
 mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1); size = 2))
-@show get_ndofs(dhl, 1, [1, 2])
+U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+dhl = Bcube.get_dhl(U)
+@show Bcube.get_ndofs(dhl, 1, 1)
+@show Bcube.get_ndofs(dhl, 1, [1, 2])
 ```
 """
+@inline get_ndofs(dhl::DofHandler, icell, icomp::Int) = dhl.ndofs[icell, icomp]
+
 @inline function get_ndofs(dhl::DofHandler, icell, icomp::AbstractVector{Int})
     sum(dhl.ndofs[icell, icomp])
 end
@@ -429,45 +426,24 @@ end
     sum(view(dhl.ndofs, icell:icell, icomp))
 end
 
-"""
-    get_ndofs(dhl::DofHandler, icell)
-
-Number of dofs for a given cell.
-
-Note that for a vector variable, the total (accross all components) number of dofs is returned.
-
-# Example
-```julia
-mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show get_ndofs(dhl, 1, :u)
-```
-"""
 get_ndofs(dhl::DofHandler, icell) = sum(view(dhl.ndofs, icell, :))
 
-"""
-    get_ndofs(dhl::DofHandler)
-
-Total number of dofs. This function takes into account that dofs can be shared by multiple cells.
-
-# Example
-```julia
-mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show get_ndofs(dhl::DofHandler)
-```
-"""
 get_ndofs(dhl::DofHandler) = dhl.ndofs_tot
 
 """
+    get_dof(dhl::DofHandler, icell)
+    get_dof(dhl::DofHandler, icell, icomp::Int)
     get_dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
 
-Global index of the `idof` local degree of freedom of component `icomp` in cell `icell`.
+Global indices (of index) of the dofs in a given cell `icell`. The dofs relative
+to a specific component can be obtained by precising `icomp`; and a specific dof number
+can be obtained by futher precising the local dof `idof`.
 
 # Example
 ```julia
 mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
+U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh)
+dhl = Bcube.get_dhl(U)
 @show get_dof(dhl, 1, 1, 1)
 ```
 """
@@ -475,18 +451,6 @@ function get_dof(dhl::DofHandler, icell, icomp::Int, idof::Int)
     dhl.iglob[dhl.offset[icell, icomp] + idof]
 end
 
-"""
-    get_dof(dhl::DofHandler, icell, icomp::Int)
-
-Global indices of all the dofs of a given component in a given cell
-
-# Example
-```julia
-mesh = one_cell_mesh(:line)
-dhl = DofHandler(mesh, Variable(:u, FunctionSpace(:Lagrange, 1)))
-@show get_dof(dhl, 1, 1)
-```
-"""
 function get_dof(dhl::DofHandler, icell, icomp::Int)
     view(dhl.iglob, dhl.offset[icell, icomp] .+ (1:get_ndofs(dhl, icell, icomp)))
 end
@@ -509,6 +473,31 @@ function get_dof(dhl::DofHandler, icell, icomp::Int, ::Val{N}) where {N}
 end
 
 """
+    get_ncomponents(dhl::DofHandler)
+
 Number of components handled by a DofHandler
 """
 get_ncomponents(dhl::DofHandler) = size(dhl.offset, 2)
+
+function apply_periodicity!(
+    dhl::DofHandler,
+    mesh::Mesh,
+    fSpace::AbstractFunctionSpace,
+    isContinuous::Bool,
+    periodicities,
+)
+    # Only continues spaces should be modified
+    isContinuous || return
+
+    for perio_domain in periodicities
+        perio_cache = get_cache(perio_domain)
+
+        foreach_element(perio_domain) do face, iface_l, _
+            f2n = get_nodes_index(face)
+            cell_n = get_cellinfo_n(face)
+            cell_p = get_cellinfo_p(face)
+            side_n = get_cell_side_n(face)
+            side_p = get_cell_side_p(face)
+        end
+    end
+end
