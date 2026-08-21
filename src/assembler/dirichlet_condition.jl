@@ -247,7 +247,7 @@ function _apply_dirichlet!(
     _mesh = parent(mesh)
     # fs_U = get_function_space(U)
     fs_V = get_function_space(V)
-    dhl_V = _get_dhl(V)
+    dhl_V = get_dhl(V)
 
     # Loop over the boundaries
     for bndTag in get_dirichlet_boundary_tags(U)

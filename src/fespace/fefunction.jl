@@ -135,7 +135,7 @@ function FEFunction(
     dofValues = allocate_dofs(feSpace, T)
 
     # Alias
-    dhl = Bcube._get_dhl(feSpace)
+    dhl = Bcube.get_dhl(feSpace)
 
     foreach_element(CellDomain(mesh)) do cinfo, _, _
         # Cell infos
