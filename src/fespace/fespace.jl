@@ -763,7 +763,7 @@ function check_numbering(
     exit_on_error = true,
 )
     # Track number of errors
-    nerrors = 0
+    n_errors = 0
 
     # Cell variable infos
     dhl = get_dhl(space)
@@ -773,7 +773,7 @@ function check_numbering(
     # For discontinuous, each dof must be unique
     if is_discontinuous(space)
         if length(unique(dhl.iglob)) != length(dhl.iglob)
-            nerrors += 1
+            n_errors += 1
             verbose && println(
                 "ERROR : two dofs share the same identifier whereas it is a discontinuous variable",
             )
@@ -781,13 +781,19 @@ function check_numbering(
         end
 
         # Exit prematurely
-        return nerrors
+        return n_errors
     end
 
     # Mesh infos
     celltypes = cells(mesh)
     c2n = connectivities_indices(mesh, :c2n)
     c2c = connectivity_cell2cell_by_nodes(mesh)
+
+    # Count all dofs, considering a discontinuous space
+    nd_tot = get_ndofs(SingleFESpace(fs, mesh; isContinuous = false))
+    dof_coords = zeros(nd_tot, spacedim(mesh))
+    dof_glob = zeros(Int, nd_tot)
+    idof = 1
 
     # Loop over cell
     for icell in 1:ncells(mesh)
@@ -799,7 +805,7 @@ function check_numbering(
         # Check that all the dofs in this cell are unique
         iglobs = get_dof(dhl, icell)
         if length(unique(iglobs)) != length(iglobs)
-            nerrors += 1
+            n_errors += 1
             verbose &&
                 println("ERROR : two dofs in the same cell share the same identifier")
             exit_on_error && error("DofHandler.check_numbering exited prematurely")
@@ -815,7 +821,14 @@ function check_numbering(
         atol = norm(max_xyz - min_xyz) * rtol
 
         # Coordinates of dofs in cell i for this FunctionSpace
-        coords_i = [mapping(cnodes_i, ct_i, ξ) for ξ in get_coords(fs, shape_i)]
+        coords_i = [mapping(ct_i, cnodes_i, ξ) for ξ in get_coords(fs, shape_i)]
+
+        # Append
+        for (idof_g, coord_i) in zip(iglobs, coords_i)
+            dof_coords[idof, :] .= coord_i
+            dof_glob[idof] = idof_g
+            idof+=1
+        end
 
         # Loop over neighbor cells
         for jcell in c2c[icell]
@@ -825,7 +838,7 @@ function check_numbering(
             shape_j = shape(ct_j)
 
             # Coordinates of dofs in cell j for this FunctionSpace
-            coords_j = [mapping(cnodes_j, ct_j, ξ) for ξ in get_coords(fs, shape_j)]
+            coords_j = [mapping(ct_j, cnodes_j, ξ) for ξ in get_coords(fs, shape_j)]
 
             # n-to-n comparison
             for (idof_loc, xi) in enumerate(coords_i), (jdof_loc, xj) in enumerate(coords_j)
@@ -848,7 +861,7 @@ function check_numbering(
 
                     # Error encountered?
                     if length(msg) > 0
-                        nerrors += 1
+                        n_errors += 1
                         verbose && println(msg)
                         verbose && println(
                             "icell=$icell, jcell=$jcell, xi=$xi, xj=$xj, iglob=$iglob, jglob=$jglob",
@@ -861,5 +874,5 @@ function check_numbering(
         end # loop on jcells
     end # loop on icells
 
-    return nerrors
+    return (; n_errors, dof_coords, dof_glob)
 end
