@@ -408,6 +408,7 @@ end
     BoundaryFaceDomain(mesh)
     BoundaryFaceDomain(mesh, label::String)
     BoundaryFaceDomain(mesh, labels::Tuple{String, Vararg{String}})
+    BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
 
 Build a `BoundaryFaceDomain` corresponding to the boundaries designated by one
 or several labels (=names).
