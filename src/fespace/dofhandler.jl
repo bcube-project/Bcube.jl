@@ -600,14 +600,14 @@ function _deal_with_dofs_on_faces_geometrical!(;
                 idofs_l,
                 jct,
                 jcell_nodes,
-                jdofs_l,
+                jdofs_l;
                 geom_factor,
             )
 
             # Copy global indices
             for (iface_dof_l, jface_dof_l) in enumerate(i2j)
                 idof_l = idofs_l[iface_dof_l]
-                jdof_g = jdofs_g[jface_dof_l]
+                jdof_g = jdofs_g[jface_dof_l] # `jdofs_g` are global dof indices of the face
                 iglob[offset[icell, icomp] + idof_l] = jdof_g
             end
 
@@ -621,13 +621,23 @@ function _deal_with_dofs_on_faces_geometrical!(;
 end
 
 """
-    identify_face_dofs_from_coords(fs, ctype_i, cnodes_i, face_dofs_i, ctype_j, cnodes_j, face_dofs_j, geom_factor = 1.)
+    identify_face_dofs_from_coords(
+        fSpace::AbstractFunctionSpace,
+        ctype_i,
+        cnodes_i,
+        face_dofs_i,
+        ctype_j,
+        cnodes_j,
+        face_dofs_j;
+        transformation = identity,
+        geom_factor = 1.0,
+    )
 
 Identify the correspondence between degrees of freedom (dofs) located on a face
 shared by two neighboring elements by comparing their physical coordinates.
 
 # Arguments
-- `fs::AbstractFunctionSpace`: function space (used to obtain `get_coords`).
+- `fSpace::AbstractFunctionSpace`: function space (used to obtain `get_coords`).
 - `ctype_i`, `ctype_j`: element types for elements `i` and `j`.
 - `cnodes_i`, `cnodes_j`: arrays of physical node coordinates for elements `i` and `j`.
 - `face_dofs_i`, `face_dofs_j`: local indices of the face dofs in each element.
@@ -640,21 +650,21 @@ of face `j` is `i2j[i]` (ie `face_dofs_j[i2j]` of cell j).
 """
 
 function identify_face_dofs_from_coords(
-    fs::AbstractFunctionSpace,
+    fSpace::AbstractFunctionSpace,
     ctype_i,
     cnodes_i,
     face_dofs_i,
     ctype_j,
     cnodes_j,
-    face_dofs_j,
+    face_dofs_j;
     geom_factor = 1.0,
 )
     shape_i = shape(ctype_i)
     shape_j = shape(ctype_j)
 
     # Get ref coordinates of dofs of each face
-    iface_ξ = get_coords(fs, shape_i)[face_dofs_i]
-    jface_ξ = get_coords(fs, shape_j)[face_dofs_j]
+    iface_ξ = get_coords(fSpace, shape_i)[face_dofs_i]
+    jface_ξ = get_coords(fSpace, shape_j)[face_dofs_j]
 
     # Map into physical space
     iface_x = [mapping(ctype_i, cnodes_i, ξ) for ξ in iface_ξ]
@@ -676,8 +686,9 @@ function identify_face_dofs_from_coords(
     # cell_radius = minimum(x -> norm(x - xc), )
     extremas = [extrema(@view D[i, :]) for i in axes(D, 1)]
     max_dist = maximum(last.(extremas))
-    @assert all(first.(extremas) .< max(geom_factor*1e-20*max_dist, 10*eps(0.0)))
     # @show first.(extremas)
+    # @show iface_x, jface_x
+    @assert all(first.(extremas) .< max(geom_factor*1e-20*max_dist, 10*eps(0.0)))
 
     # Identify the pairs. The array `i2j` indicates that for
     # the `ith` dof of the face (ie `face_dofs_i[i]` of  cell i), the corresponding dof
@@ -780,55 +791,73 @@ get_ncomponents(dhl::DofHandler) = size(dhl.offset, 2)
 
 function apply_periodicity!(
     dhl::DofHandler,
-    mesh::Mesh,
     fSpace::AbstractFunctionSpace,
     isContinuous::Bool,
-    periodicities,
+    ncomps::Integer,
+    periodicities;
     geom_factor = 1.0,
 )
+    foreach(periodicities) do periodicity
+        apply_periodicity!(dhl, fSpace, isContinuous, ncomps, periodicity; geom_factor)
+    end
+end
+
+function apply_periodicity!(
+    dhl::DofHandler,
+    fSpace::AbstractFunctionSpace,
+    isContinuous::Bool,
+    ncomps::Integer,
+    periodicity::BoundaryFaceDomain{M, BC};
+    geom_factor = 1.0,
+) where {M, BC <: PeriodicBCType}
     # Only continues spaces should be modified
     isContinuous || return
 
-    for perio_domain in periodicities
-        perio_cache = get_cache(perio_domain)
+    iglob = get_iglob(dhl)
 
-        foreach_element(perio_domain) do face, iface_l, _
-            # Unpack cells infos
-            f2n = get_nodes_index(face)
-            cell_n = get_cellinfo_n(face)
-            cell_p = get_cellinfo_p(face)
-            cnodes_n = nodes(cell_n)
-            cnodes_p = nodes(cell_p)
-            ctype_n = get_element_type(cell_n)
-            ctype_p = get_element_type(cell_p)
-            cshape_n = shape(cell_n)
-            cshape_p = shape(cell_p)
+    foreach_element(periodicity) do face, _, _
+        # Unpack cells infos
+        # Rq: because we are dealing with a PeriodicBCType,
+        # `cnodes_p` already received the periodic-transformation
+        cell_n = get_cellinfo_n(face)
+        cell_p = get_cellinfo_p(face)
+        cnodes_n = nodes(cell_n)
+        cnodes_p = nodes(cell_p)
+        ctype_n = get_element_type(cell_n)
+        ctype_p = get_element_type(cell_p)
+        cell_idx_n = get_element_index(cell_n)
+        cell_idx_p = get_element_index(cell_p)
+        cshape_n = shape(ctype_n)
+        cshape_p = shape(ctype_p)
 
-            # Unpack face infos
-            side_n = abs(get_cell_side_n(face))
-            side_p = abs(get_cell_side_p(face))
+        # Unpack face infos
+        side_n = abs(get_cell_side_n(face))
+        side_p = abs(get_cell_side_p(face))
 
-            # Identify dofs lying on this face on both sides
-            face_dofs_n = idof_by_face_with_bounds(fs, cshape_n)[side_n]
-            face_dofs_p = idof_by_face_with_bounds(fs, cshape_p)[side_p]
+        # Identify dofs lying on this face on both sides
+        face_dofs_n = idof_by_face_with_bounds(fSpace, cshape_n)[side_n]
+        face_dofs_p = idof_by_face_with_bounds(fSpace, cshape_p)[side_p]
 
-            error(
-                "need to apply a transformation on coords in identify_face_dofs_from_coords",
-            )
-            # -> il suffit de passer la transformation en argument, et de laisser l'identité par défaut
+        # Geometric identification
+        i2j = identify_face_dofs_from_coords(
+            fSpace,
+            ctype_n,
+            cnodes_n,
+            face_dofs_n,
+            ctype_p,
+            cnodes_p,
+            face_dofs_p;
+            geom_factor,
+        )
 
-            i2j = identify_face_dofs_from_coords(
-                fs,
-                ctype_n,
-                cnodes_n,
-                face_dofs_n,
-                ctype_p,
-                cnodes_p,
-                face_dofs_p,
-                tol,
-            )
-
-            error("not implemented yet")
-        end
-    end
+        # Now, erase the value of dhl.iglob for all `n` entries with `p` entries
+        for icomp in 1:ncomps
+            offset_n = get_offset(dhl, cell_idx_n, icomp)
+            for (i, j) in enumerate(i2j)
+                dof_n = face_dofs_n[i]
+                dof_p = face_dofs_p[j]
+                iglob[offset_n + dof_n] = get_dof(dhl, cell_idx_p, icomp, dof_p)
+            end
+        end # loop on ncomps
+    end # loop on faces of periodic domain
 end
