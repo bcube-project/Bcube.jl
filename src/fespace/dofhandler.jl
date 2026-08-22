@@ -3,7 +3,10 @@ The `DofHandler` handles the degree of freedom numbering. To each degree of free
 is associated a unique integer.
 
 # Constructor
-`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool)`
+`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool; periodicities = nothing, geom_factor = 1.)`
+
+For continuous spaces with periodicity conditions on the mesh, use the keyword argument `periodicities`
+by giving it a set of [`BoundaryFaceDomain`](@ref) built with a `PeriodicBCType`.
 
 # Notes
 For continuous FESpaces, the `DofHandler` handles the numbering of common dofs between several
@@ -41,12 +44,12 @@ struct DofHandler{A, B}
     ndofs_tot::Int
 end
 
-# TODO: split into sub-functions
 function DofHandler(
     mesh::Mesh,
     fSpace::AbstractFunctionSpace,
     ncomponents::Int,
-    isContinuous::Bool,
+    isContinuous::Bool;
+    periodicities = nothing,
     geom_factor = 1.0,
 )
     # Get cell types
@@ -204,6 +207,18 @@ function DofHandler(
             end # loop on icomp
         end # loop on cells
     end # if isContinuous
+
+    # Apply periodicity (if any and if continuous)
+    if !isnothing(periodicities)
+        isContinuous && apply_periodicity!(
+            iglob,
+            offset,
+            fSpace,
+            ncomponents,
+            periodicities;
+            geom_factor,
+        )
+    end
 
     # Create a cell number remapping to ensure a dense numbering
     densify!(iglob)
@@ -789,32 +804,28 @@ Number of components handled by a DofHandler
 """
 get_ncomponents(dhl::DofHandler) = size(dhl.offset, 2)
 
-function apply_periodicity!(
-    dhl::DofHandler,
-    fSpace::AbstractFunctionSpace,
-    isContinuous::Bool,
-    ncomps::Integer,
-    periodicities;
-    geom_factor = 1.0,
-)
-    foreach(periodicities) do periodicity
-        apply_periodicity!(dhl, fSpace, isContinuous, ncomps, periodicity; geom_factor)
-    end
-end
+"""
+    apply_periodicity!(
+        iglob,
+        offset,
+        fSpace::AbstractFunctionSpace,
+        ncomps::Integer,
+        periodicity::BoundaryFaceDomain{M, BC};
+        geom_factor = 1.0,
+    ) where {M, BC <: PeriodicBCType}
 
+Helper to edit the `iglob` array to take into account periodicity. For continuous
+spaces, periodicity involves some dofs (in connection through the periodicity)
+sharing the same identifier.
+"""
 function apply_periodicity!(
-    dhl::DofHandler,
+    iglob,
+    offset,
     fSpace::AbstractFunctionSpace,
-    isContinuous::Bool,
     ncomps::Integer,
     periodicity::BoundaryFaceDomain{M, BC};
     geom_factor = 1.0,
 ) where {M, BC <: PeriodicBCType}
-    # Only continues spaces should be modified
-    isContinuous || return
-
-    iglob = get_iglob(dhl)
-
     foreach_element(periodicity) do face, _, _
         # Unpack cells infos
         # Rq: because we are dealing with a PeriodicBCType,
@@ -850,14 +861,28 @@ function apply_periodicity!(
             geom_factor,
         )
 
-        # Now, erase the value of dhl.iglob for all `n` entries with `p` entries
+        # Now, erase the value of iglob for all `p` entries with `n` entries
         for icomp in 1:ncomps
-            offset_n = get_offset(dhl, cell_idx_n, icomp)
+            offset_n = offset[cell_idx_n, icomp]
+            offset_p = offset[cell_idx_p, icomp]
             for (i, j) in enumerate(i2j)
                 dof_n = face_dofs_n[i]
                 dof_p = face_dofs_p[j]
-                iglob[offset_n + dof_n] = get_dof(dhl, cell_idx_p, icomp, dof_p)
+                iglob[offset_p + dof_p] = iglob[offset_n + dof_n]
             end
         end # loop on ncomps
     end # loop on faces of periodic domain
+end
+
+function apply_periodicity!(
+    iglob,
+    offset,
+    fSpace::AbstractFunctionSpace,
+    ncomps::Integer,
+    periodicities;
+    geom_factor = 1.0,
+)
+    foreach(periodicities) do periodicity
+        apply_periodicity!(iglob, offset, fSpace, ncomps, periodicity; geom_factor)
+    end
 end

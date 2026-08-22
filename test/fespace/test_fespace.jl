@@ -61,7 +61,6 @@
         mesh = hexa_mesh(3, 2, 2; xmax = 2, zmax = 0.5)
         @test all(
             degree -> begin
-                @show degree
                 fs = FunctionSpace(:Lagrange, degree)
                 U = TrialFESpace(fs, mesh)
                 space = parent(U)
@@ -74,7 +73,6 @@
         mesh = Bcube.basic_mesh()
         @test all(
             degree -> begin
-                @show degree
                 fs = FunctionSpace(:Lagrange, degree)
                 U = TrialFESpace(fs, mesh)
                 space = parent(U)
