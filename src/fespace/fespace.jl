@@ -167,6 +167,7 @@ get_dirichlet_boundary_tags(feSpace::SingleFESpace) = feSpace.dirichletBndTags
         dirichletBndNames = String[];
         size::Int = 1,
         isContinuous::Bool = true,
+        periodicities = nothing,
         kwargs...
     )
 
@@ -181,6 +182,7 @@ Build a finite element space (scalar or vector) from a `FunctionSpace` and a `Me
 - `size::Int = 1` : the number of components of the `FESpace`
 - `isContinuous::Bool = true` : if `true`, a continuous dof numbering is created. Otherwise, dof lying
 on cell nodes or cell faces are duplicated, not shared (discontinuous dof numbering)
+- `periodicities = nothing` : (for continuous spaces only) set of [`BoundaryFaceDomain`](@ref) built with a `PeriodicBCType`.
 - (advanced) `geom_factor = 1.` : in 3D, for function spaces with degree ≥ 3, a geometrical identification is performed
 to build the dof numbering. This `geom_factor` can help this geometrical identification
 - `kwargs` : for things such as parallel cache (internal/dev usage only)
@@ -191,10 +193,11 @@ function SingleFESpace(
     dirichletBndNames = String[];
     size::Int = 1,
     isContinuous::Bool = true,
+    periodicities = nothing,
     geom_factor = 1.0,
     kwargs...,
 )
-    dhl = DofHandler(mesh, fSpace, size, isContinuous, geom_factor)
+    dhl = DofHandler(mesh, fSpace, size, isContinuous; periodicities, geom_factor)
 
     # Convert String -> Symbols and ensure that every input boundary name is known in the mesh
     dirichletBndSymbols = Symbol.(dirichletBndNames)
@@ -220,23 +223,13 @@ A TrialFESpace is basically a SingleFESpace plus other attributes (related to bo
 `dirichletValues` is a NamedTuple whose keys are the boundary names (as symbols) and values are
 functions of time such that `t -> AbstractLazy`
 
-
-# Dev notes
-* we cannot directly store Dirichlet values on dofs because the Dirichlet values needs "time" to apply
-"""
-struct TrialFESpace{S, FE <: AbstractSingleFESpace, D} <: AbstractFESpace{S}
-    feSpace::FE
-    dirichletValues::D
-end
-
-"""
+# Constructors
+```
     TrialFESpace(feSpace, dirichletValues)
     TrialFESpace(
         fSpace::AbstractFunctionSpace,
         mesh::AbstractMesh,
         dirichlet::Dict{String} = Dict{String, Any}();
-        size::Int = 1,
-        isContinuous::Bool = true,
         kwargs...
     )
     TrialFESpace(
@@ -244,9 +237,9 @@ end
         mesh::AbstractMesh,
         type::Symbol,
         dirichlet::Dict{String} = Dict{String, Any}();
-        size::Int = 1,
         kwargs...
     )
+```
 
 Build a trial finite element space.
 
@@ -270,20 +263,26 @@ julia> mesh = one_cell_mesh(:line)
 julia> fSpace = FunctionSpace(:Lagrange, 2)
 julia> U = TrialFESpace(fSpace, mesh)
 julia> V = TrialFESpace(fSpace, mesh, :discontinuous; size = 3)
+julia> V = TrialFESpace(fSpace, mesh; isContinuous = true)
 julia> W = TrialFESpace(fSpace, mesh, Dict("North" => 3., "South" => t -> PhysicalFunction(x -> t .* x)))
 ```
 
+# Dev notes
+* we cannot directly store Dirichlet values on dofs because the Dirichlet values needs "time" to apply
 """
+struct TrialFESpace{S, FE <: AbstractSingleFESpace, D} <: AbstractFESpace{S}
+    feSpace::FE
+    dirichletValues::D
+end
+
 function TrialFESpace(
     fSpace::AbstractFunctionSpace,
     mesh::AbstractMesh,
     dirichlet::Dict{String} = Dict{String, Any}();
-    size::Int = 1,
-    isContinuous::Bool = true,
     kwargs...,
 )
     # Build FESpace
-    feSpace = SingleFESpace(fSpace, mesh, keys(dirichlet); size, isContinuous, kwargs...)
+    feSpace = SingleFESpace(fSpace, mesh, keys(dirichlet); kwargs...)
 
     # Transform any constant value into a function of t->PhysicalFunction() or any AbstractLazy into t->lazy
     function diri_val_to_time_func(v)
@@ -319,18 +318,10 @@ function TrialFESpace(
     mesh::AbstractMesh,
     type::Symbol,
     dirichlet::Dict{String} = Dict{String, Any}();
-    size::Int = 1,
     kwargs...,
 )
     @assert type ∈ (:continuous, :discontinuous) "Invalid variable type. Must be ':continuous' or ':discontinuous'"
-    TrialFESpace(
-        fSpace,
-        mesh,
-        dirichlet;
-        size,
-        isContinuous = type == :continuous,
-        kwargs...,
-    )
+    TrialFESpace(fSpace, mesh, dirichlet; isContinuous = type == :continuous, kwargs...)
 end
 
 """
@@ -380,8 +371,6 @@ end
         fSpace::AbstractFunctionSpace,
         mesh::AbstractMesh,
         dirichletBndNames = String[];
-        size::Int = 1,
-        isContinuous::Bool = true,
         kwargs...,
     )
 
@@ -403,12 +392,10 @@ function TestFESpace(
     fSpace::AbstractFunctionSpace,
     mesh::AbstractMesh,
     dirichletBndNames = String[];
-    size::Int = 1,
-    isContinuous::Bool = true,
     kwargs...,
 )
     # Build FESpace
-    feSpace = SingleFESpace(fSpace, mesh, dirichletBndNames; size, isContinuous, kwargs...)
+    feSpace = SingleFESpace(fSpace, mesh, dirichletBndNames; kwargs...)
 
     return TestFESpace(feSpace)
 end
