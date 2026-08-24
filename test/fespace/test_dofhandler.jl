@@ -1,4 +1,41 @@
 @testset "DofHandler" begin
+    @testset "1D" begin
+        @testset "Periodicity" begin
+            # for line_mesh, dofs are ordered with their x-coordinate (if ncomp = 1)
+            mesh = line_mesh(3)
+            perio = PeriodicBCType(Translation(SA[-1.0]), "xmax", "xmin")
+            Γ_perio = BoundaryFaceDomain(mesh, perio)
+            fs = FunctionSpace(:Lagrange, 1)
+            dhl = DofHandler(mesh, fs, 1, true, periodicities = Γ_perio)
+            @test dhl.iglob == [1, 2, 2, 1]
+            dhl1 = DofHandler(mesh, fs, 1, false, periodicities = Γ_perio)
+            dhl2 = DofHandler(mesh, fs, 1, false)
+            @test dhl1.iglob == dhl2.iglob # discontinuous spaces should not be altered
+            dhl = DofHandler(mesh, fs, 2, true, periodicities = Γ_perio)
+            @test dhl.iglob == [1, 2, 3, 4, 2, 1, 4, 3]
+            dhl = DofHandler(
+                mesh,
+                FunctionSpace(:Lagrange, 2),
+                1,
+                true,
+                periodicities = Γ_perio,
+            )
+            @test dhl.iglob == [1, 2, 3, 3, 4, 1]
+
+            mesh = line_mesh(4)
+            perio = PeriodicBCType(Translation(SA[-1.0]), "xmax", "xmin")
+            Γ_perio = BoundaryFaceDomain(mesh, perio)
+            dhl = DofHandler(
+                mesh,
+                FunctionSpace(:Lagrange, 1),
+                1,
+                true,
+                periodicities = Γ_perio,
+            )
+            @test dhl.iglob == [1, 2, 2, 3, 3, 1]
+        end
+    end
+
     @testset "2D" begin
         @testset "Discontinuous" begin
 
@@ -224,6 +261,59 @@
 
             @test get_dof(dhl, 1) == collect(1:9)
             @test get_dof(dhl, 2) == [3, 10, 11, 6, 12, 13, 9, 14, 15]
+
+            @testset "Periodicity" begin
+                mesh = rectangle_mesh(3, 2)
+                perio_x = PeriodicBCType(Translation(SA[-1.0, 0.0]), "xmax", "xmin")
+                Γ_perio_x = BoundaryFaceDomain(mesh, perio_x)
+                dhl = DofHandler(
+                    mesh,
+                    FunctionSpace(:Lagrange, 1),
+                    1,
+                    true;
+                    periodicities = Γ_perio_x,
+                )
+                @test dhl.iglob == [1, 2, 3, 4, 2, 1, 4, 3]
+
+                mesh = rectangle_mesh(4, 3)
+                perio_x = PeriodicBCType(Translation(SA[-1.0, 0.0]), "xmax", "xmin")
+                perio_y = PeriodicBCType(Translation(SA[0.0, -1.0]), "ymax", "ymin")
+                Γ_perio_x = BoundaryFaceDomain(mesh, perio_x)
+                Γ_perio_y = BoundaryFaceDomain(mesh, perio_y)
+                dhl = DofHandler(
+                    mesh,
+                    FunctionSpace(:Lagrange, 1),
+                    1,
+                    true;
+                    periodicities = (Γ_perio_x, Γ_perio_y),
+                )
+                @test dhl.iglob == [
+                    1,
+                    2,
+                    3,
+                    4,
+                    2,
+                    5,
+                    4,
+                    6,
+                    5,
+                    1,
+                    6,
+                    3,
+                    3,
+                    4,
+                    1,
+                    2,
+                    4,
+                    6,
+                    2,
+                    5,
+                    6,
+                    3,
+                    5,
+                    1,
+                ]
+            end
         end
     end
 

@@ -276,6 +276,8 @@ Find periodic face connectivities such as :
 two limits in relation.
 """
 function compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
+    # Smoke test : it's easy to set a wrong transformation and the error obtained later on is hard to debug
+    @assert length(A(get_coords(first(get_nodes(mesh))))) == spacedim(mesh) "Input periodic transformation does not respect mesh space dimensions"
 
     # Get cell -> node connectivity
     c2n = connectivities_indices(mesh, :c2n)

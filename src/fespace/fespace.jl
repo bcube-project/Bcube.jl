@@ -82,6 +82,7 @@ is_discontinuous(feSpace::AbstractFESpace) = !is_continuous(feSpace)
 
 _get_dof_handler(feSpace::AbstractFESpace) = _get_dof_handler(parent(feSpace))
 get_dhl(feSpace::AbstractFESpace) = _get_dof_handler(feSpace)
+const _get_dhl = get_dhl # deprecated, defined for retrocompatibility
 
 """
 Return the boundary tags where a Dirichlet condition applies
@@ -744,6 +745,10 @@ mesh = rectangle_mesh(4, 4)
 fes = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh, :continuous)
 @show Bcube.check_numbering(fes, mesh)
 ```
+
+!!! warning
+    This function is not compatible with periodicities : errors will be raised because dof located at different location
+    will share the same coordinates.
 """
 function check_numbering(
     space::SingleFESpace,
