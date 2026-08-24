@@ -50,7 +50,7 @@ end
 
 """
 When a CellFunction is directly applied on a `FacePoint`, (i.e without the use of the
-`side_n` or `side_p` operators), it means that the side of the face does matter (for
+`side_n` or `side_p` operators), it means that the side of the face does not matter (for
 instance for a PhysicalFunction).
 
 Hence we just convert the FacePoint into a CellPoint (of the negative side of the face)
@@ -83,17 +83,17 @@ of the codomain (i.e `S=length(λ(x))`) and `FS` is the type of `FunctionSpace`.
 Subtypes should implement `AbstractCellFunction`:
 * `get_function(f::AbstractShapeFunction)`
 
-and its own specitic interface: [empty]
+and its own specific interface: `get_function_space`
 """
 abstract type AbstractShapeFunction{DS, S, FS} <: AbstractCellFunction{DS, S} end
 
 get_function_space(::AbstractShapeFunction{DS, S, FS}) where {DS, S, FS} = FS()
 
 """
-    ShapeFunction{DS,S,F<:Function} <: AbstractShapeFunction{DS,S}
+    ShapeFunction{DS,S,FS,F<:Function} <: AbstractShapeFunction{DS,S,FS}
 
 Subtype of [`AbstractShapeFunction`](@ref) used to wrap a function
-defined on a domain of style` `DS` in the cell
+defined on a domain of style `DS` in the cell
 """
 struct ShapeFunction{DS, S, FS, F <: Function} <: AbstractShapeFunction{DS, S, FS}
     f::F
@@ -206,7 +206,7 @@ LazyOperators.pretty_name_style(a::CellShapeFunctions) = Dict(:color => :light_g
     CellFunction{DS,S,F<:Function} <: AbstractCellFunction{DS,S}
 
 Subtype of [`AbstractCellFunction`](@ref) used to wrap a function
-defined on a domain of style` `DS` in the cell
+defined on a domain of style `DS` in the cell
 """
 struct CellFunction{DS, S, F <: Function} <: AbstractCellFunction{DS, S}
     f::F
@@ -231,7 +231,7 @@ Return a [`CellFunction`](@ref) defined on a `PhysicalDomain`.
 `size` is the size of the codomain of `f`.
 
 ## Note:
-Using a `Val` to prescribe the size a of `PhysicalFunction` is
+Using a `Val` to prescribe the size of a `PhysicalFunction` is
 recommended to improve type-stability and performance.
 """
 function PhysicalFunction(
@@ -253,7 +253,7 @@ Return a [`CellFunction`](@ref) defined on a `ReferenceDomain`.
 `size` is the size of the codomain of `f`.
 
 ## Note:
-Using a `Val` to prescribe the size a of `ReferenceFunction` is
+Using a `Val` to prescribe the size of a `ReferenceFunction` is
 recommended to improve type-stability and performance.
 """
 function ReferenceFunction(
@@ -292,7 +292,7 @@ end
 #LazyOperators.materialize(a::LazyMapOver{<:CellShapeFunctions}, x::CellPoint) = a
 
 """
-Represent the side a of face between two cells.
+Represent the side of a face between two cells.
 
 @ghislainb : to be moved to `domain.jl` ?
 """
@@ -520,7 +520,7 @@ end
 """
 Normal of a facet of a hypersurface.
 
-See [`cell_normal`]@ref for the computation method.
+See [`cell_normal`](@ref) for the computation method.
 """
 struct CellNormal <: AbstractLazy end
 

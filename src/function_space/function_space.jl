@@ -3,7 +3,7 @@
 Abstract structure for the different types of function space, for
 instance the Lagrange function space, the Taylor function space etc.
 
-# Devs notes
+# Dev notes
 All subtypes should implement the following functions:
 * `get_ndofs(::AbstractFunctionSpace, ::AbstractShape)`
 * `_scalar_shape_functions(::AbstractFunctionSpace, ::AbstractShape, ξ)`
@@ -25,7 +25,7 @@ Getter for the `type` of the `AbstractFunctionSpace`
 get_type(::AbstractFunctionSpace{type}) where {type} = type
 
 """
-    get_degree(::AbstractFunctionSpace{type, degree}) where{type, degree}
+    get_degree(::AbstractFunctionSpace{type, degree}) where {type, degree}
 
 Return the `degree` associated to the `AbstractFunctionSpace`.
 """
@@ -61,10 +61,10 @@ of the finite element space (default: `N=1` if the argument is not provided).
 The result is a vector of all the shape functions evaluated at position ξ, and not a
 tuple of the different shape functions. This choice is optimal for performance.
 
-Note : `λ = ξ -> shape_functions(fs, shape, ξ); λ(ξ)[i]` is faster than `λ =shape_functions(fs, shape); λ[i](ξ)`
+Note: `λ = ξ -> shape_functions(fs, shape, ξ); λ(ξ)[i]` is faster than `λ = shape_functions(fs, shape); λ[i](ξ)`
 
 # Implementation
-Default version, should be overriden for each concrete FunctionSpace.
+Default version, should be overridden for each concrete FunctionSpace.
 """
 function shape_functions(::AbstractFunctionSpace, ::Val{N}, ::AbstractShape, ξ) where {N}
     error("Function 'shape_functions' not implemented")
@@ -87,18 +87,18 @@ end
 """
     shape_functions_vec(fs::AbstractFunctionSpace, ::Val{N}, shape::AbstractShape, ξ) where {N}
 
-Return all the shape functions of FunctionSpace on a Shape evaluated in ξ as a vector.
+Return all the shape functions of a FunctionSpace on a Shape evaluated in ξ as a vector.
 
-`N` is the the size (number of components) of the finite element space.
+`N` is the size (number of components) of the finite element space.
 
 ---
 
-    shape_functions_vec(fs::AbstractFunctionSpace{T,D}, n::Val{N}, shape::AbstractShape) where {T,D, N}
+    shape_functions_vec(fs::AbstractFunctionSpace, n::Val{N}, shape::AbstractShape) where {N}
 
 The shape functions are returned as a vector of functions.
 
 # Implementation
-This is implementation is not always valid, but it is for Lagrange and Taylor spaces (the only
+This implementation is not always valid, but it is for Lagrange and Taylor spaces (the only
 two spaces available up to 20/01/23).
 """
 function shape_functions_vec(
@@ -182,7 +182,7 @@ Return the local indices of the dofs lying on each face of the `Shape`.
 
 Dofs lying on the face edges are excluded, only "face-interior" dofs are considered.
 
-The result is a Tuple of arrays of integers. Arrays maybe be empty. See `Lagrange`
+The result is a Tuple of arrays of integers. Arrays may be empty. See `Lagrange`
 interpolation for simple examples.
 """
 function idof_by_face(::AbstractFunctionSpace, ::AbstractShape)
@@ -196,7 +196,7 @@ Return the local indices of the dofs lying on each face of the `Shape`.
 
 Dofs lying on the face edges are included
 
-The result is a Tuple of arrays of integers. Arrays maybe be empty. See `Lagrange`
+The result is a Tuple of arrays of integers. Arrays may be empty. See `Lagrange`
 interpolation for simple examples.
 """
 function idof_by_face_with_bounds(::AbstractFunctionSpace, ::AbstractShape)
@@ -227,7 +227,7 @@ Return the local indices of the dofs lying on each edge of the `Shape`.
 
 Dofs lying on the edge vertices are excluded.
 
-The result is a Tuple of arrays of integers. Arrays maybe be empty.
+The result is a Tuple of arrays of integers. Arrays may be empty.
 See `Lagrange` interpolation for simple examples.
 """
 function idof_by_edge(::AbstractFunctionSpace, ::AbstractShape)
@@ -241,7 +241,7 @@ Return the local indices of the dofs lying on each edge of the `Shape`.
 
 Dofs lying on the edge vertices are included.
 
-The result is a Tuple of arrays of integers. Arrays maybe be empty.
+The result is a Tuple of arrays of integers. Arrays may be empty.
 See `Lagrange` interpolation for simple examples.
 """
 function idof_by_edge_with_bounds(::AbstractFunctionSpace, ::AbstractShape)
