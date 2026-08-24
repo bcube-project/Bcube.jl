@@ -5,7 +5,7 @@
 
 ## Apply dirichlet conditions
 
-Once the linear system has been assembled (i.e., the matrix `A` and vector `b` have been computed from the bilinear and linear forms), boundary conditions must be applied before solving. This section describes the functions available for applying Dirichlet boundary conditions to the assembled matrices and vectors.
+Once the linear system has been assembled (i.e., the matrix `A` and vector `b` have been computed from the bilinear and linear forms), Dirichlet boundary conditions must be applied before solving. This section describes the functions available (and typically used in the case of Lagrange elements) for applying Dirichlet boundary conditions to the assembled matrices and vectors.
 
 Dirichlet conditions constrain the solution on specific boundaries of the domain. The functions below allow you to modify the assembled system to enforce these constraints, either for homogeneous (zero) or non-homogeneous (non-zero) boundary values.
 
