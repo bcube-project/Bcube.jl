@@ -3,9 +3,9 @@ The `DofHandler` handles the degree of freedom numbering. To each degree of free
 is associated a unique integer.
 
 # Constructor
-`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool; periodicities = nothing, geom_factor = 1.)`
+`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool; periodicity = nothing, geom_factor = 1.)`
 
-For continuous spaces with periodicity conditions on the mesh, use the keyword argument `periodicities`
+For continuous spaces with periodicity conditions on the mesh, use the keyword argument `periodicity`
 by giving it a set of [`BoundaryFaceDomain`](@ref) built with a `PeriodicBCType`.
 
 # Notes
@@ -49,7 +49,7 @@ function DofHandler(
     fSpace::AbstractFunctionSpace,
     ncomponents::Int,
     isContinuous::Bool;
-    periodicities = nothing,
+    periodicity = nothing,
     geom_factor = 1.0,
 )
     # Get cell types
@@ -209,15 +209,9 @@ function DofHandler(
     end # if isContinuous
 
     # Apply periodicity (if any and if continuous)
-    if !isnothing(periodicities)
-        isContinuous && apply_periodicity!(
-            iglob,
-            offset,
-            fSpace,
-            ncomponents,
-            periodicities;
-            geom_factor,
-        )
+    if !isnothing(periodicity)
+        isContinuous &&
+            apply_periodicity!(iglob, offset, fSpace, ncomponents, periodicity; geom_factor)
     end
 
     # Create a cell number remapping to ensure a dense numbering

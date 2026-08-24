@@ -6,19 +6,19 @@
             perio = PeriodicBCType(Translation(SA[-1.0]), "xmax", "xmin")
             Γ_perio = BoundaryFaceDomain(mesh, perio)
             fs = FunctionSpace(:Lagrange, 1)
-            dhl = DofHandler(mesh, fs, 1, true, periodicities = Γ_perio)
+            dhl = DofHandler(mesh, fs, 1, true, periodicity = Γ_perio)
             @test dhl.iglob == [1, 2, 2, 1]
-            dhl1 = DofHandler(mesh, fs, 1, false, periodicities = Γ_perio)
+            dhl1 = DofHandler(mesh, fs, 1, false, periodicity = Γ_perio)
             dhl2 = DofHandler(mesh, fs, 1, false)
             @test dhl1.iglob == dhl2.iglob # discontinuous spaces should not be altered
-            dhl = DofHandler(mesh, fs, 2, true, periodicities = Γ_perio)
+            dhl = DofHandler(mesh, fs, 2, true, periodicity = Γ_perio)
             @test dhl.iglob == [1, 2, 3, 4, 2, 1, 4, 3]
             dhl = DofHandler(
                 mesh,
                 FunctionSpace(:Lagrange, 2),
                 1,
                 true,
-                periodicities = Γ_perio,
+                periodicity = Γ_perio,
             )
             @test dhl.iglob == [1, 2, 3, 3, 4, 1]
 
@@ -30,7 +30,7 @@
                 FunctionSpace(:Lagrange, 1),
                 1,
                 true,
-                periodicities = Γ_perio,
+                periodicity = Γ_perio,
             )
             @test dhl.iglob == [1, 2, 2, 3, 3, 1]
         end
@@ -271,7 +271,7 @@
                     FunctionSpace(:Lagrange, 1),
                     1,
                     true;
-                    periodicities = Γ_perio_x,
+                    periodicity = Γ_perio_x,
                 )
                 @test dhl.iglob == [1, 2, 3, 4, 2, 1, 4, 3]
 
@@ -285,7 +285,7 @@
                     FunctionSpace(:Lagrange, 1),
                     1,
                     true;
-                    periodicities = (Γ_perio_x, Γ_perio_y),
+                    periodicity = (Γ_perio_x, Γ_perio_y),
                 )
                 @test dhl.iglob == [
                     1,

@@ -168,7 +168,7 @@ get_dirichlet_boundary_tags(feSpace::SingleFESpace) = feSpace.dirichletBndTags
         dirichletBndNames = String[];
         size::Int = 1,
         isContinuous::Bool = true,
-        periodicities = nothing,
+        periodicity = nothing,
         kwargs...
     )
 
@@ -183,7 +183,7 @@ Build a finite element space (scalar or vector) from a `FunctionSpace` and a `Me
 - `size::Int = 1` : the number of components of the `FESpace`
 - `isContinuous::Bool = true` : if `true`, a continuous dof numbering is created. Otherwise, dof lying
 on cell nodes or cell faces are duplicated, not shared (discontinuous dof numbering)
-- `periodicities = nothing` : (for continuous spaces only) set of [`BoundaryFaceDomain`](@ref) built with a `PeriodicBCType`.
+- `periodicity = nothing` : (for continuous spaces only) set of [`BoundaryFaceDomain`](@ref) built with a `PeriodicBCType`.
 - (advanced) `geom_factor = 1.` : in 3D, for function spaces with degree ≥ 3, a geometrical identification is performed
 to build the dof numbering. This `geom_factor` can help this geometrical identification
 - `kwargs` : for things such as parallel cache (internal/dev usage only)
@@ -194,11 +194,11 @@ function SingleFESpace(
     dirichletBndNames = String[];
     size::Int = 1,
     isContinuous::Bool = true,
-    periodicities = nothing,
+    periodicity = nothing,
     geom_factor = 1.0,
     kwargs...,
 )
-    dhl = DofHandler(mesh, fSpace, size, isContinuous; periodicities, geom_factor)
+    dhl = DofHandler(mesh, fSpace, size, isContinuous; periodicity, geom_factor)
 
     # Convert String -> Symbols and ensure that every input boundary name is known in the mesh
     dirichletBndSymbols = Symbol.(dirichletBndNames)
@@ -747,7 +747,7 @@ fes = SingleFESpace(FunctionSpace(:Lagrange, 1), mesh, :continuous)
 ```
 
 !!! warning
-    This function is not compatible with periodicities : errors will be raised because dof located at different location
+    This function is not compatible with periodicity : errors will be raised because dof located at different location
     will share the same coordinates.
 """
 function check_numbering(
