@@ -403,6 +403,7 @@ function compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
         bnd_n2n,
         bndfaces1,
         bndfaces2,
+        tol,
     )
 end
 

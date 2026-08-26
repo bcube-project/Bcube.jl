@@ -3,7 +3,7 @@ The `DofHandler` handles the degree of freedom numbering. To each degree of free
 is associated a unique integer.
 
 # Constructor
-`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool; periodicity = nothing, geom_factor = 1.)`
+`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool; periodicity = nothing, eps_geom = 1.)`
 
 For continuous spaces with periodicity conditions on the mesh, use the keyword argument `periodicity`
 by giving it a set of [`BoundaryFaceDomain`](@ref) built with a `PeriodicBCType`.
@@ -50,7 +50,7 @@ function DofHandler(
     ncomponents::Int,
     isContinuous::Bool;
     periodicity = nothing,
-    geom_factor = 1.0,
+    eps_geom = 1e-12,
 )
     # Get cell types
     celltypes = cells(mesh)
@@ -200,7 +200,7 @@ function DofHandler(
                             fs = fSpace,
                             icomp,
                             with_bounds = true,
-                            geom_factor,
+                            eps_geom,
                         )
                     end # if/else degree
                 end # if/else topodim
@@ -210,8 +210,7 @@ function DofHandler(
 
     # Apply periodicity (if any and if continuous)
     if !isnothing(periodicity)
-        isContinuous &&
-            apply_periodicity!(iglob, offset, fSpace, ncomponents, periodicity; geom_factor)
+        isContinuous && apply_periodicity!(iglob, offset, fSpace, ncomponents, periodicity)
     end
 
     # Create a cell number remapping to ensure a dense numbering
@@ -534,7 +533,7 @@ Geometrical identification of dofs lying on faces of cell `icell`.
 - `fs` : FunctionSpace
 - `icomp` : component index
 - `with_bounds` : indicates if the identification should concerns only interior dofs (`with_bounds = false`) or all face dofs
-- `geom_factor` : a scaling factor to check that dofs distance is below the given tolerance
+- `eps_geom` : a relative tolerance to check that two dofs share the same position
 
 # Dev notes
 * in the following, we loop over faces of cell `i`, so everything related to this
@@ -555,7 +554,7 @@ function _deal_with_dofs_on_faces_geometrical!(;
     fs::AbstractFunctionSpace,
     icomp::Int,
     with_bounds::Bool,
-    geom_factor,
+    eps_geom,
 )
     # Alias
     icell_node_idx_g = c2n[icell]
@@ -610,7 +609,7 @@ function _deal_with_dofs_on_faces_geometrical!(;
                 jct,
                 jcell_nodes,
                 jdofs_l;
-                geom_factor,
+                eps_geom,
             )
 
             # Copy global indices
@@ -639,7 +638,7 @@ end
         cnodes_j,
         face_dofs_j;
         transformation = identity,
-        geom_factor = 1.0,
+        eps_geom = 1e-12,
     )
 
 Identify the correspondence between degrees of freedom (dofs) located on a face
@@ -650,7 +649,7 @@ shared by two neighboring elements by comparing their physical coordinates.
 - `ctype_i`, `ctype_j`: element types for elements `i` and `j`.
 - `cnodes_i`, `cnodes_j`: arrays of physical node coordinates for elements `i` and `j`.
 - `face_dofs_i`, `face_dofs_j`: local indices of the face dofs in each element.
-- `geom_factor` is a scaling coefficient to check the maximum admissible distance between two identified dof (leave 1 by default)
+- `eps_geom` is a relative tolerance to check the maximum admissible distance between two identified dofs
 
 # Returns
 - `Vector{Int}`: the output vector `i2j` indicates that for
@@ -666,8 +665,12 @@ function identify_face_dofs_from_coords(
     ctype_j,
     cnodes_j,
     face_dofs_j;
-    geom_factor = 1.0,
+    eps_geom = 1e-12,
 )
+    # If there is only one dof on the face, the mapping between the two faces is trivial
+    length(face_dofs_i) == length(face_dofs_j) == 1 && return SA[1]
+
+    # Ref shape of each cell
     shape_i = shape(ctype_i)
     shape_j = shape(ctype_j)
 
@@ -676,33 +679,22 @@ function identify_face_dofs_from_coords(
     jface_ξ = get_coords(fSpace, shape_j)[face_dofs_j]
 
     # Map into physical space
-    iface_x = [mapping(ctype_i, cnodes_i, ξ) for ξ in iface_ξ]
-    jface_x = [mapping(ctype_j, cnodes_j, ξ) for ξ in jface_ξ]
+    iface_x = map(ξ -> mapping(ctype_i, cnodes_i, ξ), iface_ξ)
+    jface_x = map(ξ -> mapping(ctype_j, cnodes_j, ξ), jface_ξ)
 
     # Compute point wise "distances"
-    # TODO: there might be a way to build and SMatrix because the number of dofs
-    # is statically known from the function space and the shape
-    D = zeros(length(iface_x), length(jface_x))
-    for i in eachindex(iface_x)
-        for j in eachindex(jface_x)
-            d = iface_x[i] - jface_x[j]
-            D[i, j] = d ⋅ d
-        end
-    end
+    D = distance_matrix(iface_x, jface_x)
 
     # Check the distances
-    # xc = center(jcell_nodes_g)
-    # cell_radius = minimum(x -> norm(x - xc), )
     extremas = [extrema(@view D[i, :]) for i in axes(D, 1)]
     max_dist = maximum(last.(extremas))
-    # @show first.(extremas)
-    # @show iface_x, jface_x
-    @assert all(first.(extremas) .< max(geom_factor*1e-20*max_dist, 10*eps(0.0)))
+    tol = eps_geom*max_dist
+    @assert all(first.(extremas) .< tol) "Could not identify dofs. Tol = $(tol) , first.(extremas) = $(first.(extremas))"
 
     # Identify the pairs. The array `i2j` indicates that for
     # the `ith` dof of the face (ie `face_dofs_i[i]` of  cell i), the corresponding dof
     # of face `j` is `i2j[i]` (ie `face_dofs_j[i2j]` of cell j).
-    i2j = [argmin(@view D[i, :]) for i in axes(D, 1)]
+    i2j = minimum_by_row(D)
 
     return i2j
 end
@@ -804,8 +796,7 @@ get_ncomponents(dhl::DofHandler) = size(dhl.offset, 2)
         offset,
         fSpace::AbstractFunctionSpace,
         ncomps::Integer,
-        periodicity::BoundaryFaceDomain{M, BC};
-        geom_factor = 1.0,
+        periodicity::BoundaryFaceDomain{M, BC}
     ) where {M, BC <: PeriodicBCType}
 
 Helper to edit the `iglob` array to take into account periodicity. For continuous
@@ -818,8 +809,9 @@ function apply_periodicity!(
     fSpace::AbstractFunctionSpace,
     ncomps::Integer,
     periodicity::BoundaryFaceDomain{M, BC};
-    geom_factor = 1.0,
 ) where {M, BC <: PeriodicBCType}
+    eps_geom = get_cache(periodicity).tol
+
     foreach_element(periodicity) do face, _, _
         # Unpack cells infos
         # Rq: because we are dealing with a PeriodicBCType,
@@ -852,7 +844,7 @@ function apply_periodicity!(
             ctype_p,
             cnodes_p,
             face_dofs_p;
-            geom_factor,
+            eps_geom,
         )
 
         # Now, erase the value of iglob for all `p` entries with `n` entries
@@ -873,10 +865,17 @@ function apply_periodicity!(
     offset,
     fSpace::AbstractFunctionSpace,
     ncomps::Integer,
-    periodicities;
-    geom_factor = 1.0,
+    periodicities,
 )
     foreach(periodicities) do periodicity
-        apply_periodicity!(iglob, offset, fSpace, ncomps, periodicity; geom_factor)
+        apply_periodicity!(iglob, offset, fSpace, ncomps, periodicity)
     end
+end
+
+function distance_matrix(a::NTuple{M}, b::NTuple{N}) where {M, N}
+    SMatrix{M, N}((ai - bj) ⋅ (ai - bj) for ai in a, bj in b)
+end
+
+function minimum_by_row(A::SMatrix{M, N}) where {M, N}
+    SVector{M}(argmin(@view A[i, :]) for i in axes(A, 1))
 end

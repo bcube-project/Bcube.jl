@@ -57,7 +57,7 @@
     @testset "Dof numbering" begin
         # Geometrically check that, for a mesh of two hexa side by side, the dof numbering
         # is correct (up to degree 5). Note that for degree ≤ 2, the numbering is built topologically
-        # only, and for degree ≥ 3 it is built topologically
+        # only, and for degree ≥ 3 it is built geometrically
         mesh = hexa_mesh(3, 2, 2; xmax = 2, zmax = 0.5)
         @test all(
             degree -> begin

@@ -184,8 +184,8 @@ Build a finite element space (scalar or vector) from a `FunctionSpace` and a `Me
 - `isContinuous::Bool = true` : if `true`, a continuous dof numbering is created. Otherwise, dof lying
 on cell nodes or cell faces are duplicated, not shared (discontinuous dof numbering)
 - `periodicity = nothing` : (for continuous spaces only) set of [`BoundaryFaceDomain`](@ref) built with a `PeriodicBCType`.
-- (advanced) `geom_factor = 1.` : in 3D, for function spaces with degree ≥ 3, a geometrical identification is performed
-to build the dof numbering. This `geom_factor` can help this geometrical identification
+- (advanced) `eps_geom = 1e-12` : in 3D, for function spaces with degree ≥ 3, a geometrical identification is performed
+to build the dof numbering. This `eps_geom` is a relative tolerance used to identify two dofs sharing the same position.
 - `kwargs` : for things such as parallel cache (internal/dev usage only)
 """
 function SingleFESpace(
@@ -195,10 +195,10 @@ function SingleFESpace(
     size::Int = 1,
     isContinuous::Bool = true,
     periodicity = nothing,
-    geom_factor = 1.0,
+    eps_geom = 1e-12,
     kwargs...,
 )
-    dhl = DofHandler(mesh, fSpace, size, isContinuous; periodicity, geom_factor)
+    dhl = DofHandler(mesh, fSpace, size, isContinuous; periodicity, eps_geom)
 
     # Convert String -> Symbols and ensure that every input boundary name is known in the mesh
     dirichletBndSymbols = Symbol.(dirichletBndNames)
