@@ -3,7 +3,7 @@ The `DofHandler` handles the degree of freedom numbering. To each degree of free
 is associated a unique integer.
 
 # Constructor
-`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool; periodicity = nothing, eps_geom = 1.)`
+`DofHandler(mesh::Mesh, fSpace::AbstractFunctionSpace, ncomponents::Int, isContinuous::Bool; periodicity = nothing, eps_geom = 1e-12)`
 
 For continuous spaces with periodicity conditions on the mesh, use the keyword argument `periodicity`
 by giving it a set of [`BoundaryFaceDomain`](@ref) built with a `PeriodicBCType`.
