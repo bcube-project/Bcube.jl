@@ -59,6 +59,7 @@
         # is correct (up to degree 5). Note that for degree ≤ 2, the numbering is built topologically
         # only, and for degree ≥ 3 it is built geometrically
         mesh = hexa_mesh(3, 2, 2; xmax = 2, zmax = 0.5)
+        max_degree = VERSION ≥ v"1.12" ? 5 : 2 # TODO on Julia 1.10, degrees ≥ 3 takes forever to build...
         @test all(
             degree -> begin
                 fs = FunctionSpace(:Lagrange, degree)
@@ -67,7 +68,7 @@
                 res = Bcube.check_numbering(space, mesh; exit_on_error = false)
                 return res.n_errors == 0
             end,
-            0:5,
+            0:max_degree,
         )
         # Same but in 2D for the "basic mesh"
         mesh = Bcube.basic_mesh()
