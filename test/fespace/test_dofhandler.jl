@@ -1,4 +1,41 @@
 @testset "DofHandler" begin
+    @testset "1D" begin
+        @testset "Periodicity" begin
+            # for line_mesh, dofs are ordered with their x-coordinate (if ncomp = 1)
+            mesh = line_mesh(3)
+            perio = PeriodicBCType(Translation(SA[-1.0]), "xmax", "xmin")
+            Γ_perio = BoundaryFaceDomain(mesh, perio)
+            fs = FunctionSpace(:Lagrange, 1)
+            dhl = DofHandler(mesh, fs, 1, true, periodicity = Γ_perio)
+            @test dhl.iglob == [1, 2, 2, 1]
+            dhl1 = DofHandler(mesh, fs, 1, false, periodicity = Γ_perio)
+            dhl2 = DofHandler(mesh, fs, 1, false)
+            @test dhl1.iglob == dhl2.iglob # discontinuous spaces should not be altered
+            dhl = DofHandler(mesh, fs, 2, true, periodicity = Γ_perio)
+            @test dhl.iglob == [1, 2, 3, 4, 2, 1, 4, 3]
+            dhl = DofHandler(
+                mesh,
+                FunctionSpace(:Lagrange, 2),
+                1,
+                true,
+                periodicity = Γ_perio,
+            )
+            @test dhl.iglob == [1, 2, 3, 3, 4, 1]
+
+            mesh = line_mesh(4)
+            perio = PeriodicBCType(Translation(SA[-1.0]), "xmax", "xmin")
+            Γ_perio = BoundaryFaceDomain(mesh, perio)
+            dhl = DofHandler(
+                mesh,
+                FunctionSpace(:Lagrange, 1),
+                1,
+                true,
+                periodicity = Γ_perio,
+            )
+            @test dhl.iglob == [1, 2, 2, 3, 3, 1]
+        end
+    end
+
     @testset "2D" begin
         @testset "Discontinuous" begin
 
@@ -17,7 +54,7 @@
             U = MultiFESpace(U_sca, U_sca)
 
             m = get_mapping(U, 2)
-            dhl = Bcube._get_dhl(get_fespace(U)[2])
+            dhl = Bcube.get_dhl(get_fespace(U)[2])
             @test m[get_dofs(U_sca, 1)] == collect(5:8)
             @test m[get_dof(dhl, 1, 1, 3)] == 7
             @test get_ndofs(dhl, 1) == 4
@@ -30,8 +67,8 @@
             m1 = get_mapping(U, 1)
             m2 = get_mapping(U, 2)
 
-            dhl1 = Bcube._get_dhl(get_fespace(U)[1])
-            dhl2 = Bcube._get_dhl(get_fespace(U)[2])
+            dhl1 = Bcube.get_dhl(get_fespace(U)[1])
+            dhl2 = Bcube.get_dhl(get_fespace(U)[2])
 
             @test m1[get_dofs(U1, 1)] == collect(1:9)
             @test m2[get_dofs(U2, 1)] == collect(10:13)
@@ -94,8 +131,8 @@
             m1 = get_mapping(U, 1)
             m2 = get_mapping(U, 2)
 
-            dhl1 = Bcube._get_dhl(get_fespace(U)[1])
-            dhl2 = Bcube._get_dhl(get_fespace(U)[2])
+            dhl1 = Bcube.get_dhl(get_fespace(U)[1])
+            dhl2 = Bcube.get_dhl(get_fespace(U)[2])
 
             @test m1[get_dofs(U1, 1)] == collect(1:9)
             @test m2[get_dofs(U2, 1)] == collect(10:13)
@@ -131,8 +168,8 @@
             m1 = get_mapping(U, 1)
             m2 = get_mapping(U, 2)
 
-            dhl1 = Bcube._get_dhl(get_fespace(U)[1])
-            dhl2 = Bcube._get_dhl(get_fespace(U)[2])
+            dhl1 = Bcube.get_dhl(get_fespace(U)[1])
+            dhl2 = Bcube.get_dhl(get_fespace(U)[2])
 
             @test m1[get_dofs(U1, 1)] == collect(1:9)
             @test m2[get_dofs(U2, 1)] == collect(10:13)
@@ -224,6 +261,59 @@
 
             @test get_dof(dhl, 1) == collect(1:9)
             @test get_dof(dhl, 2) == [3, 10, 11, 6, 12, 13, 9, 14, 15]
+
+            @testset "Periodicity" begin
+                mesh = rectangle_mesh(3, 2)
+                perio_x = PeriodicBCType(Translation(SA[-1.0, 0.0]), "xmax", "xmin")
+                Γ_perio_x = BoundaryFaceDomain(mesh, perio_x)
+                dhl = DofHandler(
+                    mesh,
+                    FunctionSpace(:Lagrange, 1),
+                    1,
+                    true;
+                    periodicity = Γ_perio_x,
+                )
+                @test dhl.iglob == [1, 2, 3, 4, 2, 1, 4, 3]
+
+                mesh = rectangle_mesh(4, 3)
+                perio_x = PeriodicBCType(Translation(SA[-1.0, 0.0]), "xmax", "xmin")
+                perio_y = PeriodicBCType(Translation(SA[0.0, -1.0]), "ymax", "ymin")
+                Γ_perio_x = BoundaryFaceDomain(mesh, perio_x)
+                Γ_perio_y = BoundaryFaceDomain(mesh, perio_y)
+                dhl = DofHandler(
+                    mesh,
+                    FunctionSpace(:Lagrange, 1),
+                    1,
+                    true;
+                    periodicity = (Γ_perio_x, Γ_perio_y),
+                )
+                @test dhl.iglob == [
+                    1,
+                    2,
+                    3,
+                    4,
+                    2,
+                    5,
+                    4,
+                    6,
+                    5,
+                    1,
+                    6,
+                    3,
+                    3,
+                    4,
+                    1,
+                    2,
+                    4,
+                    6,
+                    2,
+                    5,
+                    6,
+                    3,
+                    5,
+                    1,
+                ]
+            end
         end
     end
 
@@ -244,7 +334,7 @@
             U = MultiFESpace(U_sca, U_sca)
 
             m = get_mapping(U, 2)
-            dhl = Bcube._get_dhl(get_fespace(U)[2])
+            dhl = Bcube.get_dhl(get_fespace(U)[2])
 
             @test m[get_dofs(U_sca, 1)] == collect(9:16)
             @test m[get_dof(dhl, 1, 1, 3)] == 11

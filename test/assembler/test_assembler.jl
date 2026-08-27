@@ -618,6 +618,58 @@
         end
     end
 
+    @testset "Periodicity" begin
+        # We solve -Δ(u) = f on a rectangular periodic domain
+        # with f = α*(2π/lx)^2*cos(2π/lx*x) + β*(2π/ly)^2*sin(2π/ly*y),
+        # leading to u = α*cos(2π/lx*x) + β*sin(2π/ly*y).
+        # Rq: this test is actually not very good because omitting the periodicity
+        # in the x-direction will lead to the same L2-error. But for now I haven't
+        # found a better idea
+        degree = 1
+        lx = 1
+        ly = 2
+        mesh = rectangle_mesh(10, 20; xmax = lx, ymax = ly)
+        perio_x = PeriodicBCType(Translation(SA[lx, 0.0]), "xmin", "xmax")
+        perio_y = PeriodicBCType(Translation(SA[0.0, ly]), "ymin", "ymax")
+        Γ_perio_x = BoundaryFaceDomain(mesh, perio_x)
+        Γ_perio_y = BoundaryFaceDomain(mesh, perio_y)
+
+        U_u = TrialFESpace(
+            FunctionSpace(:Lagrange, degree),
+            mesh;
+            periodicity = (Γ_perio_x, Γ_perio_y),
+        )
+        V_u = TestFESpace(U_u)
+        U_λ = MultiplierFESpace(mesh, 1)
+        V_λ = TestFESpace(U_λ)
+        U = MultiFESpace(U_u, U_λ)
+        V = MultiFESpace(V_u, V_λ)
+
+        α = 2.0
+        β = 3.0
+
+        dΩ = Measure(CellDomain(mesh), 2degree+1)
+
+        f = PhysicalFunction(
+            xy -> α*(2π/lx)^2*cos(2π/lx*xy[1]) + β*(2π/ly)^2*sin(2π/ly*xy[2]),
+        )
+        a((u, λᵤ), (v, λᵥ)) = ∫(∇(u) ⋅ ∇(v) + λᵤ*v + u*λᵥ)dΩ
+        l((v, λᵥ)) = ∫(f*v)dΩ
+
+        # Replace with AffineFESystem once fixed
+        # sys = AffineFESystem(a, l, U, V)
+        # u, λ = solve(sys)
+        A = assemble_bilinear(a, U, V)
+        b = assemble_linear(l, V)
+        u, λ = FEFunction(U, A\b)
+
+        f_u_exact(xy) = α*cos(2π/lx*xy[1]) + β*sin(2π/ly*xy[2])
+        u_exact = PhysicalFunction(f_u_exact)
+
+        err_L2 = sqrt(sum(Bcube.compute(∫((u - u_exact) ⋅ (u - u_exact))dΩ)))
+        @test err_L2 ≤ 0.09
+    end
+
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials

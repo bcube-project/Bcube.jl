@@ -172,11 +172,11 @@
             @test length(Bcube.get_indices(subdomains[1])) == 5
             @test all(Bcube.get_indices(subdomains[1]) .== 1:5)
             @test all(
-                Bcube.get_cache(Γ_perio_x)[7][Bcube.get_indices(subdomains[1])] .==
+                Bcube.get_cache(Γ_perio_x).bndfaces1[Bcube.get_indices(subdomains[1])] .==
                 [106, 120, 123, 149, 151],
             )
             @test all(
-                Bcube.get_cache(Γ_perio_x)[8][Bcube.get_indices(subdomains[1])] .==
+                Bcube.get_cache(Γ_perio_x).bndfaces2[Bcube.get_indices(subdomains[1])] .==
                 [103, 114, 117, 145, 147],
             )
 
@@ -186,11 +186,11 @@
             @test length(Bcube.get_indices(subdomains[2])) == 5
             @test all(Bcube.get_indices(subdomains[2])[1:5] .== 6:10)
             @test all(
-                Bcube.get_cache(Γ_perio_x)[7][Bcube.get_indices(subdomains[2])] .==
+                Bcube.get_cache(Γ_perio_x).bndfaces1[Bcube.get_indices(subdomains[2])] .==
                 [268, 270, 272, 274, 276],
             )
             @test all(
-                Bcube.get_cache(Γ_perio_x)[8][Bcube.get_indices(subdomains[2])] .==
+                Bcube.get_cache(Γ_perio_x).bndfaces2[Bcube.get_indices(subdomains[2])] .==
                 [185, 188, 191, 194, 197],
             )
 
@@ -203,11 +203,11 @@
             @test length(Bcube.get_indices(subdomains[1])) == 9
             @test all(Bcube.get_indices(subdomains[1]) .== 1:9)
             @test all(
-                Bcube.get_cache(Γ_perio_y)[7][Bcube.get_indices(subdomains[1])] .==
+                Bcube.get_cache(Γ_perio_y).bndfaces1[Bcube.get_indices(subdomains[1])] .==
                 [39, 46, 63, 77, 80, 82, 92, 132, 138],
             )
             @test all(
-                Bcube.get_cache(Γ_perio_y)[8][Bcube.get_indices(subdomains[1])] .==
+                Bcube.get_cache(Γ_perio_y).bndfaces2[Bcube.get_indices(subdomains[1])] .==
                 [196, 207, 217, 227, 237, 247, 257, 267, 277],
             )
         end

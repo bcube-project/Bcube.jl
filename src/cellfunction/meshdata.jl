@@ -77,7 +77,7 @@ function convert_to_lagrange_P1(mesh::AbstractMesh, data::MeshData{PointData})
     # (especially coming from ill-constructed input file).
     fs = FunctionSpace(:Lagrange, 1)
     U = TrialFESpace(fs, mesh)
-    dhl = _get_dhl(U)
+    dhl = get_dhl(U)
     node2idof = zeros(Int, nnodes(mesh))
     for cellInfo in DomainIterator(CellDomain(mesh))
         cshape = shape(celltype(cellInfo))

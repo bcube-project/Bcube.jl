@@ -86,7 +86,7 @@ Construct sub‑domains for periodic boundaries, grouped by face type (including
 
 # Arguments
 - `mesh`: the mesh on which the periodic boundary is defined.
-- `perio_cache`: a cache tuple returned by `_compute_periodicity`, containing at least
+- `perio_cache`: a cache tuple returned by `compute_periodicity`, containing at least
   `bnd_f2c` (boundary face to cell connectivity) and `bnd_ftypes` (boundary face types).
 
 # Returns
@@ -234,7 +234,7 @@ LazyOperators.pretty_name(domain::BoundaryFaceDomain) = "BoundaryFaceDomain"
 indices(d::BoundaryFaceDomain) = get_cache(d)
 
 function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
-    cache = _compute_periodicity(
+    cache = compute_periodicity(
         mesh,
         labels_master(bc),
         labels_slave(bc),
@@ -267,10 +267,17 @@ function indices(d::BoundaryFaceDomain{M, <:PeriodicBCType}) where {M}
 end
 
 """
-    Find periodic face connectivities sush as :
-    (faces of `labels2`) = A(faces of `labels1`)
+    compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
+
+Find periodic face connectivities such as :
+(faces of `labels2`) = A(faces of `labels1`)
+
+`A` is the geometric transformation (translation, rotation) between the
+two limits in relation.
 """
-function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
+function compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
+    # Smoke test : it's easy to set a wrong transformation and the error obtained later on is hard to debug
+    @assert length(A(get_coords(first(get_nodes(mesh))))) == spacedim(mesh) "Input periodic transformation does not respect mesh space dimensions"
 
     # Get cell -> node connectivity
     c2n = connectivities_indices(mesh, :c2n)
@@ -396,6 +403,7 @@ function _compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
         bnd_n2n,
         bndfaces1,
         bndfaces2,
+        tol,
     )
 end
 
@@ -403,6 +411,7 @@ end
     BoundaryFaceDomain(mesh)
     BoundaryFaceDomain(mesh, label::String)
     BoundaryFaceDomain(mesh, labels::Tuple{String, Vararg{String}})
+    BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
 
 Build a `BoundaryFaceDomain` corresponding to the boundaries designated by one
 or several labels (=names).
@@ -1121,7 +1130,7 @@ function _foreach_element(
     backend::AbstractBcubeBackend,
 ) where {F <: Function, D <: AbstractDomain, SD <: Bcube.SubDomain}
     indices = Bcube.get_indices(subdomain)
-    iter_subdomain = Bcube.SubDomainIterator(domain, subdomain)
+    iter_subdomain = SubDomainIterator(domain, subdomain)
     for i in eachindex(indices)
         f(iter_subdomain[i]...)
     end
