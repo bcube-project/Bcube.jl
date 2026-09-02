@@ -66,37 +66,53 @@ end
     convert_to_lagrange_P1(mesh::AbstractMesh, data::MeshData{PointData})
 
 Return a Lagrange P1 representation of the `MeshPointData`.
+
+# Examples
+Scalar field
+```julia
+nx = ny = 10
+mesh = rectangle_mesh(nx, ny)
+node_values = MeshPointData([i+j for i in 1:nx for j in 1:ny])
+u_sca = Bcube.convert_to_lagrange_P1(mesh, node_values)
+```
+
+Vector field
+```julia
+nx = ny = 10
+mesh = rectangle_mesh(nx, ny)
+node_values = MeshPointData([[i,j] for i in 1:nx for j in 1:ny])
+u_vec = Bcube.convert_to_lagrange_P1(mesh, node_values)
+```
 """
 function convert_to_lagrange_P1(mesh::AbstractMesh, data::MeshData{PointData})
-    # For now, only "scalar" MeshPointData are supported
-    @assert ndims(get_values(data)) == 1 "Only scalar data are supported for now"
-    @assert length(get_values(data)) == nnodes(mesh)
+    vals = get_values(data)
 
-    # Build the node -> dof numbering
-    # Warning : in the mesh, it can exist some nodes that don't belong to any element
-    # (especially coming from ill-constructed input file).
+    @assert length(vals) == nnodes(mesh)
+
+    # Get the size of the FESpace
+    ncomps = length(first(vals))
+
+    # Create the FEFunction
     fs = FunctionSpace(:Lagrange, 1)
-    U = TrialFESpace(fs, mesh)
+    U = TrialFESpace(fs, mesh; size = ncomps)
     dhl = get_dhl(U)
-    node2idof = zeros(Int, nnodes(mesh))
-    for cellInfo in DomainIterator(CellDomain(mesh))
-        cshape = shape(celltype(cellInfo))
-        icell = cellindex(cellInfo)
-        c2n = get_nodes_index(cellInfo)
-        for (ivertex_l, idofs_l) in enumerate(idof_by_vertex(fs, cshape))
-            ivertex_g = c2n[ivertex_l]
-            idof_g = get_dof(dhl, icell, 1, first(idofs_l)) # there is only one dof per vertex with Lagrange P1
-            node2idof[ivertex_g] = idof_g
+    u = FEFunction(U)
+    dofValues = get_dof_values(u)
+
+    # Loop over the mesh cells. In each cell, loop over the vertices and the dofs (same number)
+    # and set the dof values.
+    for cinfo in DomainIterator(CellDomain(mesh))
+        cshape = shape(celltype(cinfo))
+        icell = cellindex(cinfo)
+        c2n = get_nodes_index(cinfo)
+        for (ivertex_g, idofs_l) in zip(c2n, idof_by_vertex(fs, cshape))
+            idof_l = first(idofs_l) # there is only one dof per vertex with Lagrange P1
+            idofs_g = map(icomp -> get_dof(dhl, icell, icomp, idof_l), 1:ncomps)
+            dofValues[idofs_g] .= vals[ivertex_g]
         end
     end
 
-    # Filter to eliminate nodes belonging to no cell
-    ind = findall(x -> x > 0, node2idof)
-    perm = invperm(node2idof[ind])
-    vals = get_values(data)[ind]
-
-    # Reorder the MeshPointData values to match the dof ordering
-    return FEFunction(U, vals[perm])
+    return u
 end
 
 _wrap_value(value) = value
