@@ -1003,6 +1003,9 @@ function domain_to_mesh(domain::CellDomain; clipped_bnd_name = "CLIPPED_BND")
     bnd_nodes[tag] = unique(I_nodes_o2n[exterior_nodes])
     bnd_names[tag] = clipped_bnd_name
 
+    # Metadata
+    metadata = ParentMeshMetaData(I_nodes_n2o, I_cells_n2o)
+
     # New mesh
     return Mesh(
         get_nodes(mesh)[I_nodes_n2o],
@@ -1010,6 +1013,7 @@ function domain_to_mesh(domain::CellDomain; clipped_bnd_name = "CLIPPED_BND")
         c2n_new;
         bc_names = bnd_names,
         bc_nodes = bnd_nodes,
+        metadata,
     )
 end
 
