@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>How to... (FAQ) · Bcube</title><meta name="title" content="How to... (FAQ) · Bcube"/><meta property="og:title" content="How to... (FAQ) · Bcube"/><meta property="twitter:title" content="How to... (FAQ) · Bcube"/><meta name="description" content="Documentation for Bcube."/><meta property="og:description" content="Documentation for Bcube."/><meta property="twitter:description" content="Documentation for Bcube."/><meta property="og:url" content="https://bcube-project.github.io/Bcube.jl/howto/howto/"/><meta property="twitter:url" content="https://bcube-project.github.io/Bcube.jl/howto/howto/"/><link rel="canonical" href="https://bcube-project.github.io/Bcube.jl/howto/howto/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.jpg" alt="Bcube logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Bcube</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/conventions/">Conventions</a></li><li><a class="tocitem" href="../../manual/geometry/">Geometry and mesh</a></li><li><a class="tocitem" href="../../manual/integration/">Integration</a></li><li><a class="tocitem" href="../../manual/cellfunction/">Cell function</a></li><li><a class="tocitem" href="../../manual/function_space/">Function and FE spaces</a></li><li><a class="tocitem" href="../../manual/operator/">LazyOperators</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../api/mesh/mesh/">Mesh</a></li><li><a class="tocitem" href="../../api/mesh/gmsh_utils/">GMSH</a></li><li><a class="tocitem" href="../../api/mesh/mesh_generator/">Mesh generator</a></li><li><a class="tocitem" href="../../api/interpolation/shape/">Reference shape</a></li><li><a class="tocitem" href="../../api/interpolation/function_space/">Function spaces</a></li><li><a class="tocitem" href="../../api/interpolation/fespace/">Finite element spaces</a></li><li><a class="tocitem" href="../../api/mapping/mapping/">Mapping</a></li><li><a class="tocitem" href="../../api/integration/integration/">Integration</a></li><li><a class="tocitem" href="../../api/dof/dof/">Degree of freedom</a></li><li><a class="tocitem" href="../../api/io/io_interface/">IO interface</a></li></ul></li><li class="is-active"><a class="tocitem" href>How to... (FAQ)</a><ul class="internal"><li><a class="tocitem" href="#Build-your-own-LazyOperator"><span>Build your own <code>LazyOperator</code></span></a></li><li><a class="tocitem" href="#Evaluate-a-LazyOperator-on-a-specific-point"><span>Evaluate a <code>LazyOperator</code> on a specific point</span></a></li><li><a class="tocitem" href="#Get-the-coordinates-of-Lagrange-dofs"><span>Get the coordinates of Lagrange dofs</span></a></li><li><a class="tocitem" href="#Loop-over-the-cells-or-faces-of-a-mesh"><span>Loop over the cells or faces of a mesh</span></a></li><li><a class="tocitem" href="#Export-face-normals-to-a-CSV-file"><span>Export face normals to a CSV file</span></a></li><li><a class="tocitem" href="#Comparing-manually-the-benchmarks-with-main"><span>Comparing manually the benchmarks with <code>main</code></span></a></li><li><a class="tocitem" href="#Run-the-benchmark-manually"><span>Run the benchmark manually</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>How to... (FAQ)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>How to... (FAQ)</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/bcube-project/Bcube.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/bcube-project/Bcube.jl/blob/main/docs/src/howto/howto.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="How-to...-(FAQ)"><a class="docs-heading-anchor" href="#How-to...-(FAQ)">How to... (FAQ)</a><a id="How-to...-(FAQ)-1"></a><a class="docs-heading-anchor-permalink" href="#How-to...-(FAQ)" title="Permalink"></a></h1><h2 id="Build-your-own-LazyOperator"><a class="docs-heading-anchor" href="#Build-your-own-LazyOperator">Build your own <code>LazyOperator</code></a><a id="Build-your-own-LazyOperator-1"></a><a class="docs-heading-anchor-permalink" href="#Build-your-own-LazyOperator" title="Permalink"></a></h2><p>Imagine that you want some kind of function (~operator) that has a different behavior depending on the cell (or face) it is applied to. The <code>PhysicalFunction</code> won&#39;t do the job since it is assumed that the provided function applies the same way in all the different cells. What you want is a <code>LazyOperator</code>. Here is how to build a custom one.</p><p>For the example, let&#39;s say that you want an operator whose action is to multiply <code>x</code>, the evaluated point, by the index of the cell surrounding <code>x</code>. Start importing some Bcube material and by declaring a type corresponding to this operator:</p><pre><code class="language-julia hljs">using Bcube
+import Bcube: CellInfo, CellPoint, get_coords
+struct DummyOperator &lt;: Bcube.AbstractLazy end</code></pre><p>Then, specify what happens when <code>Bcube</code> asks for the restriction of your operator in a given cell. This is done before applying it to any point. In most case, you don&#39;t want to do anything special, so just return the operator itself:</p><pre><code class="language-julia hljs">Bcube.materialize(op::DummyOperator, ::CellInfo) = op</code></pre><p>Now, specify what to return when <code>Bcube</code> wants to apply this operator on a given point in a cell. As said earlier, we want it the return the point, multiplied by the cell index (but it could be anything you want):</p><pre><code class="language-julia hljs">function Bcube.materialize(
+    ::DummyOperator,
+    cPoint::CellPoint,
+)
+    x = get_coords(cPoint)
+    cInfo = Bcube.get_cellinfo(cPoint)
+    index = Bcube.cellindex(cInfo)
+    return x * index
+end</code></pre><p>That&#39;s it! To see your operator in action, take a look at the related <a href="#Evaluate-a-LazyOperator-on-a-specific-point">section</a>.</p><p>In this short example, note that we restricted ourselves to <code>CellPoint</code> : the <code>DummyOperator</code> won&#39;t be applicable to a face. To do so, you have to specialize the materialization on a <code>Side</code> of a <code>FaceInfo</code> and on a <code>Side</code> of a <code>FacePoint</code>. Checkout the source code for <code>TangentialProjector</code> to see this in action. Besides, the <code>CellPoint</code> is parametrized by a <code>DomainStyle</code>, allowing to specify different behavior depending on if your operator is applied to a point in the <code>ReferenceDomain</code> or in the <code>PhysicalDomain</code>.</p><h2 id="Evaluate-a-LazyOperator-on-a-specific-point"><a class="docs-heading-anchor" href="#Evaluate-a-LazyOperator-on-a-specific-point">Evaluate a <code>LazyOperator</code> on a specific point</a><a id="Evaluate-a-LazyOperator-on-a-specific-point-1"></a><a class="docs-heading-anchor-permalink" href="#Evaluate-a-LazyOperator-on-a-specific-point" title="Permalink"></a></h2><p>Suppose that you have built a mesh and defined a <code>LazyOperator</code> on this mesh and you want, for debug purpose, evaluate this operator on a point of your choice. First, let&#39;s define our example operator:</p><pre><code class="language-julia hljs">using Bcube
+mesh = circle_mesh(10)
+op = Bcube.TangentialProjector()</code></pre><p>Then, let&#39;s define the point where we want to evaluate this operator. For this, we need to create a so-called <code>CellPoint</code>. It&#39;s structure is quite basic : it needs the coordinates, the mesh cell owning these coordinates, and if the coordinates are given in the <code>ReferenceDomain</code> or in the <code>PhysicalDomain</code>. Here, we will select the first cell of the mesh, and choose the coordinates <code>[0.5]</code> (recall that we are in 1D, hence this vector of one component):</p><pre><code class="language-julia hljs">cInfo = Bcube.CellInfo(mesh, 1)
+cPoint = Bcube.CellPoint([0.5], cInfo, Bcube.ReferenceDomain())</code></pre><p>Now, they are always two steps to evaluate a <code>LazyOperator</code>. First we need to materialize it on a cell (or a face) and then to evaluate it on a cell-point (or face-point). The materialization on a cell does not necessarily triggers something, it depends on the operator. For instance, an analytic function will not have a specific behaviour depending on the cell; however a shape function will.</p><pre><code class="language-julia hljs">op_cell = Bcube.materialize(op, cInfo)</code></pre><p>Finally, we can apply our operator on the cell point defined above and observe the result. It is also called a &quot;materialization&quot;:</p><pre><code class="language-julia hljs">@show Bcube.materialize(op_cell, cPoint)</code></pre><p>Note that before and after the materialization on a cell point, the operator can be displayed as a tree with</p><pre><code class="language-julia hljs">Bcube.show_lazy_operator(op)
+Bcube.show_lazy_operator(op_cell)</code></pre><h2 id="Get-the-coordinates-of-Lagrange-dofs"><a class="docs-heading-anchor" href="#Get-the-coordinates-of-Lagrange-dofs">Get the coordinates of Lagrange dofs</a><a id="Get-the-coordinates-of-Lagrange-dofs-1"></a><a class="docs-heading-anchor-permalink" href="#Get-the-coordinates-of-Lagrange-dofs" title="Permalink"></a></h2><p>For a <strong>Lagrange</strong> &quot;uniform&quot; function space, the dofs corresponds to vertices. The following <code>lagrange_dof_to_coords</code> function returns a matrix : each line contains the coordinates of the dof corresponding to the line number.</p><pre><code class="language-julia hljs">function lagrange_dof_to_coords(mesh, degree)
+    U = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh)
+    coords = map(1:Bcube.spacedim(mesh)) do i
+        f = PhysicalFunction(x -&gt; x[i])
+        u = FEFunction(U)
+        projection_l2!(u, f, mesh)
+        return get_dof_values(u)
+    end
+    return hcat(coords...)
+end</code></pre><p>For instance:</p><pre><code class="language-julia hljs">using Bcube
+mesh = rectangle_mesh(2, 3; xmin = 1, xmax = 2, ymin = 3, ymax = 5)
+coords = lagrange_dof_to_coords(mesh, 1)
+@show coords[2] # coordinates of dof &#39;2&#39; in the global numbering</code></pre><h2 id="Loop-over-the-cells-or-faces-of-a-mesh"><a class="docs-heading-anchor" href="#Loop-over-the-cells-or-faces-of-a-mesh">Loop over the cells or faces of a mesh</a><a id="Loop-over-the-cells-or-faces-of-a-mesh-1"></a><a class="docs-heading-anchor-permalink" href="#Loop-over-the-cells-or-faces-of-a-mesh" title="Permalink"></a></h2><p>Let&#39;s say you have a <code>Mesh</code> with one or several limits</p><pre><code class="language-julia hljs">using Bcube
+mesh = rectangle_mesh(2, 3)
+Ω = CellDomain(mesh)
+Γ = InteriorFaceDomain(mesh)
+Λ = BoundaryFaceDomain(mesh, (&quot;xmin&quot;, &quot;ymin&quot;))</code></pre><p>You can loop over the mesh cell and/or faces using the <code>DomainIterator</code> iterator associated to any &quot;domain&quot;. Each item is either a <code>CellInfo</code> or a <code>FaceInfo</code> (or a <code>CellSide</code>) depending on the nature of the domain. This information contains all the geometric information about the entity:</p><pre><code class="language-julia hljs"># Loop over the different domains (to illustrate that it works for different kind of domains)
+for (domain, legend) in zip((Ω, Γ, Λ), (&quot;Cells in Ω&quot;, &quot;Faces in Γ&quot;, &quot;Faces in Λ&quot;))
+    println(&quot;\n-----------&quot;)
+    println(legend)
+    println(&quot;-----------&quot;)
+
+    # Loop over the elements (cells of faces) in this domain
+    for element in Bcube.DomainIterator(domain)
+
+        # index of the cell/face in the mesh
+        println(&quot;&quot;)
+        println(&quot;Element $(Bcube.get_element_index(element))&quot;)
+
+        # show the nodes index forming this element
+        @show Bcube.get_nodes_index(element)
+
+        # array of the &quot;Node&quot; forming this element
+        elt_nodes = Bcube.nodes(element)
+        @show elt_nodes
+
+        # element &quot;entity type&quot; (Bar2_t, Quad4_t etc)
+        elt_type = Bcube.get_element_type(element)
+        @show elt_type
+
+        # element center
+        elt_center = Bcube.center(elt_type, elt_nodes)
+        @show elt_center
+
+        # Additionnal info for faces
+        if element isa Bcube.FaceInfo
+            # Access the CellInfo of the neighbor cell (&quot;negative&quot; cell)
+            # For interior faces only, the &quot;positive&quot; side can be retrieved
+            # as well (with side_p)
+            neighbor_cell_n = side_n(element)
+
+            # We can also retrieve the local index of the face in the neighbor cells
+            # Note that boundary faces only have one neighbor cell, which is on the
+            # negative side by convention.
+            kside = Bcube.get_cell_side_n(element)
+
+            # Normal of the face at the face center using the low level API
+            cell_type = Bcube.get_element_type(neighbor_cell_n)
+            cell_nodes = Bcube.nodes(neighbor_cell_n)
+            @show Bcube.normal(cell_type, cell_nodes, kside, elt_center)
+        end
+    end
+end</code></pre><h2 id="Export-face-normals-to-a-CSV-file"><a class="docs-heading-anchor" href="#Export-face-normals-to-a-CSV-file">Export face normals to a CSV file</a><a id="Export-face-normals-to-a-CSV-file-1"></a><a class="docs-heading-anchor-permalink" href="#Export-face-normals-to-a-CSV-file" title="Permalink"></a></h2><p>Imagine that you want to export some face normals (of one boundary for instance) in a CSV file to check their orientation. You can get inspiration from this script:</p><pre><code class="language-julia hljs">using Bcube
+using DelimitedFiles
+using SparseArrays
+
+# Build a toy mesh and extract some boundaries
+mesh = rectangle_mesh(3, 4)
+Ω = CellDomain(mesh)
+Λ = BoundaryFaceDomain(mesh, (&quot;xmin&quot;, &quot;ymin&quot;))
+
+# Get face normals
+nΛ = get_face_normals(Λ)
+
+# Compute : location of face centers, normals and surface of each face
+dΛ = Measure(Λ, 1)
+x = Bcube.compute(∫(side_n(PhysicalFunction(x -&gt; x)))dΛ)
+n = Bcube.compute(∫(side_n(nΛ))dΛ)
+s = Bcube.compute(∫(side_n(PhysicalFunction(x -&gt; 1)))dΛ)
+
+# Get non-zeros values (results are sparse vectors from now)
+_, x = findnz(x)
+_, n = findnz(n)
+_, s = findnz(s)
+
+# Use surface to &quot;correct&quot; x and n
+x = x ./ s
+n = n ./ s
+
+# Prepare data for output
+x = transpose(hcat(x...))
+n = transpose(hcat(n...))
+y = hcat(x, n)
+
+# Write normals as CSV
+a = (&quot;x&quot;, &quot;y&quot;, &quot;z&quot;)[1:Bcube.spacedim(mesh)]
+header = join(a, &quot;,&quot;) * &quot;,&quot; * join(&quot;n&quot; .* a, &quot;,&quot;)
+open(joinpath(@__DIR__, &quot;output.csv&quot;), &quot;w&quot;) do io
+    println(io, header)
+    writedlm(io, y, &quot;,&quot;)
+end
+
+# Write mesh as VTK
+write_vtk(joinpath(@__DIR__, &quot;output&quot;), mesh)</code></pre><p>Note that once the CSV file is obtained, the normals can be visualized for instance with Paraview by using three consecutive filters:</p><ul><li><code>TableToPoints</code> to convert coordinates into points</li><li><code>Calculator</code> to convert &quot;normals columns&quot; into vectors (using <code>iHat</code>, <code>jHat</code> etc)</li><li><code>Glyph</code> to visualized these vectors</li></ul><h2 id="Comparing-manually-the-benchmarks-with-main"><a class="docs-heading-anchor" href="#Comparing-manually-the-benchmarks-with-main">Comparing manually the benchmarks with <code>main</code></a><a id="Comparing-manually-the-benchmarks-with-main-1"></a><a class="docs-heading-anchor-permalink" href="#Comparing-manually-the-benchmarks-with-main" title="Permalink"></a></h2><p>Let&#39;s say you want to compare the performance of your current branch (named &quot;target&quot; hereafter) with the <code>main</code> branch (named &quot;baseline&quot; hereafter).</p><p>Open from <code>Bcube.jl/</code> a REPL and type:</p><pre><code class="language-julia hljs">pkg&gt; activate --temp
+pkg&gt; add BenchmarkTools PkgBenchmark StaticArrays UnPack
+pkg&gt; dev .
+using PkgBenchmark
+import Bcube
+benchmarkpkg(Bcube, BenchmarkConfig(; env = Dict(&quot;JULIA_NUM_THREADS&quot; =&gt; &quot;1&quot;)); resultfile = joinpath(@__DIR__, &quot;result-target.json&quot;))</code></pre><p>This will create a <code>result-target.json</code> in the current directory.</p><p>Then checkout the <code>main</code> branch. Start a fresh REPL and type (almost the same):</p><pre><code class="language-julia hljs">pkg&gt; activate --temp
+pkg&gt; add BenchmarkTools PkgBenchmark StaticArrays UnPack
+pkg&gt; dev .
+using PkgBenchmark
+import Bcube
+benchmarkpkg(Bcube, BenchmarkConfig(; env = Dict(&quot;JULIA_NUM_THREADS&quot; =&gt; &quot;1&quot;)); resultfile = joinpath(@__DIR__, &quot;result-baseline.json&quot;))</code></pre><p>This will create a <code>result-baseline.json</code> in the current directory.</p><p>You can now &quot;compare&quot; the two files by running (watch-out for the order):</p><pre><code class="language-julia hljs">target = PkgBenchmark.readresults(&quot;result-target.json&quot;)
+baseline = PkgBenchmark.readresults(&quot;result-baseline.json&quot;)
+judgement = judge(target, baseline)
+export_markdown(&quot;judgement.md&quot;, judgement)</code></pre><p>This will create the markdown file <code>judgement.md</code> with the results.</p><p>For more details, once you&#39;ve built the <code>judgement</code> object, you can also type the following code from <code>https://github.com/tkf/BenchmarkCI.jl</code>:</p><pre><code class="language-julia hljs">open(&quot;detailed-judgement.md&quot;, &quot;w&quot;) do io
+    println(io, &quot;# Judge result&quot;)
+    export_markdown(io, judgement)
+    println(io)
+    println(io)
+    println(io, &quot;---&quot;)
+    println(io, &quot;# Target result&quot;)
+    export_markdown(io, PkgBenchmark.target_result(judgement))
+    println(io)
+    println(io)
+    println(io, &quot;---&quot;)
+    println(io, &quot;# Baseline result&quot;)
+    export_markdown(io, PkgBenchmark.baseline_result(judgement))
+    println(io)
+    println(io)
+    println(io, &quot;---&quot;)
+end</code></pre><h2 id="Run-the-benchmark-manually"><a class="docs-heading-anchor" href="#Run-the-benchmark-manually">Run the benchmark manually</a><a id="Run-the-benchmark-manually-1"></a><a class="docs-heading-anchor-permalink" href="#Run-the-benchmark-manually" title="Permalink"></a></h2><p>Let&#39;s say you want to run the benchmarks locally (without comparing with <code>main</code>)</p><p>Open from <code>Bcube.jl/</code> a REPL and type:</p><pre><code class="language-julia hljs">pkg&gt; activate --temp
+pkg&gt; add BenchmarkTools PkgBenchmark StaticArrays WriteVTK UnPack
+pkg&gt; dev .
+using PkgBenchmark
+import Bcube
+results = benchmarkpkg(Bcube, BenchmarkConfig(; env = Dict(&quot;JULIA_NUM_THREADS&quot; =&gt; &quot;1&quot;)); resultfile = joinpath(@__DIR__, &quot;result.json&quot;))
+export_markdown(&quot;results.md&quot;, results)</code></pre><p>This will create the markdown file <code>results.md</code> with the results.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../api/io/io_interface/">« IO interface</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Tuesday 28 January 2025 14:50">Tuesday 28 January 2025</span>. Using Julia version 1.10.8.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
