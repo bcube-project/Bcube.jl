@@ -14,7 +14,7 @@ cells (dofs on vertices, on edges, on faces...). In 1D and 2D, this research is 
 In 3D, a geometrical research is performed for function spaces with degree greater than 2.
 
 !!! tip
-    See [check_numbering](@ref) to perform a check that all dofs shared by several entities have an unique
+    See [`check_numbering`](@ref) to perform a check that all dofs shared by several entities have an unique
     identifier.
 """
 struct DofHandler{A, B}

@@ -68,7 +68,8 @@
     end
 
     @testset "PointData" begin
-        # Note that the first node doesn't belong to any segment
+        # Scalar test
+        ## Note that the first node doesn't belong to any segment
         nodes = [Node([1.0]), Node([2.0]), Node([3.0]), Node([4.0]), Node([5.0])]
         celltypes = [Bar2_t(), Bar2_t(), Bar2_t()]
         cell2node = Connectivity([2, 2, 2], [3, 4, 2, 3, 4, 5]) # note that the segment are not in natural order (to complexify)
@@ -79,5 +80,14 @@
         u = Bcube.convert_to_lagrange_P1(mesh, data)
 
         @test get_dof_values(u) == [3, 4, 2, 5]
+
+        # Vector test
+        mesh = Bcube.one_cell_mesh(:bar)
+        icell = 1
+        node_values = Bcube.MeshPointData([[1, 10], [2, 20]])
+        u = Bcube.convert_to_lagrange_P1(mesh, node_values)
+        dhl = Bcube.get_dhl(Bcube.get_fespace(u))
+        @test get_dof_values(u)[Bcube.get_dof(dhl, icell, 1)] == [1, 2]
+        @test get_dof_values(u)[Bcube.get_dof(dhl, icell, 2)] == [10, 20]
     end
 end
