@@ -10,7 +10,7 @@ sub‑domains of the same element type (e.g., for coloring or labeling). This
 structure is primarily intended for internal organization of mesh entities
 belonging to a `Domain`.
 """
-struct SubDomain{A,E,I} <: AbstractSubDomain
+struct SubDomain{A, E, I} <: AbstractSubDomain
     tag::A
     elementType::E
     indices::I
@@ -114,7 +114,7 @@ end
 An `AbstractDomain` designates any set of entities from a mesh. For instance a set of
 cells, a set of faces etc.
 """
-abstract type AbstractDomain{M<:AbstractMesh} end
+abstract type AbstractDomain{M <: AbstractMesh} end
 
 @inline get_subdomains(domain::AbstractDomain) = domain.subdomains
 @inline get_mesh(domain::AbstractDomain) = domain.mesh
@@ -138,11 +138,11 @@ function get_bcube_backend(domain::AbstractDomain)
     get_bcube_backend(get_mesh(domain))
 end
 
-function get_subdomains(domain::AbstractDomain, tag, f=sdom -> get_tag(sdom) == tag)
+function get_subdomains(domain::AbstractDomain, tag, f = sdom -> get_tag(sdom) == tag)
     filter(f, get_subdomains(domain))
 end
 
-abstract type AbstractCellDomain{M,I} <: AbstractDomain{M} end
+abstract type AbstractCellDomain{M, I} <: AbstractDomain{M} end
 
 """
 A `CellDomain` is a representation of the cells of a mesh. It's primary
@@ -164,7 +164,7 @@ julia> Ω_selected = CellDomain(mesh, selectedCells)
     To create a `CellDomain` from a geometrical criterion, use first [`identify_cells`](@ref)
     to obtain the corresponding indices.
 """
-struct CellDomain{M,SD,T} <: AbstractCellDomain{M,I}
+struct CellDomain{M, SD, T} <: AbstractCellDomain{M, I}
     mesh::M
     subdomains::SD
     uniqueTags::T
@@ -187,7 +187,7 @@ LazyOperators.pretty_name(domain::CellDomain) = "CellDomain"
 
 abstract type AbstractFaceDomain{M} <: AbstractDomain{M} end
 
-struct InteriorFaceDomain{M,SD,T} <: AbstractFaceDomain{M}
+struct InteriorFaceDomain{M, SD, T} <: AbstractFaceDomain{M}
     mesh::M
     subdomains::SD
     uniqueTags::T
@@ -202,7 +202,7 @@ function InteriorFaceDomain(mesh::Mesh, indices::AbstractVector{<:Integer})
 end
 LazyOperators.pretty_name(domain::InteriorFaceDomain) = "InteriorFaceDomain"
 
-struct AllFaceDomain{M,SD,T} <: AbstractFaceDomain{M}
+struct AllFaceDomain{M, SD, T} <: AbstractFaceDomain{M}
     mesh::M
     subdomains::SD
     uniqueTags::T
@@ -216,7 +216,7 @@ function AllFaceDomain(mesh::AbstractMesh, indices)
 end
 LazyOperators.pretty_name(domain::AllFaceDomain) = "AllFaceDomain"
 
-struct BoundaryFaceDomain{M,BC,L,C,SD,T} <: AbstractFaceDomain{M}
+struct BoundaryFaceDomain{M, BC, L, C, SD, T} <: AbstractFaceDomain{M}
     mesh::M
     bc::BC
     labels::L
@@ -226,7 +226,7 @@ struct BoundaryFaceDomain{M,BC,L,C,SD,T} <: AbstractFaceDomain{M}
 end
 @inline get_mesh(d::BoundaryFaceDomain) = d.mesh
 @inline topodim(d::BoundaryFaceDomain) = topodim(get_mesh(d)) - 1
-@inline bctype(::BoundaryFaceDomain{M,BC}) where {M,BC} = BC
+@inline bctype(::BoundaryFaceDomain{M, BC}) where {M, BC} = BC
 @inline get_bc(d::BoundaryFaceDomain) = d.bc
 @inline get_cache(d::BoundaryFaceDomain) = d.cache
 LazyOperators.pretty_name(domain::BoundaryFaceDomain) = "BoundaryFaceDomain"
@@ -261,7 +261,7 @@ function BoundaryFaceDomain(mesh::Mesh, bc::PeriodicBCType)
     )
 end
 
-function indices(d::BoundaryFaceDomain{M,<:PeriodicBCType}) where {M}
+function indices(d::BoundaryFaceDomain{M, <:PeriodicBCType}) where {M}
     _, _, _, _, bnd_ftypes, = get_cache(d)
     return 1:length(bnd_ftypes)
 end
@@ -275,7 +275,7 @@ Find periodic face connectivities such as :
 `A` is the geometric transformation (translation, rotation) between the
 two limits in relation.
 """
-function compute_periodicity(mesh, labels1, labels2, A, tol=1e-9)
+function compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
     # Smoke test : it's easy to set a wrong transformation and the error obtained later on is hard to debug
     @assert length(A(get_coords(first(get_nodes(mesh))))) == spacedim(mesh) "Input periodic transformation does not respect mesh space dimensions"
 
@@ -419,7 +419,7 @@ or several labels (=names).
 If no label is provided, all the `BoundaryFaceDomain` corresponds
 to all the boundary faces.
 """
-function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol,Vararg{Symbol}})
+function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol, Vararg{Symbol}})
     bndfaces = vcat(map(label -> boundary_faces(mesh, label), labels)...)
     cache = bndfaces
     bc = nothing
@@ -442,7 +442,7 @@ function BoundaryFaceDomain(mesh::Mesh, labels::Tuple{Symbol,Vararg{Symbol}})
         tags,
     )
 end
-function BoundaryFaceDomain(mesh::AbstractMesh, labels::Tuple{String,Vararg{String}})
+function BoundaryFaceDomain(mesh::AbstractMesh, labels::Tuple{String, Vararg{String}})
     BoundaryFaceDomain(mesh, map(Symbol, labels))
 end
 BoundaryFaceDomain(mesh::AbstractMesh, label::String) = BoundaryFaceDomain(mesh, (label,))
@@ -466,14 +466,14 @@ abstract type AbstractDomainIndex end
 
 abstract type AbstractCellInfo <: AbstractDomainIndex end
 
-struct CellInfo{C<:AbstractEntityType,N,CN} <: AbstractCellInfo
+struct CellInfo{C <: AbstractEntityType, N, CN} <: AbstractCellInfo
     icell::Int
     ctype::C
     nodes::N # List/array of the cell `Node`s
     c2n::CN # Global indices of the nodes composing the cell
 end
 function CellInfo(icell, ctype, nodes, c2n)
-    CellInfo{typeof(ctype),typeof(nodes),typeof(c2n)}(icell, ctype, nodes, c2n)
+    CellInfo{typeof(ctype), typeof(nodes), typeof(c2n)}(icell, ctype, nodes, c2n)
 end
 @inline cellindex(c::CellInfo) = c.icell
 @inline celltype(c::CellInfo) = c.ctype
@@ -501,7 +501,7 @@ end
 
 abstract type AbstractCellSide <: AbstractDomainIndex end
 
-struct CellSide{C,N,CN} <: AbstractCellSide
+struct CellSide{C, N, CN} <: AbstractCellSide
     icell::Int
     iside::Int
     ctype::C
@@ -509,7 +509,7 @@ struct CellSide{C,N,CN} <: AbstractCellSide
     c2n::CN
 end
 function CellSide(icell, iside, ctype, nodes, c2n)
-    CellSide{typeof(ctype),typeof(nodes),typeof(c2n)}(icell, iside, ctype, nodes, c2n)
+    CellSide{typeof(ctype), typeof(nodes), typeof(c2n)}(icell, iside, ctype, nodes, c2n)
 end
 @inline cellindex(c::CellSide) = c.icell
 @inline cellside(c::CellSide) = c.iside
@@ -541,8 +541,8 @@ parameters, namely `CSN` and `CSP` whereas in practice `CSN == CSP == Int`
 (bmxam : I've done multiple tests and this is the only solution I have for now.
 But I don't understand this solution and this might not be necessary)
 """
-struct FaceInfo{CN<:CellInfo,CP<:Union{CellInfo,Nothing},CSN,CSP,FT,FN,F2N,I} <:
-    AbstractFaceInfo
+struct FaceInfo{CN <: CellInfo, CP <: Union{CellInfo, Nothing}, CSN, CSP, FT, FN, F2N, I} <:
+       AbstractFaceInfo
     cellinfo_n::CN
     cellinfo_p::CP
     cellside_n::CSN
@@ -567,7 +567,7 @@ Face info constructor. Cell sides are computed automatically.
 """
 function FaceInfo(
     cellinfo_n::CellInfo,
-    cellinfo_p::Union{CellInfo,Nothing},
+    cellinfo_p::Union{CellInfo, Nothing},
     faceType,
     faceNodes,
     f2n::AbstractVector,
@@ -668,12 +668,12 @@ Indicate if the `FaceInfo` has an opposite side, i.e if the corresponding face h
 For instance all internal mesh faces have two sides, while boundary faces (not periodic) have
 only one side.
 """
-has_opposite_side(fInfo::FaceInfo{<:CellInfo,<:CellInfo}) = true
-has_opposite_side(fInfo::FaceInfo{<:CellInfo,Nothing}) = false
+has_opposite_side(fInfo::FaceInfo{<:CellInfo, <:CellInfo}) = true
+has_opposite_side(fInfo::FaceInfo{<:CellInfo, Nothing}) = false
 
 function assert_has_opposite_side(
     fInfo::FaceInfo,
-    msg::String="Cannot materialize on Side⁺ of a FaceInfo that does not have an opposite side",
+    msg::String = "Cannot materialize on Side⁺ of a FaceInfo that does not have an opposite side",
 )
     @assert has_opposite_side(fInfo) "$(msg)"
 end
@@ -702,7 +702,7 @@ end
 
 get_cell_normals(mesh::Mesh) = get_cell_normals(CellDomain(mesh))
 
-abstract type AbstractDomainIterator{D<:AbstractDomain} end
+abstract type AbstractDomainIterator{D <: AbstractDomain} end
 get_domain(iter::AbstractDomainIterator) = iter.domain
 Base.iterate(::AbstractDomainIterator) = error("to be defined")
 Base.iterate(::AbstractDomainIterator, state) = error("to be defined")
@@ -711,14 +711,14 @@ Base.length(iter::AbstractDomainIterator) = length(indices(get_domain(iter)))
 Base.firstindex(::AbstractDomainIterator) = 1
 Base.getindex(::AbstractDomainIterator, i) = error("to be defined")
 
-struct DomainIterator{D<:AbstractDomain} <: AbstractDomainIterator{D}
+struct DomainIterator{D <: AbstractDomain} <: AbstractDomainIterator{D}
     domain::D
 end
 
 Base.eltype(::DomainIterator{<:AbstractCellDomain}) = CellInfo
 Base.eltype(::DomainIterator{<:AbstractFaceDomain}) = FaceInfo
 
-function Base.iterate(iter::DomainIterator, i::Integer=1)
+function Base.iterate(iter::DomainIterator, i::Integer = 1)
     a = getindex(iter, i)
     if a === nothing
         return nothing
@@ -745,7 +745,7 @@ A `DomainIteratorByTags` is a helper to iterate over a `Domain` by iterating
 over groups of `SubDomain`s sharing the same tag. This helps applying type-stable
 operations on the elements of the `Domain`.
 """
-struct DomainIteratorByTags{D<:AbstractDomain} <: AbstractDomainIterator{D}
+struct DomainIteratorByTags{D <: AbstractDomain} <: AbstractDomainIterator{D}
     domain::D
 end
 
@@ -753,7 +753,7 @@ Base.eltype(::DomainIteratorByTags) = SubDomain
 
 Base.length(iter::DomainIteratorByTags) = length(get_unique_tags(iter.domain))
 
-function Base.iterate(iter::DomainIteratorByTags, i::Integer=1)
+function Base.iterate(iter::DomainIteratorByTags, i::Integer = 1)
     domain = get_domain(iter)
     tags = get_unique_tags(domain)
     if i > length(tags)
@@ -776,8 +776,8 @@ function Base.getindex(iter::DomainIteratorByTags, i)
     return nothing
 end
 
-struct SubDomainIterator{D<:AbstractDomain,SD<:AbstractSubDomain} <:
-    AbstractDomainIterator{D}
+struct SubDomainIterator{D <: AbstractDomain, SD <: AbstractSubDomain} <:
+       AbstractDomainIterator{D}
     domain::D
     subdomain::SD
 end
@@ -785,7 +785,7 @@ end
 Base.eltype(a::SubDomainIterator) = eltype(a[1])
 Base.length(iter::SubDomainIterator) = length(get_indices(iter.subdomain))
 
-function Base.iterate(iter::SubDomainIterator, i::Integer=1)
+function Base.iterate(iter::SubDomainIterator, i::Integer = 1)
     if i > length(get_indices(iter.subdomain))
         return nothing
     else
@@ -801,13 +801,13 @@ end
 """
 Get `i`th element of the subdomain.
 """
-function _get_index(domain::D, subdomain, i::Integer) where {D<:AbstractCellDomain}
+function _get_index(domain::D, subdomain, i::Integer) where {D <: AbstractCellDomain}
     mesh = get_mesh(domain)
     ctype = get_element_type(subdomain)
     icell = get_indices(subdomain)[i]
     _get_cellinfo(mesh, ctype, icell)
 end
-function _get_cellinfo(mesh::M, ctype, icell) where {M<:AbstractMesh}
+function _get_cellinfo(mesh::M, ctype, icell) where {M <: AbstractMesh}
     c2n = connectivities_indices(mesh, :c2n)
     n_nodes = Val(nnodes(ctype))
     _c2n = c2n[icell, n_nodes]
@@ -815,7 +815,7 @@ function _get_cellinfo(mesh::M, ctype, icell) where {M<:AbstractMesh}
     CellInfo(icell, ctype, cnodes, _c2n)
 end
 
-function _get_index(domain::D, subdomain, i::Integer) where {D<:AbstractFaceDomain}
+function _get_index(domain::D, subdomain, i::Integer) where {D <: AbstractFaceDomain}
     iface = get_indices(subdomain)[i]
     mesh = get_mesh(domain)
     f2n = connectivities_indices(mesh, :f2n)
@@ -856,7 +856,7 @@ function _get_face_cellinfo(domain::BoundaryFaceDomain, subdomain, iface::Intege
 end
 
 function _get_index(
-    domain::BoundaryFaceDomain{M,<:PeriodicBCType},
+    domain::BoundaryFaceDomain{M, <:PeriodicBCType},
     subdomain,
     i::Integer,
 ) where {M}
@@ -919,7 +919,7 @@ If `all_nodes` is `true`, then all cells verifying `f(x_i)==true` where `x_i` ar
 nodes are selected. On the contrary, if `all_nodes` is `false`, all cells with at least one
 node verifying the criteria are selected.
 """
-function identify_cells(mesh::Mesh, f::Function, all_nodes=true)
+function identify_cells(mesh::Mesh, f::Function, all_nodes = true)
     c2n = connectivities_indices(mesh, :c2n)
     criteria(nodes_coords) = all_nodes ? all(f.(nodes_coords)) : any(f.(nodes_coords))
     I_cells =
@@ -939,7 +939,7 @@ For a `BoundaryFaceDomain`, the new boundary faces (with respect to this domain)
 """
 domain_to_mesh(::AbstractDomain; kwargs...) = error("not implemented yet")
 
-function domain_to_mesh(domain::CellDomain; clipped_bnd_name="CLIPPED_BND")
+function domain_to_mesh(domain::CellDomain; clipped_bnd_name = "CLIPPED_BND")
     # Note : `_o2n` means "old to new" while `_n2o` means "new to old"
 
     # Alias
@@ -1011,14 +1011,7 @@ function domain_to_mesh(domain::CellDomain; clipped_bnd_name="CLIPPED_BND")
     bc_nodes = Dict(keys(bc_nodes) .=> values(bc_nodes))
 
     # New mesh
-    return Mesh(
-        get_nodes(mesh)[I_nodes_n2o],
-        ctypes,
-        c2n_new;
-        bc_names,
-        bc_nodes,
-        metadata,
-    )
+    return Mesh(get_nodes(mesh)[I_nodes_n2o], ctypes, c2n_new; bc_names, bc_nodes, metadata)
 end
 
 function domain_to_mesh(domain::AbstractFaceDomain)
@@ -1048,7 +1041,7 @@ function domain_to_mesh(domain::AbstractFaceDomain)
             end
         end
     end
-    loc2glo = loc2glo[1:(offset-1)]
+    loc2glo = loc2glo[1:(offset - 1)]
     glo2loc[loc2glo] .= collect(1:length(loc2glo))
 
     # New "c2n" with updated nodes
@@ -1067,8 +1060,8 @@ function domain_to_mesh(domain::AbstractFaceDomain)
     (domain isa BoundaryFaceDomain) || return return Mesh(nodes, ctypes, c2n; metadata)
 
     # Empty bc
-    bc_names = Dict{Int,String}()
-    bc_nodes = Dict{Int,Vector{Int}}()
+    bc_names = Dict{Int, String}()
+    bc_nodes = Dict{Int, Vector{Int}}()
 
     for (tag, bnd_name) in enumerate(boundary_names(mesh))
         # If the boundary is already part of the domain, we skip it
@@ -1114,7 +1107,7 @@ ensuring that `f` receives the appropriate element information.
 # Returns
 `nothing`.
 """
-function foreach_element(f::F, domain::AbstractDomain) where {F<:Function}
+function foreach_element(f::F, domain::AbstractDomain) where {F <: Function}
     _foreach_element(f, domain, get_bcube_backend(domain))
 end
 
@@ -1122,7 +1115,7 @@ function _foreach_element(
     f::F,
     domain::AbstractDomain,
     backend::AbstractBcubeBackend,
-) where {F<:Function}
+) where {F <: Function}
     for subdomains in DomainIteratorByTags(domain)
         for subdomain in subdomains
             _foreach_element(f, domain, subdomain, backend)
@@ -1136,7 +1129,7 @@ function _foreach_element(
     domain::D,
     subdomain::SD,
     backend::AbstractBcubeBackend,
-) where {F<:Function,D<:AbstractDomain,SD<:Bcube.SubDomain}
+) where {F <: Function, D <: AbstractDomain, SD <: Bcube.SubDomain}
     indices = Bcube.get_indices(subdomain)
     iter_subdomain = SubDomainIterator(domain, subdomain)
     for i in eachindex(indices)
@@ -1179,6 +1172,6 @@ function _map_element(
     domain::D,
     subdomain::SD,
     backend::AbstractBcubeBackend,
-) where {F,D<:AbstractDomain,SD<:AbstractSubDomain}
+) where {F, D <: AbstractDomain, SD <: AbstractSubDomain}
     map(f, SubDomainIterator(domain, subdomain))
 end
