@@ -57,6 +57,26 @@
         @test Bcube.outer_faces(new_mesh) == [2, 6]
         @test Bcube.boundary_faces(new_mesh, "xmax") == [6]
         @test Bcube.boundary_faces(new_mesh, "ymin") == [2]
+
+        # Test "ParentMetaData" -> checked graphically
+        nx = 4
+        ny = 3
+        mesh_parent = rectangle_mesh(nx, ny; xmin = 1, ymin = 1, xmax = nx, ymax = ny)
+        function g(xy)
+            x, y = xy
+            if x ≤ 3.0 && y ≤ 2.0
+                return true
+            elseif x ≥ 3.0 && y ≥ 2.0
+                return true
+            else
+                return false
+            end
+        end
+        indices = Bcube.identify_cells(mesh_parent, g)
+        mesh_child = Bcube.domain_to_mesh(CellDomain(mesh_parent, indices))
+        @test Bcube.get_node_loc_to_glob(Bcube.get_metadata(mesh_child)) ==
+              [1, 2, 3, 5, 6, 7, 8, 11, 12]
+        @test Bcube.get_elt_loc_to_glob(Bcube.get_metadata(mesh_child)) == [1, 2, 6]
     end
 
     @testset "subdomains" begin
