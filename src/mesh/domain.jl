@@ -122,7 +122,7 @@ function get_nelements(domain::AbstractDomain)
     mapreduce(length ∘ get_indices, +, get_subdomains(domain))
 end
 function indices(domain::AbstractDomain)
-    reduce(vcat, map(get_indices, get_subdomains(domain)))
+    reduce(vcat, map(get_indices, get_subdomains(domain)); init = Int[])
 end
 @inline topodim(::AbstractDomain) = error("undefined")
 @inline codimension(d::AbstractDomain) = topodim(get_mesh(d)) - topodim(d)

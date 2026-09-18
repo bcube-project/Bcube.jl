@@ -14,4 +14,7 @@ params.json
 .ipynb_checkpoints/
 /example/private/
 tmp
+.clinerules
+memory-bank
+.claude
 

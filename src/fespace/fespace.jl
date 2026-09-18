@@ -644,6 +644,24 @@ Build the jacobian sparsity pattern corresponding to the "FESpace U".
 
 A jacobian is associated to a given function, here this function is assumed to mix (i.e "link")
 all the variables of the FESpace together.
+
+# Restriction to a `Tuple` of `CellDomain`
+
+When every variable of `u` is defined on the whole `mesh`, the call above produces a correct
+(but conservative) pattern. When one or several variables are actually restricted to a portion
+of the mesh, a tighter pattern can be obtained by passing a `Tuple` of `CellDomain` (one per
+FESpace, see [`CellDomain`](@ref)) instead of the mesh:
+
+```julia
+build_jacobian_sparsity_pattern(u, (cd1, cd2, ...))
+```
+
+The coupling rule is: an entry is produced on a cell pair `(ic, ic2)` (with `ic == ic2` allowed)
+iff `ic` and `ic2` are connected (identical, or geometric neighbors via shared node/face) **and**
+`ic` belongs to the `CellDomain` of variable `i` **and** `ic2` belongs to the `CellDomain` of
+variable `j`. Adjacency is always computed on the full mesh topology, so two adjacent
+`CellDomain`s sharing boundary vertices still couple across the interface. All `CellDomain`s
+must share the same underlying mesh as the FESpaces.
 """
 function build_jacobian_sparsity_pattern(u::TrialFESpace, mesh::AbstractMesh)
     build_jacobian_sparsity_pattern(MultiFESpace(u), mesh)
@@ -652,49 +670,110 @@ function build_jacobian_sparsity_pattern(u::AbstractMultiFESpace, mesh::Abstract
     build_jacobian_sparsity_pattern(parent(u), parent(mesh))
 end
 function build_jacobian_sparsity_pattern(u::MultiFESpace, mesh::Mesh)
+    # Backward-compatible mesh form: every variable lives on the whole mesh.
+    # Build a single full-mesh CellDomain and reuse it for every FESpace (a
+    # tuple of references to the same object, not N separate CellDomains).
+    cd = CellDomain(mesh)
+    domains = ntuple(_ -> cd, length(u))
+    return build_jacobian_sparsity_pattern(u, domains)
+end
+
+# Tuple-of-CellDomain entry points (one CellDomain per FESpace)
+function build_jacobian_sparsity_pattern(
+    u::TrialFESpace,
+    domains::Tuple{Vararg{CellDomain}},
+)
+    build_jacobian_sparsity_pattern(MultiFESpace(u), domains)
+end
+function build_jacobian_sparsity_pattern(
+    u::AbstractMultiFESpace,
+    domains::Tuple{Vararg{CellDomain}},
+)
+    build_jacobian_sparsity_pattern(parent(u), domains)
+end
+function build_jacobian_sparsity_pattern(
+    u::MultiFESpace,
+    domains::Tuple{Vararg{CellDomain}},
+)
+    length(domains) == length(u) || throw(ArgumentError(
+        "build_jacobian_sparsity_pattern: number of CellDomains ($(length(domains))) " *
+        "must match the number of FESpaces ($(length(u)))"))
     if _is_AoS(u)
-        return _build_jacobian_sparsity_pattern_AoS(u, mesh)
+        return _build_jacobian_sparsity_pattern_AoS(u, domains)
     else
-        return _build_jacobian_sparsity_pattern_SoA(u, mesh)
+        return _build_jacobian_sparsity_pattern_SoA(u, domains)
     end
 end
 
-function _build_jacobian_sparsity_pattern_AoS(u::AbstractMultiFESpace, mesh)
+function _build_jacobian_sparsity_pattern_AoS(
+    u::AbstractMultiFESpace,
+    domains::Tuple{Vararg{CellDomain}},
+)
+    nvars = length(u)
+    length(domains) == nvars || throw(ArgumentError(
+        "build_jacobian_sparsity_pattern: number of CellDomains ($(length(domains))) " *
+        "must match the number of FESpaces ($(nvars))"))
+    # All CellDomains must share the same underlying mesh as the FESpaces.
+    mesh = get_mesh(domains[1])
+    for i_fespace in 2:nvars
+        @assert get_mesh(domains[i_fespace]) === mesh
+    end
+
     I = Int[]
     J = Int[]
     f2c = connectivities_indices(mesh, :f2c)
     c2f = connectivities_indices(mesh, :c2f)
 
     all_discontinuous = all(is_discontinuous.(u))
+    # Neighbor reach is computed on the FULL mesh topology (not restricted to a
+    # single domain): this is what lets two adjacent CellDomains sharing boundary
+    # vertices still couple across their interface.
     c2c = all_discontinuous ? nothing : connectivity_cell2cell_by_nodes(mesh)
 
-    for ic in 1:ncells(mesh)
-        for (j, uj) in enumerate(u)
-            for (i, ui) in enumerate(u)
-                if true #varsDependency[i, j]
-                    for jdof in get_mapping(u, j)[get_dofs(uj, ic)]
-                        for idof in get_mapping(u, i)[get_dofs(ui, ic)]
-                            push!(I, idof)
-                            push!(J, jdof)
-                        end
+    # Precompute an O(1) membership test: a boolean matrix whose entry
+    # `is_in_cellset[i_fespace, icell]` tells whether cell `icell` belongs to the
+    # CellDomain of the i_fespace-th FESpace. FESpaces are still indexed by GLOBAL
+    # cell index; the CellDomain only restricts WHICH cells/pairings contribute
+    # to the pattern.
+    ncell = ncells(mesh)
+    is_in_cellset = fill(false, nvars, ncell)
+    for i_fespace in 1:nvars
+        for icell in indices(domains[i_fespace])
+            is_in_cellset[i_fespace, icell] = true
+        end
+    end
+
+    for icell in 1:ncell
+        # --- On-cell pairings: only when icell is in the CellDomain of both
+        # --- FESpaces involved in the pairing.
+        for (j_fespace, u_j) in enumerate(u)
+            is_in_cellset[j_fespace, icell] || continue
+            for (i_fespace, u_i) in enumerate(u)
+                is_in_cellset[i_fespace, icell] || continue
+                for jdof in get_mapping(u, j_fespace)[get_dofs(u_j, icell)]
+                    for idof in get_mapping(u, i_fespace)[get_dofs(u_i, icell)]
+                        push!(I, idof)
+                        push!(J, jdof)
                     end
                 end
             end
         end
 
         if all_discontinuous
-            # For discontinuous FESpaces, we look to neighbors by faces
-            for ifa in c2f[ic]
-                for ic2 in f2c[ifa]
-                    ic2 == ic && continue
-                    for (j, uj) in enumerate(u)
-                        for (i, ui) in enumerate(u)
-                            if true #varsDependency[i, j]
-                                for jdof in get_mapping(u, j)[get_dofs(uj, ic2)]
-                                    for idof in get_mapping(u, i)[get_dofs(ui, ic)]
-                                        push!(I, idof)
-                                        push!(J, jdof)
-                                    end
+            # For discontinuous FESpaces, we look to neighbors by faces.
+            # Entry is (u_i on icell) ↔ (u_j on icell2): require icell in the
+            # CellDomain of the i-th FESpace and icell2 in the one of the j-th.
+            for iface in c2f[icell]
+                for icell2 in f2c[iface]
+                    icell2 == icell && continue
+                    for (j_fespace, u_j) in enumerate(u)
+                        is_in_cellset[j_fespace, icell2] || continue
+                        for (i_fespace, u_i) in enumerate(u)
+                            is_in_cellset[i_fespace, icell] || continue
+                            for jdof in get_mapping(u, j_fespace)[get_dofs(u_j, icell2)]
+                                for idof in get_mapping(u, i_fespace)[get_dofs(u_i, icell)]
+                                    push!(I, idof)
+                                    push!(J, jdof)
                                 end
                             end
                         end
@@ -703,16 +782,18 @@ function _build_jacobian_sparsity_pattern_AoS(u::AbstractMultiFESpace, mesh)
             end
         else
             # If a continuous FESpace is present, we look to neighbors by nodes.
-            # Rq: this is very conservative but better than nothing
-            for ic2 in c2c[ic]
-                for (j, uj) in enumerate(u)
-                    for (i, ui) in enumerate(u)
-                        if true #varsDependency[i, j]
-                            for jdof in get_mapping(u, j)[get_dofs(uj, ic2)]
-                                for idof in get_mapping(u, i)[get_dofs(ui, ic)]
-                                    push!(I, idof)
-                                    push!(J, jdof)
-                                end
+            # Rq: this is very conservative but better than nothing.
+            # Entry is (u_i on icell) ↔ (u_j on icell2): require icell in the
+            # CellDomain of the i-th FESpace and icell2 in the one of the j-th.
+            for icell2 in c2c[icell]
+                for (j_fespace, u_j) in enumerate(u)
+                    is_in_cellset[j_fespace, icell2] || continue
+                    for (i_fespace, u_i) in enumerate(u)
+                        is_in_cellset[i_fespace, icell] || continue
+                        for jdof in get_mapping(u, j_fespace)[get_dofs(u_j, icell2)]
+                            for idof in get_mapping(u, i_fespace)[get_dofs(u_i, icell)]
+                                push!(I, idof)
+                                push!(J, jdof)
                             end
                         end
                     end
@@ -724,7 +805,7 @@ function _build_jacobian_sparsity_pattern_AoS(u::AbstractMultiFESpace, mesh)
     return sparse(I, J, 1.0, m, n, max)
 end
 
-function _build_jacobian_sparsity_pattern_SoA(::MultiFESpace, mesh)
+function _build_jacobian_sparsity_pattern_SoA(::MultiFESpace, ::Any)
     error("Function `_build_jacobian_sparsity_pattern_SoA` is not implemented yet")
 end
 
