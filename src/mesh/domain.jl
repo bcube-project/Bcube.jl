@@ -982,10 +982,10 @@ function domain_to_mesh(domain::CellDomain; clipped_bnd_name = "CLIPPED_BND")
         Dict(((i => boundary_faces(mesh, i)) for (i, a) in pairs(dict_bc_names))...)
 
     d1 = filter(((tag, inodes),) -> any(view(hasNode, inodes)), dict_bc_nodes)
-    bnd_nodes = Dict(
+    bc_nodes = Dict(
         tag => I_nodes_o2n[filter(inode -> hasNode[inode], inodes)] for (tag, inodes) in d1
     )
-    bnd_names = filter(((tag, name),) -> tag ∈ keys(bnd_nodes), dict_bc_names)
+    bc_names = filter(((tag, name),) -> tag ∈ keys(bc_nodes), dict_bc_names)
 
     # Assign boundary condition to nodes that were not boundary nodes in the old mesh
     # but are bnd nodes in the new mesh
@@ -999,18 +999,19 @@ function domain_to_mesh(domain::CellDomain; clipped_bnd_name = "CLIPPED_BND")
             push!(exterior_nodes, f2n[iface]...)
         end
     end
-    tag = length(bnd_nodes) > 0 ? maximum(keys(bnd_nodes)) + 1 : 1
-    bnd_nodes[tag] = unique(I_nodes_o2n[exterior_nodes])
-    bnd_names[tag] = clipped_bnd_name
+    tag = length(bc_nodes) > 0 ? maximum(keys(bc_nodes)) + 1 : 1
+    bc_nodes[tag] = unique(I_nodes_o2n[exterior_nodes])
+    bc_names[tag] = clipped_bnd_name
+
+    # Metadata
+    metadata = ParentMeshMetaData(I_nodes_n2o, I_cells_n2o)
+
+    # Ensure dicts are concrete
+    bc_names = Dict(keys(bc_names) .=> values(bc_names))
+    bc_nodes = Dict(keys(bc_nodes) .=> values(bc_nodes))
 
     # New mesh
-    return Mesh(
-        get_nodes(mesh)[I_nodes_n2o],
-        ctypes,
-        c2n_new;
-        bc_names = bnd_names,
-        bc_nodes = bnd_nodes,
-    )
+    return Mesh(get_nodes(mesh)[I_nodes_n2o], ctypes, c2n_new; bc_names, bc_nodes, metadata)
 end
 
 function domain_to_mesh(domain::AbstractFaceDomain)
