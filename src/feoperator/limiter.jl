@@ -27,10 +27,8 @@ function linear_scaling_limiter_coef(
     mean = get_values(cell_mean(v, cache.cacheCellMean))
     limiter = similar(mean)
 
-    minval = similar(mean)
-    minval .= typemax(eltype(minval))
-    maxval = similar(mean)
-    maxval .= -minval
+    minval = copy(mean)
+    maxval = copy(mean)
     _minmax_cells!(minval, maxval, v, get_domain(dω), cellQuadratures)
     _minmax_faces!(minval, maxval, v, get_domain(dω), faceQuadratures)
     if !isnothing(periodicBCs)
@@ -39,10 +37,8 @@ function linear_scaling_limiter_coef(
         end
     end
 
-    minval_mean = similar(mean)
-    minval_mean .= typemax(eltype(minval))
-    maxval_mean = similar(mean)
-    maxval_mean .= -minval_mean
+    minval_mean = copy(mean)
+    maxval_mean = copy(mean)
     _mean_minmax_cells!(minval_mean, maxval_mean, mean, mesh)
     if !isnothing(periodicBCs)
         for domain in periodicBCs
