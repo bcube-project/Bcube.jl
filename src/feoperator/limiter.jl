@@ -1,3 +1,9 @@
+"""
+    CacheLinearScalingLimiter(u::SingleFieldFEFunction, dω::Measure)
+
+Build a cache for the linear scaling limiter computation.
+The cache stores a cache to build cell mean values of `u` computed on `dω`.
+"""
 struct CacheLinearScalingLimiter{CM}
     cacheCellMean::CM
 end
@@ -6,8 +12,26 @@ function CacheLinearScalingLimiter(u::SingleFieldFEFunction, dω::Measure)
     CacheLinearScalingLimiter{typeof(cacheCellMean)}(cacheCellMean)
 end
 
-# REF:
-# https://www.brown.edu/research/projects/scientific-computing/sites/brown.edu.research.projects.scientific-computing/files/uploads/Maximum-principle-satisfying%20and%20positivity-preserving.pdf
+"""
+    linear_scaling_limiter_coef(
+        v::SingleFieldFEFunction,
+        dω::Measure,
+        cellQuadratures,
+        faceQuadratures;
+        bounds = nothing,
+        DMPrelax = zero(eltype(get_dof_values(v))),
+        periodicBCs = nothing,
+        check = true,
+        coefmax = one(eltype(get_dof_values(v))),
+        cache = CacheLinearScalingLimiter(v, dω),
+    )
+
+Internal function that computes the limiter coefficients and the cell mean values
+for `v` on the measure `dω`. See [`linear_scaling_limiter`](@ref) for the public API.
+
+Returns a tuple `(limiter_coef, mean)` where `limiter_coef` is a `MeshCellData`
+of limiter coefficients and `mean` is a `MeshCellData` of cell mean values.
+"""
 function linear_scaling_limiter_coef(
     v::SingleFieldFEFunction,
     dω::Measure,
@@ -291,34 +315,22 @@ m = minval_mean
 M = maxval_mean
 """
 function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, coefmax, checkmean = true)
-    _0 = zero(v̅ᵢ)
-    eps0 = 2 * eps(eltype(v̅ᵢ))
+    _0 = zero(eltype(v̅ᵢ))
+
     if checkmean
-        ((Mᵢ - v̅ᵢ) < (-10eps() * max(Mᵢ, one(Mᵢ)))) &&
-            error("Invalid max value :  Mᵢ=$Mᵢ, v̅ᵢ=$v̅ᵢ")
-        ((v̅ᵢ - mᵢ) < (-10eps() * max(v̅ᵢ, one(v̅ᵢ)))) &&
-            error("Invalid min value :  mᵢ=$mᵢ, v̅ᵢ=$v̅ᵢ")
-        if !(m ≤ v̅ᵢ ≤ M) ||
-           !((M - v̅ᵢ) ≥ _0) ||
-           !((Mᵢ - v̅ᵢ) ≥ -eps0) ||
-           !((v̅ᵢ - m) ≥ _0) ||
-           !((v̅ᵢ - mᵢ) ≥ -eps0)
+        if !((m ≤ v̅ᵢ ≤ M) && (mᵢ ≤ v̅ᵢ ≤ Mᵢ))
             @show m ≤ v̅ᵢ ≤ M
             @show (M - v̅ᵢ) ≥ _0
-            @show (Mᵢ - v̅ᵢ) ≥ -eps0
+            @show (Mᵢ - v̅ᵢ) ≥ _0
             @show (v̅ᵢ - m) ≥ _0
-            @show (v̅ᵢ - mᵢ) ≥ -eps0
+            @show (v̅ᵢ - mᵢ) ≥ _0
             @show m, M
             @show mᵢ, v̅ᵢ, Mᵢ
             error("Limiter values are out of range")
         end
     end
-    #(Mᵢ - v̅ᵢ) < eps(v̅ᵢ) && return zero(v̅ᵢ)
-    #(v̅ᵢ - mᵢ) < eps(v̅ᵢ) && return zero(v̅ᵢ)
-    _v̅ᵢ = v̅ᵢ# max(mᵢ, min(Mᵢ, v̅ᵢ))
-    #abs(Mᵢ-v̅ᵢ) > 10*eps(typeof(M)) ? coef⁺ = abs((M-v̅ᵢ)/(Mᵢ-v̅ᵢ)) : coef⁺ = zero(M)
-    #abs(v̅ᵢ-mᵢ) > 10*eps(typeof(M)) ? coef⁻ = abs((v̅ᵢ-m)/(v̅ᵢ-mᵢ)) : coef⁻ = zero(M)
-    return max(_0, min(_ratio(M - _v̅ᵢ, Mᵢ - _v̅ᵢ), _ratio(_v̅ᵢ - m, _v̅ᵢ - mᵢ), coefmax))
+
+    return max(_0, min(_ratio(M - v̅ᵢ, Mᵢ - v̅ᵢ), _ratio(v̅ᵢ - m, v̅ᵢ - mᵢ), coefmax))
 end
 
 _ratio(x, y) = (x / (y + eps(eltype(y))))
@@ -326,20 +338,50 @@ _ratio(x, y) = (x / (y + eps(eltype(y))))
 """
     linear_scaling_limiter(
         u::SingleFieldFEFunction,
-        dω::Measure;
-        bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
-        DMPrelax = 0.0,
-        periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}} = nothing,
+        dω::Measure,
+        cellQuadratures = (get_quadrature(dω),),
+        faceQuadratures = (get_quadrature(dω),);
+        bounds = nothing,
+        DMPrelax = zero(eltype(get_dof_values(u))),
+        periodicBCs = nothing,
         mass = nothing,
-        checkmean = true
-    ) where {N, Me, BC <: PeriodicBCType}
+        checkmean = true,
+        coefmax = one(eltype(get_dof_values(u))),
+        cache = CacheLinearScalingLimiter(u, dω),
+    )
 
 Apply the linear scaling limiter (see "Maximum-principle-satisfying and positivity-preserving high order schemes for
 conservation laws: Survey and new developments", Zhang & Shu).
 
 `u_limited = u̅ + lim_u * (u - u̅)`
 
-The first returned argument is the coefficient `lim_u`, and the second is `u_limited`.
+where `u̅` is the cell mean of `u`.
+
+# Arguments
+- `u`: the scalar discontinuous `FEFunction` to limit (must be on a discontinuous FESpace).
+- `dω`: the `Measure` on which the limiter is evaluated (its `CellDomain` defines the mesh).
+- `cellQuadratures`: tuple of quadrature orders/rules used to compute cell min/max values
+  (default: one rule at the degree of `dω`).
+- `faceQuadratures`: tuple of quadrature orders/rules used to compute face min/max values
+  (default: one rule at the degree of `dω`).
+
+# Keyword arguments
+- `bounds`: optional `(lower, upper)` tuple imposing strong physical bounds on the solution.
+- `DMPrelax`: relaxation parameter added to (`-`/`+`) the DMP bounds to relax the
+  discrete maximum principle (default: `0`).
+- `periodicBCs`: optional tuple of `BoundaryFaceDomain`s representing periodic boundary
+  conditions to include in the min/max face computations.
+- `mass`: optional precomputed mass matrix for the projection step.
+- `checkmean`: if `true` (default), checks that the mean values are consistent with the
+  min/max bounds and raises an error otherwise.
+- `coefmax`: upper bound on the limiter coefficient (default: `1`).
+- `cache`: a [`CacheLinearScalingLimiter`](@ref) to reuse cell mean computations across calls.
+
+# Returns
+A tuple `(lim_u, u_lim, u̅)` where:
+- `lim_u` is the limiter coefficient (`MeshCellData`).
+- `u_lim` is the limited `FEFunction`.
+- `u̅` is the cell mean (`MeshCellData`).
 """
 function linear_scaling_limiter(
     u::SingleFieldFEFunction,
