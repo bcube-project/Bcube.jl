@@ -276,7 +276,15 @@ function quadrature_rule(line::Line, degree::Val{D}, quad::AbstractQuadratureTyp
     return _quadrature_rule(Val(n), quad)
 end
 
-# Triangle quadratures
+# Triangle uniform quadratures
+function quadrature_rule(t::Triangle, ::Val{1}, ::QuadratureUniform)
+    #ent = entity(Triangle(), deg)
+    x = get_coords(t)
+    n = length(x)
+    w = SVector{n}(one(eltype(first(x))) / n for i in 1:n)
+    return w, SVector{n}(x...)
+end
+
 function quadrature_rule(::Triangle, ::Val{1}, ::QuadratureLegendre)
     raw_unzip(get_quadrature_points(Val{:GLTRI1}))
 end
