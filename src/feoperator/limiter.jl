@@ -1,21 +1,30 @@
+struct CacheLinearScalingLimiter{CM}
+    cacheCellMean::CM
+end
+function CacheLinearScalingLimiter(u::SingleFieldFEFunction, dω::Measure)
+    cacheCellMean = build_cell_mean_cache(u, dω)
+    CacheLinearScalingLimiter{typeof(cacheCellMean)}(cacheCellMean)
+end
+
 # REF:
 # https://www.brown.edu/research/projects/scientific-computing/sites/brown.edu.research.projects.scientific-computing/files/uploads/Maximum-principle-satisfying%20and%20positivity-preserving.pdf
-
 function linear_scaling_limiter_coef(
     v::SingleFieldFEFunction,
     dω::Measure,
     cellQuadratures,
     faceQuadratures,
-    bounds,
-    DMPrelax,
-    periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}},
+    bounds = nothing,
+    DMPrelax = zero(eltype(get_dof_values(v))),
+    periodicBCs = nothing,
     check = true;
-) where {N, Me, BC <: PeriodicBCType}
+    coefmax = one(eltype(get_dof_values(v))),
+    cache = CacheLinearScalingLimiter(v, dω),
+)
     @assert is_discontinuous(get_fespace(v)) "LinearScalingLimiter only support discontinuous variables"
 
     mesh = get_mesh(get_domain(dω))
 
-    mean = get_values(cell_mean(v, dω))
+    mean = get_values(cell_mean(v, cache.cacheCellMean))
     limiter = similar(mean)
 
     minval = similar(mean)
@@ -26,7 +35,7 @@ function linear_scaling_limiter_coef(
     _minmax_faces!(minval, maxval, v, get_domain(dω), faceQuadratures)
     if !isnothing(periodicBCs)
         for domain in periodicBCs
-            _minmax_faces_periodic!(minval, maxval, v, degquad, domain, faceQuadratures)
+            _minmax_faces_periodic!(minval, maxval, v, domain, faceQuadratures)
         end
     end
 
@@ -58,6 +67,7 @@ function linear_scaling_limiter_coef(
             maxval[i],
             minval_mean[i],
             maxval_mean[i],
+            coefmax,
             check,
         )
     end
@@ -175,7 +185,7 @@ function _minmax_faces!(minval, maxval, v, faceDomain::AbstractFaceDomain, quadr
     return nothing
 end
 
-function _minmax_faces_periodic!(minval, maxval, v, degquad, periodicBcDomain, quadratures)
+function _minmax_faces_periodic!(minval, maxval, v, periodicBcDomain, quadratures)
     error("TODO")
     # mesh = get_mesh(v)
     # c2n = connectivities_indices(mesh,:c2n)
@@ -284,22 +294,38 @@ Mᵢ = maxval
 m = minval_mean
 M = maxval_mean
 """
-function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, checkmean = true)
+function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, coefmax, checkmean = true)
+    _0 = zero(v̅ᵢ)
+    eps0 = 2 * eps(eltype(v̅ᵢ))
     if checkmean
         ((Mᵢ - v̅ᵢ) < (-10eps() * max(Mᵢ, one(Mᵢ)))) &&
             error("Invalid max value :  Mᵢ=$Mᵢ, v̅ᵢ=$v̅ᵢ")
         ((v̅ᵢ - mᵢ) < (-10eps() * max(v̅ᵢ, one(v̅ᵢ)))) &&
             error("Invalid min value :  mᵢ=$mᵢ, v̅ᵢ=$v̅ᵢ")
+        if !(m ≤ v̅ᵢ ≤ M) ||
+           !((M - v̅ᵢ) ≥ _0) ||
+           !((Mᵢ - v̅ᵢ) ≥ -eps0) ||
+           !((v̅ᵢ - m) ≥ _0) ||
+           !((v̅ᵢ - mᵢ) ≥ -eps0)
+            @show m ≤ v̅ᵢ ≤ M
+            @show (M - v̅ᵢ) ≥ _0
+            @show (Mᵢ - v̅ᵢ) ≥ -eps0
+            @show (v̅ᵢ - m) ≥ _0
+            @show (v̅ᵢ - mᵢ) ≥ -eps0
+            @show m, M
+            @show mᵢ, v̅ᵢ, Mᵢ
+            error("Limiter values are out of range")
+        end
     end
-    (Mᵢ - v̅ᵢ) < eps() && return zero(v̅ᵢ)
-    (v̅ᵢ - mᵢ) < eps() && return zero(v̅ᵢ)
-    _v̅ᵢ = max(mᵢ, min(Mᵢ, v̅ᵢ))
+    #(Mᵢ - v̅ᵢ) < eps(v̅ᵢ) && return zero(v̅ᵢ)
+    #(v̅ᵢ - mᵢ) < eps(v̅ᵢ) && return zero(v̅ᵢ)
+    _v̅ᵢ = v̅ᵢ# max(mᵢ, min(Mᵢ, v̅ᵢ))
     #abs(Mᵢ-v̅ᵢ) > 10*eps(typeof(M)) ? coef⁺ = abs((M-v̅ᵢ)/(Mᵢ-v̅ᵢ)) : coef⁺ = zero(M)
     #abs(v̅ᵢ-mᵢ) > 10*eps(typeof(M)) ? coef⁻ = abs((v̅ᵢ-m)/(v̅ᵢ-mᵢ)) : coef⁻ = zero(M)
-    return min(_ratio(M - _v̅ᵢ, Mᵢ - _v̅ᵢ), _ratio(_v̅ᵢ - m, _v̅ᵢ - mᵢ), 1.0)
+    return max(_0, min(_ratio(M - _v̅ᵢ, Mᵢ - _v̅ᵢ), _ratio(_v̅ᵢ - m, _v̅ᵢ - mᵢ), coefmax))
 end
 
-_ratio(x, y) = abs(x / (y + eps(y)))
+_ratio(x, y) = (x / (y + eps(eltype(y))))
 
 """
     linear_scaling_limiter(
@@ -326,10 +352,12 @@ function linear_scaling_limiter(
     faceQuadratures::NTuple{Nq, AbstractQuadrature} = (get_quadrature(dω),);
     bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
     DMPrelax = 0.0,
-    periodicBCs::Union{Nothing, NTuple{Nbc, <:BoundaryFaceDomain{Me, BC}}} = nothing,
+    periodicBCs = nothing,
     mass = nothing,
     checkmean = true,
-) where {Nq, Nbc, Me, BC <: PeriodicBCType}
+    coefmax = one(eltype(get_dof_values(u))),
+    cache = CacheLinearScalingLimiter(u, dω),
+) where {Nq}
     lim_u, u̅ = linear_scaling_limiter_coef(
         u,
         dω,
@@ -338,7 +366,9 @@ function linear_scaling_limiter(
         bounds,
         DMPrelax,
         periodicBCs,
-        checkmean,
+        checkmean;
+        coefmax = coefmax,
+        cache = cache,
     )
     u_lim = FEFunction(get_fespace(u), get_dof_type(u))
     projection_l2!(u_lim, u̅ + lim_u * (u - u̅), dω; mass = mass)
