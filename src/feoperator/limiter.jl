@@ -4,6 +4,8 @@
 function linear_scaling_limiter_coef(
     v::SingleFieldFEFunction,
     dω::Measure,
+    cellQuadratures,
+    faceQuadratures,
     bounds,
     DMPrelax,
     periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}},
@@ -20,11 +22,11 @@ function linear_scaling_limiter_coef(
     minval .= typemax(eltype(minval))
     maxval = similar(mean)
     maxval .= -minval
-    _minmax_cells!(minval, maxval, v, dω)
-    _minmax_faces!(minval, maxval, v, dω)
+    _minmax_cells!(minval, maxval, v, get_domain(dω), cellQuadratures)
+    _minmax_faces!(minval, maxval, v, get_domain(dω), faceQuadratures)
     if !isnothing(periodicBCs)
         for domain in periodicBCs
-            _minmax_faces_periodic!(minval, maxval, v, degquad, domain)
+            _minmax_faces_periodic!(minval, maxval, v, degquad, domain, faceQuadratures)
         end
     end
 
@@ -114,88 +116,66 @@ function _mean_minmax_cells_periodic!(minval_mean, maxval_mean, mean, periodicBc
     return nothing
 end
 
-function _minmax_cells(v, mesh, quadrature)
-    c2n = connectivities_indices(mesh, :c2n)
-    cellTypes = cells(mesh)
-
-    val = map(1:ncells(mesh)) do i
-        # mᵢ, Mᵢ : min/max at cell quadrature points
-        ctypeᵢ = cellTypes[i]
-        cnodesᵢ = get_nodes(mesh, c2n[i])
-        cᵢ = CellInfo(i, ctypeᵢ, cnodesᵢ)
-        vᵢ = materialize(v, cᵢ)
-        fᵢ(ξ) = vᵢ(CellPoint(ξ, cᵢ, ReferenceDomain()))
-        quadrule = QuadratureRule(shape(ctypeᵢ), quadrature)
-        mᵢ, Mᵢ = _minmax(fᵢ, quadrule)
-        mᵢ, Mᵢ
-    end
-    return val
-end
-
 """
-    _minmax_cells!(minval, maxval, v, dω)
+    _minmax_cells!(minval, maxval, v, domain, quadratures)
 
-Compute the min and max values of `v` in each cell of `dω`
+Compute the min and max values of `v` interpolated at
+`quadratures` points in each cell of `domain`
 """
-function _minmax_cells!(minval, maxval, v, dω)
-    domain = get_domain(dω)
-    quadrature = get_quadrature(dω)
-
+function _minmax_cells!(minval, maxval, v, domain, quadratures)
     foreach_element(domain) do cellInfo, _, _
         # mᵢ, Mᵢ : min/max at cell quadrature points
         vᵢ = materialize(v, cellInfo)
         fᵢ(ξ) = vᵢ(CellPoint(ξ, cellInfo, ReferenceDomain()))
-        quadrule = QuadratureRule(shape(celltype(cellInfo)), quadrature)
-        mᵢ, Mᵢ = _minmax(fᵢ, quadrule)
         icell = cellindex(cellInfo)
-        minval[icell] = min(mᵢ, minval[icell])
-        maxval[icell] = max(Mᵢ, maxval[icell])
+        for quadrature in quadratures
+            quadrule = QuadratureRule(shape(celltype(cellInfo)), quadrature)
+            mᵢ, Mᵢ = _minmax(fᵢ, quadrule)
+            minval[icell] = min(mᵢ, minval[icell])
+            maxval[icell] = max(Mᵢ, maxval[icell])
+        end
     end
     return nothing
 end
 
-function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractCellDomain})
-    mesh = get_mesh(get_domain(dω))
-    dΓ = Measure(InteriorFaceDomain(mesh), get_quadrature(dω))
-    _minmax_faces!(minval, maxval, v, dΓ)
-    bc_labels = values(boundary_names(mesh))
-    if length(bc_labels) > 0
-        dΓb = Measure(BoundaryFaceDomain(mesh, bc_labels), get_quadrature(dω))
-        _minmax_faces!(minval, maxval, v, dΓb)
-    end
+function _minmax_faces!(minval, maxval, v, Ω::AbstractCellDomain, faceQuadratures)
+    Γ = InteriorFaceDomain(get_mesh(Ω))
+    _minmax_faces!(minval, maxval, v, Γ, faceQuadratures)
+    Γb = BoundaryFaceDomain(get_mesh(Ω))
+    _minmax_faces!(minval, maxval, v, Γb, faceQuadratures)
 end
 
-function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractFaceDomain})
-    quadrature = get_quadrature(dω)
-
-    foreach_element(get_domain(dω)) do faceInfo, _, _
+function _minmax_faces!(minval, maxval, v, faceDomain::AbstractFaceDomain, quadratures)
+    foreach_element(faceDomain) do faceInfo, _, _
+        i = cellindex(get_cellinfo_n(faceInfo))
         if has_opposite_side(faceInfo)
             oppositeFaceInfo = opposite_side(faceInfo)
+            j = cellindex(get_cellinfo_p(faceInfo))
         else
             oppositeFaceInfo = nothing
+            j = -1
         end
 
-        mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ = _minmax_on_face(
-            side_n(v),
-            quadrature,
-            facetype(faceInfo),
-            faceInfo,
-            oppositeFaceInfo,
-        )
-
-        i = cellindex(get_cellinfo_n(faceInfo))
-        minval[i] = min(mᵢⱼ, minval[i])
-        maxval[i] = max(Mᵢⱼ, maxval[i])
-        if has_opposite_side(faceInfo)
-            j = cellindex(get_cellinfo_p(faceInfo))
-            minval[j] = min(mⱼᵢ, minval[j])
-            maxval[j] = max(Mⱼᵢ, maxval[j])
+        for quadrature in quadratures
+            mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ = _minmax_on_face(
+                side_n(v),
+                quadrature,
+                facetype(faceInfo),
+                faceInfo,
+                oppositeFaceInfo,
+            )
+            minval[i] = min(mᵢⱼ, minval[i])
+            maxval[i] = max(Mᵢⱼ, maxval[i])
+            if has_opposite_side(faceInfo)
+                minval[j] = min(mⱼᵢ, minval[j])
+                maxval[j] = max(Mⱼᵢ, maxval[j])
+            end
         end
     end
     return nothing
 end
 
-function _minmax_faces_periodic!(minval, maxval, v, degquad, periodicBcDomain)
+function _minmax_faces_periodic!(minval, maxval, v, degquad, periodicBcDomain, quadratures)
     error("TODO")
     # mesh = get_mesh(v)
     # c2n = connectivities_indices(mesh,:c2n)
@@ -341,14 +321,25 @@ The first returned argument is the coefficient `lim_u`, and the second is `u_lim
 """
 function linear_scaling_limiter(
     u::SingleFieldFEFunction,
-    dω::Measure;
+    dω::Measure,
+    cellQuadratures::NTuple{Nq, AbstractQuadrature} = (get_quadrature(dω),),
+    faceQuadratures::NTuple{Nq, AbstractQuadrature} = (get_quadrature(dω),);
     bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
     DMPrelax = 0.0,
-    periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}} = nothing,
+    periodicBCs::Union{Nothing, NTuple{Nbc, <:BoundaryFaceDomain{Me, BC}}} = nothing,
     mass = nothing,
     checkmean = true,
-) where {N, Me, BC <: PeriodicBCType}
-    lim_u, u̅ = linear_scaling_limiter_coef(u, dω, bounds, DMPrelax, periodicBCs, checkmean)
+) where {Nq, Nbc, Me, BC <: PeriodicBCType}
+    lim_u, u̅ = linear_scaling_limiter_coef(
+        u,
+        dω,
+        cellQuadratures,
+        faceQuadratures,
+        bounds,
+        DMPrelax,
+        periodicBCs,
+        checkmean,
+    )
     u_lim = FEFunction(get_fespace(u), get_dof_type(u))
     projection_l2!(u_lim, u̅ + lim_u * (u - u̅), dω; mass = mass)
     lim_u, u_lim, u̅
