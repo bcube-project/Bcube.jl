@@ -45,6 +45,7 @@ function linear_scaling_limiter_coef(
     cache = CacheLinearScalingLimiter(v, dω),
 )
     @assert is_discontinuous(get_fespace(v)) "LinearScalingLimiter only support discontinuous variables"
+    @assert DMPrelax≥0 "DMPrelax must be non-negative"
 
     mesh = get_mesh(get_domain(dω))
 
@@ -74,10 +75,10 @@ function linear_scaling_limiter_coef(
     @. minval_mean = minval_mean - DMPrelax
     @. maxval_mean = maxval_mean + DMPrelax
 
-    # impose strong physical bounds
+    # Impose strong physical bounds, but clipped to the range allowed by the local cell means
     if !isnothing(bounds)
-        @. minval_mean = max(minval_mean, bounds[1])
-        @. maxval_mean = min(maxval_mean, bounds[2])
+        @. minval_mean = max(minval_mean, min(mean, bounds[1]))
+        @. maxval_mean = min(maxval_mean, max(mean, bounds[2]))
     end
 
     for i in 1:ncells(mesh)
@@ -314,23 +315,23 @@ Mᵢ = maxval
 m = minval_mean
 M = maxval_mean
 """
-function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, coefmax, checkmean = true)
+function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m̅, M̅, coefmax, checkmean = true)
     _0 = zero(eltype(v̅ᵢ))
 
     if checkmean
-        if !((m ≤ v̅ᵢ ≤ M) && (mᵢ ≤ v̅ᵢ ≤ Mᵢ))
-            @show m ≤ v̅ᵢ ≤ M
-            @show (M - v̅ᵢ) ≥ _0
+        if !((m̅ ≤ v̅ᵢ ≤ M̅) && (mᵢ ≤ v̅ᵢ ≤ Mᵢ))
+            @show m̅ ≤ v̅ᵢ ≤ M̅
+            @show (M̅ - v̅ᵢ) ≥ _0
             @show (Mᵢ - v̅ᵢ) ≥ _0
-            @show (v̅ᵢ - m) ≥ _0
+            @show (v̅ᵢ - m̅) ≥ _0
             @show (v̅ᵢ - mᵢ) ≥ _0
-            @show m, M
+            @show m̅, M̅
             @show mᵢ, v̅ᵢ, Mᵢ
             error("Limiter values are out of range")
         end
     end
 
-    return max(_0, min(_ratio(M - v̅ᵢ, Mᵢ - v̅ᵢ), _ratio(v̅ᵢ - m, v̅ᵢ - mᵢ), coefmax))
+    return max(_0, min(_ratio(M̅ - v̅ᵢ, Mᵢ - v̅ᵢ), _ratio(v̅ᵢ - m̅, v̅ᵢ - mᵢ), coefmax))
 end
 
 _ratio(x, y) = (x / (y + eps(eltype(y))))

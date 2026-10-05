@@ -6,7 +6,7 @@
 CacheLinearScalingLimiter
 ```
 
-## linear_scaling_limiter
+## linear\_scaling\_limiter
 
 ```@docs
 linear_scaling_limiter

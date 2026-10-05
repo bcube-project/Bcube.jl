@@ -134,7 +134,7 @@ export var_on_centers,
     var_on_vertices, var_on_nodes_discontinuous, var_on_bnd_nodes_discontinuous
 
 include("./feoperator/limiter.jl")
-export linear_scaling_limiter
+export CacheLinearScalingLimiter, linear_scaling_limiter
 
 include("./io/io_interface.jl")
 export read_file, read_mesh, write_file

@@ -24,6 +24,25 @@
             limᵤ, u_lim, ũ = linear_scaling_limiter(u, dΩ)
             @test get_values(ũ) ≈ [0.0, 0.5, 1.0]
             @test get_values(limᵤ) ≈ [0.0, 1.0 / k, 0.0]
+
+            # test that `bounds` doesn't affect the result when values
+            # are not restrictive
+            limᵤ, u_lim, ũ = linear_scaling_limiter(u, dΩ; bounds = (0, 1))
+            @test get_values(ũ) ≈ [0.0, 0.5, 1.0]
+            @test get_values(limᵤ) ≈ [0.0, 1.0 / k, 0.0]
+
+            # test that `bounds` affect the result when values
+            # are restrictive
+            limᵤ, u_lim, ũ = linear_scaling_limiter(u, dΩ; bounds = (0.4, 0.9))
+            @test get_values(ũ) ≈ [0.0, 0.5, 1.0]
+            @test get_values(limᵤ) ≈ [0.0, (0.4-0.5) / (k*(1-1.5)), 0.0]
+
+            # test that limiter reduces to a 1st-order scheme if `bounds`
+            # imposes constraints that are not even satisfied by
+            # cell mean values
+            limᵤ, u_lim, ũ = linear_scaling_limiter(u, dΩ; bounds = (10, 20))
+            @test get_values(ũ) ≈ [0.0, 0.5, 1.0]
+            @test get_values(limᵤ) ≈ [0.0, 0.0, 0.0]
         end
     end
 end
