@@ -4,12 +4,14 @@
 Build a cache for the linear scaling limiter computation.
 The cache stores a cache to build cell mean values of `u` computed on `dω`.
 """
-struct CacheLinearScalingLimiter{CM}
+struct CacheLinearScalingLimiter{M, CM}
+    mass::M
     cacheCellMean::CM
 end
 function CacheLinearScalingLimiter(u::SingleFieldFEFunction, dω::Measure)
+    mass = build_mass_matrix(u, dω)
     cacheCellMean = build_cell_mean_cache(u, dω)
-    CacheLinearScalingLimiter{typeof(cacheCellMean)}(cacheCellMean)
+    CacheLinearScalingLimiter{typeof(mass), typeof(cacheCellMean)}(mass, cacheCellMean)
 end
 
 """
@@ -34,31 +36,35 @@ of limiter coefficients and `mean` is a `MeshCellData` of cell mean values.
 """
 function linear_scaling_limiter_coef(
     v::SingleFieldFEFunction,
-    dω::Measure,
-    cellQuadratures,
-    faceQuadratures,
-    bounds = nothing,
-    DMPrelax = zero(eltype(get_dof_values(v))),
-    periodicBCs = nothing,
-    check = true;
-    coefmax = one(eltype(get_dof_values(v))),
-    cache = CacheLinearScalingLimiter(v, dω),
-)
+    dΩ::Measure{<:AbstractCellDomain},
+    otherMeasures::Union{NTuple{N, AbstractMeasure}, Nothing},
+    bounds,
+    DMPrelax,
+    periodicBCs,
+    check,
+    coefmax,
+    cache,
+) where {N}
     @assert is_discontinuous(get_fespace(v)) "LinearScalingLimiter only support discontinuous variables"
-    @assert DMPrelax≥0 "DMPrelax must be non-negative"
+    @assert all(DMPrelax .≥ 0) "DMPrelax must be non-negative"
 
-    mesh = get_mesh(get_domain(dω))
+    mesh = get_mesh(get_domain(dΩ))
 
     mean = get_values(cell_mean(v, cache.cacheCellMean))
     limiter = similar(mean)
 
     minval = copy(mean)
     maxval = copy(mean)
-    _minmax_cells!(minval, maxval, v, get_domain(dω), cellQuadratures)
-    _minmax_faces!(minval, maxval, v, get_domain(dω), faceQuadratures)
-    if !isnothing(periodicBCs)
-        for domain in periodicBCs
-            _minmax_faces_periodic!(minval, maxval, v, domain, faceQuadratures)
+    _minmax_elements!(minval, maxval, v, get_domain(dΩ), get_quadrature(dΩ))
+    if !isnothing(otherMeasures)
+        foreach(otherMeasures) do measure
+            _minmax_elements!(
+                minval,
+                maxval,
+                v,
+                get_domain(measure),
+                get_quadrature(measure),
+            )
         end
     end
 
@@ -147,6 +153,22 @@ function _mean_minmax_cells_periodic!(minval_mean, maxval_mean, mean, periodicBc
     return nothing
 end
 
+function _minmax_elements!(minval, maxval, v, domain::AbstractCellDomain, quadrature)
+    _minmax_cells!(minval, maxval, v, domain, (quadrature,))
+end
+function _minmax_elements!(minval, maxval, v, domain::AbstractFaceDomain, quadrature)
+    _minmax_faces!(minval, maxval, v, domain, (quadrature,))
+end
+function _minmax_elements!(
+    minval,
+    maxval,
+    v,
+    domain::BoundaryFaceDomain{M, <:PeriodicBCType},
+    quadrature,
+) where {M}
+    _minmax_faces_periodic!(minval, maxval, v, domain, (quadrature,))
+end
+
 """
     _minmax_cells!(minval, maxval, v, domain, quadratures)
 
@@ -167,13 +189,6 @@ function _minmax_cells!(minval, maxval, v, domain, quadratures)
         end
     end
     return nothing
-end
-
-function _minmax_faces!(minval, maxval, v, Ω::AbstractCellDomain, faceQuadratures)
-    Γ = InteriorFaceDomain(get_mesh(Ω))
-    _minmax_faces!(minval, maxval, v, Γ, faceQuadratures)
-    Γb = BoundaryFaceDomain(get_mesh(Ω))
-    _minmax_faces!(minval, maxval, v, Γb, faceQuadratures)
 end
 
 function _minmax_faces!(minval, maxval, v, faceDomain::AbstractFaceDomain, quadratures)
@@ -386,30 +401,27 @@ A tuple `(lim_u, u_lim, u̅)` where:
 """
 function linear_scaling_limiter(
     u::SingleFieldFEFunction,
-    dω::Measure,
-    cellQuadratures::NTuple{Nq, AbstractQuadrature} = (get_quadrature(dω),),
-    faceQuadratures::NTuple{Nq, AbstractQuadrature} = (get_quadrature(dω),);
+    dΩ::Measure{<:AbstractCellDomain};
+    otherMeasures::Union{NTuple{N, AbstractMeasure}, Nothing} = nothing,
     bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
-    DMPrelax = 0.0,
+    DMPrelax = zero(get_dof_type(u)),
     periodicBCs = nothing,
-    mass = nothing,
     checkmean = true,
     coefmax = one(eltype(get_dof_values(u))),
-    cache = CacheLinearScalingLimiter(u, dω),
-) where {Nq}
+    cache = CacheLinearScalingLimiter(u, dΩ),
+) where {N}
     lim_u, u̅ = linear_scaling_limiter_coef(
         u,
-        dω,
-        cellQuadratures,
-        faceQuadratures,
+        dΩ,
+        otherMeasures,
         bounds,
         DMPrelax,
         periodicBCs,
-        checkmean;
-        coefmax = coefmax,
-        cache = cache,
+        checkmean,
+        coefmax,
+        cache,
     )
     u_lim = FEFunction(get_fespace(u), get_dof_type(u))
-    projection_l2!(u_lim, u̅ + lim_u * (u - u̅), dω; mass = mass)
+    projection_l2!(u_lim, u̅ + lim_u * (u - u̅), dΩ; mass = cache.mass)
     lim_u, u_lim, u̅
 end
