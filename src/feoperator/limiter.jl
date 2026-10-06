@@ -1,15 +1,89 @@
+# REF:
+# https://www.brown.edu/research/projects/scientific-computing/sites/brown.edu.research.projects.scientific-computing/files/uploads/Maximum-principle-satisfying%20and%20positivity-preserving.pdf
+
 """
     linear_scaling_limiter(
         u::SingleFieldFEFunction,
-        u_mean::MeshCellData,
+        u_mean::MeshData{<:CellData},
         domain::AbstractCellDomain,
         targetMeasures::NTuple{N, AbstractMeasure};
-        periodicBCs::Union{BoundaryFaceDomain{M, <:PeriodicBCType}, Nothing} = nothing,
+        periodicBCs::Union{NTuple{Nbc, BoundaryFaceDomain{M, <:PeriodicBCType}}, Nothing} = nothing,
         bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
         DMPrelax = zero(get_dof_type(u)),
         coefmax = one(get_dof_type(u)),
         checkvalues = false,
     )
+
+Apply the linear scaling limiter (see "Maximum-principle-satisfying and positivity-preserving
+high-order schemes for conservation laws: survey and new developments", Zhang & Shu) to a
+scalar discontinuous `FEFunction`, in order to enforce a local discrete maximum principle
+(DMP), i.e. to prevent the creation of spurious extrema — typically in the neighborhood of
+discontinuities.
+
+In each cell, the limited solution is obtained by scaling the fluctuation around the cell
+mean with a scalar coefficient `lim_u ∈ [0, coefmax]`:
+
+    u_limited = u_mean + lim_u * (u - u_mean)
+
+The cell mean is thus preserved by construction, and `lim_u = 0` corresponds to a
+first-order (piecewise constant) solution.
+
+# Arguments
+- `u`: the scalar `FEFunction` to limit; its `FESpace` must be discontinuous.
+- `u_mean`: the cell mean values of `u`, as a `MeshCellData` (i.e. `MeshData{<:CellData}`).
+  It is typically obtained with `cell_mean(u, dΩ)` where `dΩ` is a `Measure` on the cells of
+  the mesh.
+- `domain`: an `AbstractCellDomain` — typically the whole `CellDomain(mesh)` — used to
+  retrieve the mesh and the neighboring cells, needed to compute the min/max of the
+  neighboring cell mean values. Restricted `CellDomain`s (a subset of cells) are not
+  supported yet: the neighbor search currently runs over all mesh faces.
+- `targetMeasures`: the complete list of `Measure`s on which the min and max of `u` are
+  evaluated (at the quadrature nodes of each measure). Nothing is automatic: both the cell
+  measure (e.g. `dΩ = Measure(CellDomain(mesh), 2 * degree + 1)`) and any face measure
+  (e.g. `dΓ = Measure(InteriorFaceDomain(mesh), 2 * degree + 1)`) must be provided
+  explicitly, as in `(dΩ, dΓ)`. Note that a `Measure` defined on a periodic
+  `BoundaryFaceDomain` is not supported yet (it currently raises an error).
+
+# Keyword arguments
+- `periodicBCs`: not yet supported: any value other than `nothing` currently raises an
+  error.
+- `bounds`: optional `(lower, upper)` strong physical bounds imposed on the solution. The
+  bounds are clipped to the range allowed by the local cell mean: if a cell mean does not
+  satisfy the bounds, the admissible window of that cell reduces to its mean and the
+  limiter degenerates to a first-order (piecewise constant) solution in that cell.
+- `DMPrelax`: non-negative relaxation parameter (possibly broadcastable to the number of
+  components) that enlarges the admissible range of neighboring cell mean values by
+  `- DMPrelax` / `+ DMPrelax` (default: `0`, i.e. strict DMP).
+- `coefmax`: upper bound of the limiter coefficient (default: `1`, i.e. the fluctuation is
+  never amplified).
+- `checkvalues`: if `true`, check that the cell mean values are consistent with the
+  min/max bounds and error otherwise (default: `false`).
+
+# Returns
+A tuple `(lim_u, u_lim)` where:
+- `lim_u` is a `MeshCellData` containing one limiter coefficient in `[0, coefmax]` per cell;
+- `u_lim` is the limited field `u_mean + lim_u * (u - u_mean)` given as a lazy expression
+  (`AbstractLazy`), and not as an `FEFunction`. It can be used directly inside a weak form
+  (e.g. `∫(u_lim ⋅ v)dΩ`); to obtain the dofs of the limited solution, project it for
+  instance with `projection_l2!`.
+
+# Example
+```julia
+mesh = rectangle_mesh(20, 4)
+degree = 2
+fes = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh, :discontinuous)
+u = FEFunction(fes, mesh, PhysicalFunction(x -> x[1])) # the DG field to limit
+
+Ω = CellDomain(mesh)
+dΩ = Measure(Ω, 2 * degree + 1)
+dΓ = Measure(InteriorFaceDomain(mesh), 2 * degree + 1)
+
+u_mean = cell_mean(u, dΩ)
+lim_u, u_lim = linear_scaling_limiter(u, u_mean, Ω, (dΩ, dΓ); bounds = (0.0, 1.0))
+
+u_limited = FEFunction(fes)
+projection_l2!(u_limited, u_lim, mesh)
+```
 """
 function linear_scaling_limiter(
     u::SingleFieldFEFunction,
@@ -22,7 +96,7 @@ function linear_scaling_limiter(
     coefmax = one(get_dof_type(u)),
     checkvalues = false,
 ) where {N, Nbc, M}
-    @assert is_discontinuous(get_fespace(u)) "LinearScalingLimiter only support discontinuous variables"
+    @assert is_discontinuous(get_fespace(u)) "linear_scaling_limiter only supports discontinuous FEFunction"
     @assert all(DMPrelax .≥ 0) "DMPrelax must be non-negative"
 
     mean = get_values(u_mean)
@@ -40,7 +114,7 @@ function linear_scaling_limiter(
     _mean_minmax_cells!(minval_mean, maxval_mean, mean, domain)
     # deal with periodic BC for mean values
     if !isnothing(periodicBCs)
-        error("PeriodicBC are not yet suppoted for limiters")
+        error("PeriodicBC are not yet supported for limiters")
     end
 
     # relax DMP
@@ -70,12 +144,13 @@ function linear_scaling_limiter(
 end
 
 """
-    _mean_minmax_cells!(minval_mean, maxval_mean, mean, mesh)
+    _mean_minmax_cells!(minval_mean, maxval_mean, mean, domain)
 
 For each cell, compute the min and max of mean values (in the `mean` array)
 of the neighbor cells.
 
 So `minval_mean[i]` is the minimum of the mean values of cells surrounding cell `i`.
+The `domain` (an `AbstractCellDomain`) is only used to retrieve the mesh.
 """
 function _mean_minmax_cells!(minval_mean, maxval_mean, mean, domain)
     mesh = get_mesh(domain)
@@ -102,7 +177,7 @@ function _mean_minmax_cells!(minval_mean, maxval_mean, mean, domain)
 end
 
 function _mean_minmax_cells_periodic!(minval_mean, maxval_mean, mean, periodicBcDomain)
-    error("TODO")
+    error("PeriodicBCs are not yet supported by the limiter (TODO)")
     # # TODO : add a specific API for the domain cache:
     # perio_cache = get_cache(periodicBcDomain)
     # _1, _2, _3, bnd_f2c, _5, _6 = perio_cache
@@ -190,7 +265,7 @@ function _minmax_faces!(minval, maxval, v, faceDomain::AbstractFaceDomain, quadr
 end
 
 function _minmax_faces_periodic!(minval, maxval, v, periodicBcDomain, quadratures)
-    error("TODO")
+    error("PeriodicBCs are not yet supported by the limiter (TODO)")
     # mesh = get_mesh(v)
     # c2n = connectivities_indices(mesh,:c2n)
     # f2n = connectivities_indices(mesh,:f2n)
@@ -290,13 +365,21 @@ end
 _minmax(f, quadrule::AbstractQuadratureRule) = extrema(f(ξ) for ξ in get_nodes(quadrule))
 
 """
-    _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, checkvalues = true)
+    _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m̅, M̅, coefmax, checkvalues = false)
 
-v̅ᵢ = mean
-mᵢ = minval
-Mᵢ = maxval
-m = minval_mean
-M = maxval_mean
+Compute the limiter coefficient θᵢ of cell `i`:
+
+    θᵢ = max(0, min((M̅-v̅ᵢ)/(Mᵢ-v̅ᵢ), (v̅ᵢ-m̅)/(v̅ᵢ-mᵢ), coefmax))
+
+where:
+- `v̅ᵢ` is the cell mean value,
+- `mᵢ`/`Mᵢ` are the min/max values of `u` in the cell (at the quadrature nodes
+  of the target measures),
+- `m̅`/`M̅` are the min/max of the neighboring cell mean values (relaxed by
+  `DMPrelax`, and possibly clipped by the strong `bounds`).
+
+Each ratio is regularized by `eps(eltype(y))` in the denominator. If `checkvalues`
+is `true`, check that `v̅ᵢ` lies within `[mᵢ, Mᵢ]` and `[m̅, M̅]` and error otherwise.
 """
 function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m̅, M̅, coefmax, checkvalues = false)
     _0 = zero(eltype(v̅ᵢ))
