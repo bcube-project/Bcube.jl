@@ -2,6 +2,61 @@
 # https://www.brown.edu/research/projects/scientific-computing/sites/brown.edu.research.projects.scientific-computing/files/uploads/Maximum-principle-satisfying%20and%20positivity-preserving.pdf
 
 """
+    default_target_measures(u::SingleFieldFEFunction, Ω::AbstractCellDomain)
+    default_target_measures(u::SingleFieldFEFunction, dΩ::AbstractMeasure{<:AbstractCellDomain})
+
+Build the default list of `Measure`s used as target measures for the limiter on domain `Ω`
+or measure `dΩ`.
+
+When a domain is provided, the target measures default to a single cell measure built on
+that domain. This measure is constructed with quadrature `degree`, where `degree`
+is the degree of the `FunctionSpace` of `u`. For a `:Lagrange` space, the quadrature type
+follows the space (`:Legendre`, `:Lobatto`, or `:Uniform`); for any other space type a
+`QuadratureUniform()` quadrature is used.
+
+When a measure `dΩ` is provided, the measure is added itself to the list of target measures
+and another measure is build from its associated domain `Ω` as describred above.
+"""
+function default_target_measures(u::SingleFieldFEFunction, domain::AbstractCellDomain)
+    fs = get_function_space(get_fespace(u))
+    fstype = get_type(fs)
+    quadtype =
+        isa(fstype, Lagrange) ? lagrange_quadrature_type(fstype) : QuadratureUniform()
+    return (Measure(domain, Quadrature(quadtype, get_degree(fs))),)
+end
+
+function default_target_measures(
+    u::SingleFieldFEFunction,
+    dΩ::AbstractMeasure{<:AbstractCellDomain},
+)
+    return (dΩ, default_target_measures(u, get_domain(dΩ))...)
+end
+
+"""
+    linear_scaling_limiter(
+        u::SingleFieldFEFunction,
+        u_mean::MeshData{<:CellData},
+        domainOrMeasure::Union{AbstractCellDomain, AbstractMeasure{<:AbstractCellDomain}};
+        kwargs...,
+    )
+
+Convenience wrapper for [`linear_scaling_limiter`](@ref) that accepts either an
+`AbstractCellDomain` or an `AbstractMeasure{<:AbstractCellDomain}` as the third positional
+argument. The target measures are built automatically via
+[`default_target_measures`](@ref). All keyword arguments are forwarded to the main [`linear_scaling_limiter`](@ref)
+method.
+"""
+function linear_scaling_limiter(
+    u::SingleFieldFEFunction,
+    u_mean::MeshData{<:CellData},
+    domainOrMeasure::Union{AbstractCellDomain, AbstractMeasure{<:AbstractCellDomain}};
+    kwargs...,
+)
+    targetMeasures = default_target_measures(u, domainOrMeasure)
+    linear_scaling_limiter(u, u_mean, domainOrMeasure, targetMeasures; kwargs...)
+end
+
+"""
     linear_scaling_limiter(
         u::SingleFieldFEFunction,
         u_mean::MeshData{<:CellData},
@@ -149,8 +204,8 @@ end
 For each cell, compute the min and max of mean values (in the `mean` array)
 of the neighbor cells.
 
-So `minval_mean[i]` is the minimum of the mean values of cells surrounding cell `i`.
-The `domain` (an `AbstractCellDomain`) is only used to retrieve the mesh.
+So `minval_mean[i]` is the minimum of the mean values of cells surrounding cell `i`,
+and `maxval_mean[i]` is the maximum.
 """
 function _mean_minmax_cells!(minval_mean, maxval_mean, mean, domain)
     mesh = get_mesh(domain)
@@ -196,6 +251,21 @@ function _mean_minmax_cells_periodic!(minval_mean, maxval_mean, mean, periodicBc
     return nothing
 end
 
+"""
+    _minmax_elements!(minval, maxval, v, domain, quadrature)
+
+Compute the min and max values of `v` (an `AbstractLazy` field) over the elements of
+`domain`. The specific behavior depends on the type of `domain`:
+
+- `AbstractCellDomain`: min/max are computed per cell using [`_minmax_cells!`](@ref).
+- `AbstractFaceDomain`: min/max are computed per face using [`_minmax_faces!`](@ref).
+- `BoundaryFaceDomain{<:PeriodicBCType}`: min/max are computed on periodic boundary
+  faces using [`_minmax_faces_periodic!`](@ref).
+
+The single `quadrature` value is passed as a 1-tuple to the underlying function.
+This dispatch wrapper allows callers to use a single quadrature object regardless of
+the domain type.
+"""
 function _minmax_elements!(minval, maxval, v, domain::AbstractCellDomain, quadrature)
     _minmax_cells!(minval, maxval, v, domain, (quadrature,))
 end
@@ -215,8 +285,12 @@ end
 """
     _minmax_cells!(minval, maxval, v, domain, quadratures)
 
-Compute the min and max values of `v` interpolated at
-`quadratures` points in each cell of `domain`
+Compute the min and max values of `v` (an `AbstractLazy` field) interpolated at
+`quadratures` points in each cell of `domain`.
+
+The `quadratures` argument is a tuple of quadrature degrees; for each one a
+`QuadratureRule` is built and the min/max of `v` at its nodes are used to update
+`minval[icell]` and `maxval[icell]`.
 """
 function _minmax_cells!(minval, maxval, v, domain, quadratures)
     foreach_element(domain) do cellInfo, _, _
@@ -234,6 +308,17 @@ function _minmax_cells!(minval, maxval, v, domain, quadratures)
     return nothing
 end
 
+"""
+    _minmax_faces!(minval, maxval, v, faceDomain::AbstractFaceDomain, quadratures)
+
+For each face in `faceDomain`, compute the min and max values of `v` (an `AbstractLazy`
+field evaluated on both sides of the face) at the quadrature points given by `quadratures`
+(a tuple of quadrature degrees).
+
+For each face, the min/max values of the `N` side (`mᵢⱼ, Mᵢⱼ`) are stored in `minval[i]`
+/ `maxval[i]` and those of the `P` side (`mⱼᵢ, Mⱼᵢ`) in `minval[j]` / `maxval[j]`
+(if an opposite side exists).
+"""
 function _minmax_faces!(minval, maxval, v, faceDomain::AbstractFaceDomain, quadratures)
     foreach_element(faceDomain) do faceInfo, _, _
         i = cellindex(get_cellinfo_n(faceInfo))
@@ -305,6 +390,20 @@ function _minmax_faces_periodic!(minval, maxval, v, periodicBcDomain, quadrature
     return nothing
 end
 
+"""
+    _minmax_on_face(v, quadrature, ftype, finfo_ij, finfo_ji)
+
+Compute the min/max values of the field `v` (an `AbstractLazy` field) evaluated on both
+sides of a face, at the quadrature points of `quadrature`.
+
+- `ftype` is the face element type.
+- `finfo_ij` is the `FaceInfo` for the `N`-side (cell `i`, face side `n`).
+- `finfo_ji` is the `FaceInfo` for the `P`-side (cell `j`, face side `p`), or `nothing`
+  if the face has no opposite side.
+
+Returns `(mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ)`: the min/max on the `N`-side and (if available) on the
+`P`-side. When there is no opposite side, `mⱼᵢ` and `Mⱼᵢ` are `nothing`.
+"""
 function _minmax_on_face(v, quadrature, ftype, finfo_ij, finfo_ji)
     quadrule = QuadratureRule(shape(ftype), quadrature)
 
@@ -361,7 +460,14 @@ function _minmax_on_face_periodic(
     return mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ
 end
 
-# here we assume that f is define in ref. space
+"""
+    _minmax(f, quadrule::AbstractQuadratureRule)
+
+Compute the minimum and maximum of the reference-space function `f` (a callable taking a
+`SVector` reference coordinate) at the nodes of the quadrature rule `quadrule`.
+
+Returns a tuple `(min, max)`.
+"""
 _minmax(f, quadrule::AbstractQuadratureRule) = extrema(f(ξ) for ξ in get_nodes(quadrule))
 
 """
@@ -380,6 +486,9 @@ where:
 
 Each ratio is regularized by `eps(eltype(y))` in the denominator. If `checkvalues`
 is `true`, check that `v̅ᵢ` lies within `[mᵢ, Mᵢ]` and `[m̅, M̅]` and error otherwise.
+
+# Returns
+The limiter coefficient θᵢ ∈ [0, coefmax].
 """
 function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m̅, M̅, coefmax, checkvalues = false)
     _0 = zero(eltype(v̅ᵢ))
