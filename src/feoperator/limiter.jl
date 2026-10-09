@@ -5,31 +5,47 @@
     default_target_measures(u::SingleFieldFEFunction, Ω::AbstractCellDomain)
     default_target_measures(u::SingleFieldFEFunction, dΩ::AbstractMeasure{<:AbstractCellDomain})
 
-Build the default list of `Measure`s used as target measures for the limiter on domain `Ω`
-or measure `dΩ`.
+Build the default list of target `Measure`s used by [`linear_scaling_limiter`](@ref) to
+evaluate the min and max of the solution.
 
-When a domain is provided, the target measures default to a single cell measure built on
-that domain. This measure is constructed with quadrature `degree`, where `degree`
-is the degree of the `FunctionSpace` of `u`. For a `:Lagrange` space, the quadrature type
-follows the space (`:Legendre`, `:Lobatto`, or `:Uniform`); for any other space type a
-`QuadratureUniform()` quadrature is used.
+When a cell domain `Ω` is provided, a cell measure `dΩ` is first built on that domain and
+the method below applies. The quadrature degree of `dΩ` is the degree of the
+`FunctionSpace` of `u`; for a `:Lagrange` space the quadrature type follows the space
+(`:Legendre`, `:Lobatto` or `:Uniform`), and for any other space a uniform quadrature is
+used.
 
-When a measure `dΩ` is provided, the measure is added itself to the list of target measures
-and another measure is build from its associated domain `Ω` as describred above.
+When a cell measure `dΩ` is provided, the returned measures are:
+- `dΩ` itself, on which the min/max of the solution are evaluated inside the cells;
+- a measure on the interior faces of the mesh, on which they are evaluated on both sides
+  of each face;
+- a measure on the boundary faces of the mesh (all boundary names), if the mesh defines
+  boundary names.
+
+The face measures are built with the same quadrature as `dΩ`. They are required to "see"
+the values reached on the cell boundaries: for a Gauss-type quadrature (e.g. `:Legendre`)
+the nodes of `dΩ` lie strictly inside the cells.
 """
-function default_target_measures(u::SingleFieldFEFunction, domain::AbstractCellDomain)
+function default_target_measures(u::SingleFieldFEFunction, Ω::AbstractCellDomain)
     fs = get_function_space(get_fespace(u))
-    fstype = get_type(fs)
-    quadtype =
-        isa(fstype, Lagrange) ? lagrange_quadrature_type(fstype) : QuadratureUniform()
-    return (Measure(domain, Quadrature(quadtype, get_degree(fs))),)
+    quadtype = if isa(fs, FunctionSpace{<:Lagrange})
+        lagrange_quadrature_type(fs)
+    else
+        QuadratureUniform()
+    end
+    dΩ = Measure(Ω, Quadrature(quadtype, get_degree(fs)))
+    return default_target_measures(u, dΩ)
 end
 
 function default_target_measures(
     u::SingleFieldFEFunction,
     dΩ::AbstractMeasure{<:AbstractCellDomain},
 )
-    return (dΩ, default_target_measures(u, get_domain(dΩ))...)
+    mesh = get_mesh(get_domain(dΩ))
+    quad = get_quadrature(dΩ)
+    dΓ = Measure(InteriorFaceDomain(mesh), quad)
+    bc_labels = values(boundary_names(mesh))
+    dΓbc = length(bc_labels)>0 ? (Measure(BoundaryFaceDomain(mesh, bc_labels), quad),) : ()
+    return (dΩ, dΓ, dΓbc...)
 end
 
 """
@@ -37,31 +53,7 @@ end
         u::SingleFieldFEFunction,
         u_mean::MeshData{<:CellData},
         domainOrMeasure::Union{AbstractCellDomain, AbstractMeasure{<:AbstractCellDomain}};
-        kwargs...,
-    )
-
-Convenience wrapper for [`linear_scaling_limiter`](@ref) that accepts either an
-`AbstractCellDomain` or an `AbstractMeasure{<:AbstractCellDomain}` as the third positional
-argument. The target measures are built automatically via
-[`default_target_measures`](@ref). All keyword arguments are forwarded to the main [`linear_scaling_limiter`](@ref)
-method.
-"""
-function linear_scaling_limiter(
-    u::SingleFieldFEFunction,
-    u_mean::MeshData{<:CellData},
-    domainOrMeasure::Union{AbstractCellDomain, AbstractMeasure{<:AbstractCellDomain}};
-    kwargs...,
-)
-    targetMeasures = default_target_measures(u, domainOrMeasure)
-    linear_scaling_limiter(u, u_mean, domainOrMeasure, targetMeasures; kwargs...)
-end
-
-"""
-    linear_scaling_limiter(
-        u::SingleFieldFEFunction,
-        u_mean::MeshData{<:CellData},
-        domain::AbstractCellDomain,
-        targetMeasures::NTuple{N, AbstractMeasure};
+        targetMeasures::NTuple{N, AbstractMeasure} = default_target_measures(u, domainOrMeasure),
         periodicBCs::Union{NTuple{Nbc, BoundaryFaceDomain{M, <:PeriodicBCType}}, Nothing} = nothing,
         bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
         DMPrelax = zero(get_dof_type(u)),
@@ -88,16 +80,17 @@ first-order (piecewise constant) solution.
 - `u_mean`: the cell mean values of `u`, as a `MeshCellData` (i.e. `MeshData{<:CellData}`).
   It is typically obtained with `cell_mean(u, dΩ)` where `dΩ` is a `Measure` on the cells of
   the mesh.
-- `domain`: an `AbstractCellDomain` — typically the whole `CellDomain(mesh)` — used to
-  retrieve the mesh and the neighboring cells, needed to compute the min/max of the
-  neighboring cell mean values. Restricted `CellDomain`s (a subset of cells) are not
-  supported yet: the neighbor search currently runs over all mesh faces.
-- `targetMeasures`: the complete list of `Measure`s on which the min and max of `u` are
-  evaluated (at the quadrature nodes of each measure). Nothing is automatic: both the cell
-  measure (e.g. `dΩ = Measure(CellDomain(mesh), 2 * degree + 1)`) and any face measure
-  (e.g. `dΓ = Measure(InteriorFaceDomain(mesh), 2 * degree + 1)`) must be provided
-  explicitly, as in `(dΩ, dΓ)`. Note that a `Measure` defined on a periodic
-  `BoundaryFaceDomain` is not supported yet (it currently raises an error).
+- `domainOrMeasure`: either the `AbstractCellDomain` — typically the whole `CellDomain(mesh)`
+  — or the cell `Measure` `dΩ` used to compute `u_mean`. It is only used to retrieve the
+  mesh and the neighboring cells, needed to compute the min/max of the neighboring cell
+  mean values. Restricted `CellDomain`s (a subset of cells) are not supported yet: the
+  neighbor search currently runs over all mesh faces.
+- `targetMeasures`: the list of `Measure`s on which the min and max of `u` are evaluated
+  (at the quadrature nodes of each measure). By default it is built by
+  [`default_target_measures`](@ref) as `(dΩ, dΓ, dΓbc)`: the cell measure, a measure on the
+  interior faces and — when the mesh defines boundary names — one on the boundary faces.
+  It can also be provided explicitly, as in `(dΩ, dΓ)`. Note that a `Measure` defined on a
+  periodic `BoundaryFaceDomain` is not supported yet (it currently raises an error).
 
 # Keyword arguments
 - `periodicBCs`: not yet supported: any value other than `nothing` currently raises an
@@ -111,8 +104,10 @@ first-order (piecewise constant) solution.
   `- DMPrelax` / `+ DMPrelax` (default: `0`, i.e. strict DMP).
 - `coefmax`: upper bound of the limiter coefficient (default: `1`, i.e. the fluctuation is
   never amplified).
-- `checkvalues`: if `true`, check that the cell mean values are consistent with the
-  min/max bounds and error otherwise (default: `false`).
+- `checkvalues`: if `true`, check that each cell mean lies within the min/max values of
+  `u` in the cell and within the admissible window, and error otherwise (default:
+  `false`). This is a safety net — e.g. against `NaN`s — as both ranges are initialized
+  from the cell means themselves and are thus consistent by construction.
 
 # Returns
 A tuple `(lim_u, u_lim)` where:
@@ -131,10 +126,9 @@ u = FEFunction(fes, mesh, PhysicalFunction(x -> x[1])) # the DG field to limit
 
 Ω = CellDomain(mesh)
 dΩ = Measure(Ω, 2 * degree + 1)
-dΓ = Measure(InteriorFaceDomain(mesh), 2 * degree + 1)
 
 u_mean = cell_mean(u, dΩ)
-lim_u, u_lim = linear_scaling_limiter(u, u_mean, Ω, (dΩ, dΓ); bounds = (0.0, 1.0))
+lim_u, u_lim = linear_scaling_limiter(u, u_mean, Ω; bounds = (0.0, 1.0))
 
 u_limited = FEFunction(fes)
 projection_l2!(u_limited, u_lim, mesh)
@@ -143,8 +137,11 @@ projection_l2!(u_limited, u_lim, mesh)
 function linear_scaling_limiter(
     u::SingleFieldFEFunction,
     u_mean::MeshData{<:CellData},
-    domain::AbstractCellDomain,
-    targetMeasures::NTuple{N, AbstractMeasure};
+    domainOrMeasure::Union{AbstractCellDomain, AbstractMeasure{<:AbstractCellDomain}};
+    targetMeasures::NTuple{N, AbstractMeasure} = default_target_measures(
+        u,
+        domainOrMeasure,
+    ),
     periodicBCs::Union{NTuple{Nbc, BoundaryFaceDomain{M, <:PeriodicBCType}}, Nothing} = nothing,
     bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
     DMPrelax = zero(get_dof_type(u)),
@@ -154,6 +151,11 @@ function linear_scaling_limiter(
     @assert is_discontinuous(get_fespace(u)) "linear_scaling_limiter only supports discontinuous FEFunction"
     @assert all(DMPrelax .≥ 0) "DMPrelax must be non-negative"
 
+    domain = if isa(domainOrMeasure, AbstractCellDomain)
+        domainOrMeasure
+    else
+        get_domain(domainOrMeasure)
+    end
     mean = get_values(u_mean)
     limiter = similar(mean)
 
