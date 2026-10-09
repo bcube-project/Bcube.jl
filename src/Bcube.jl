@@ -127,7 +127,7 @@ include("./assembler/affine_fe_system.jl")
 export AffineFESystem
 
 include("./feoperator/projection_newapi.jl")
-export projection_l2!, cell_mean
+export projection_l2!, build_cell_mean_cache, cell_mean
 
 include("./feoperator/projection.jl")
 export var_on_centers,

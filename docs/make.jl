@@ -41,6 +41,7 @@ makedocs(;
             "api/dof/dof.md",
             "api/cellfunction/meshdata.md",
             "api/io/io_interface.md",
+            "api/interpolation/limiter.md",
         ],
         "How to... (FAQ)" => "howto/howto.md",
         "Dev" => "dev/dev.md",
