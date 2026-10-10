@@ -19,6 +19,7 @@ jobs:
   test:
     name: ${{ matrix.package.repo }}/${{ matrix.package.group }}/${{ matrix.julia-version }}
     runs-on: ${{ matrix.os }}
+    if: contains(github.event.pull_request.labels.*.name, 'draft') == false
     env:
       GROUP: ${{ matrix.package.group }}
     strategy:
