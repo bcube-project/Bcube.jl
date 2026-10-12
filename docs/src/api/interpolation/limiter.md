@@ -33,3 +33,7 @@ projection_l2!(u_limited, u_lim, mesh)
 ```@docs
 linear_scaling_limiter
 ```
+
+```@docs
+default_target_measures
+```
