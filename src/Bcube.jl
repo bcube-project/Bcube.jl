@@ -127,14 +127,14 @@ include("./assembler/affine_fe_system.jl")
 export AffineFESystem
 
 include("./feoperator/projection_newapi.jl")
-export projection_l2!, cell_mean
+export projection_l2!, build_cell_mean_cache, cell_mean
 
 include("./feoperator/projection.jl")
 export var_on_centers,
     var_on_vertices, var_on_nodes_discontinuous, var_on_bnd_nodes_discontinuous
 
 include("./feoperator/limiter.jl")
-export linear_scaling_limiter
+export default_target_measures, linear_scaling_limiter
 
 include("./io/io_interface.jl")
 export read_file, read_mesh, write_file

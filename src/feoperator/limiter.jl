@@ -1,77 +1,216 @@
 # REF:
 # https://www.brown.edu/research/projects/scientific-computing/sites/brown.edu.research.projects.scientific-computing/files/uploads/Maximum-principle-satisfying%20and%20positivity-preserving.pdf
 
-function linear_scaling_limiter_coef(
-    v::SingleFieldFEFunction,
-    dω::Measure,
-    bounds,
-    DMPrelax,
-    periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}},
-    check = true;
-) where {N, Me, BC <: PeriodicBCType}
-    @assert is_discontinuous(get_fespace(v)) "LinearScalingLimiter only support discontinuous variables"
+"""
+    default_target_measures(u::SingleFieldFEFunction, Ω::AbstractCellDomain)
+    default_target_measures(u::SingleFieldFEFunction, dΩ::AbstractMeasure{<:AbstractCellDomain})
 
-    mesh = get_mesh(get_domain(dω))
+Build the default list of target `Measure`s used by [`linear_scaling_limiter`](@ref) to
+evaluate the min and max of the solution.
 
-    mean = get_values(cell_mean(v, dω))
+When a cell domain `Ω` is provided, a cell measure `dΩ` is first built on that domain and
+the method below applies. The quadrature degree of `dΩ` is the degree of the
+`FunctionSpace` of `u`; for a `:Lagrange` space the quadrature type follows the space
+(`:Legendre`, `:Lobatto` or `:Uniform`), and for any other space a uniform quadrature is
+used.
+
+When a cell measure `dΩ` is provided, the returned measures are:
+- `dΩ` itself, on which the min/max of the solution are evaluated inside the cells;
+- a measure on the interior faces of the mesh, on which they are evaluated on both sides
+  of each face;
+- a measure on the boundary faces of the mesh (all boundary names), if the mesh defines
+  boundary names.
+
+The face measures are built with the same quadrature as `dΩ`. They are required to "see"
+the values reached on the cell boundaries: for a Gauss-type quadrature (e.g. `:Legendre`)
+the nodes of `dΩ` lie strictly inside the cells.
+"""
+function default_target_measures(u::SingleFieldFEFunction, Ω::AbstractCellDomain)
+    fs = get_function_space(get_fespace(u))
+    quadtype = if isa(fs, FunctionSpace{<:Lagrange})
+        lagrange_quadrature_type(fs)
+    else
+        QuadratureUniform()
+    end
+    dΩ = Measure(Ω, Quadrature(quadtype, get_degree(fs)))
+    return default_target_measures(u, dΩ)
+end
+
+function default_target_measures(
+    u::SingleFieldFEFunction,
+    dΩ::AbstractMeasure{<:AbstractCellDomain},
+)
+    mesh = get_mesh(get_domain(dΩ))
+    quad = get_quadrature(dΩ)
+    dΓ = Measure(InteriorFaceDomain(mesh), quad)
+    bc_labels = values(boundary_names(mesh))
+    dΓbc = length(bc_labels)>0 ? (Measure(BoundaryFaceDomain(mesh, bc_labels), quad),) : ()
+    return (dΩ, dΓ, dΓbc...)
+end
+
+"""
+    linear_scaling_limiter(
+        u::SingleFieldFEFunction,
+        u_mean::MeshData{<:CellData},
+        domainOrMeasure::Union{AbstractCellDomain, AbstractMeasure{<:AbstractCellDomain}};
+        targetMeasures::NTuple{N, AbstractMeasure} = default_target_measures(u, domainOrMeasure),
+        periodicBCs::Union{NTuple{Nbc, BoundaryFaceDomain{M, <:PeriodicBCType}}, Nothing} = nothing,
+        bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
+        DMPrelax = zero(get_dof_type(u)),
+        coefmax = one(get_dof_type(u)),
+        checkvalues = false,
+    )
+
+Apply the linear scaling limiter (see "Maximum-principle-satisfying and positivity-preserving
+high-order schemes for conservation laws: survey and new developments", Zhang & Shu) to a
+scalar discontinuous `FEFunction`, in order to enforce a local discrete maximum principle
+(DMP), i.e. to prevent the creation of spurious extrema — typically in the neighborhood of
+discontinuities.
+
+In each cell, the limited solution is obtained by scaling the fluctuation around the cell
+mean with a scalar coefficient `lim_u ∈ [0, coefmax]`:
+
+    u_limited = u_mean + lim_u * (u - u_mean)
+
+The cell mean is thus preserved by construction, and `lim_u = 0` corresponds to a
+first-order (piecewise constant) solution.
+
+# Arguments
+- `u`: the scalar `FEFunction` to limit; its `FESpace` must be discontinuous.
+- `u_mean`: the cell mean values of `u`, as a `MeshCellData` (i.e. `MeshData{<:CellData}`).
+  It is typically obtained with `cell_mean(u, dΩ)` where `dΩ` is a `Measure` on the cells of
+  the mesh.
+- `domainOrMeasure`: either the `AbstractCellDomain` — typically the whole `CellDomain(mesh)`
+  — or the cell `Measure` `dΩ` used to compute `u_mean`. It is only used to retrieve the
+  mesh and the neighboring cells, needed to compute the min/max of the neighboring cell
+  mean values. Restricted `CellDomain`s (a subset of cells) are not supported yet: the
+  neighbor search currently runs over all mesh faces.
+- `targetMeasures`: the list of `Measure`s on which the min and max of `u` are evaluated
+  (at the quadrature nodes of each measure). By default it is built by
+  [`default_target_measures`](@ref) as `(dΩ, dΓ, dΓbc)`: the cell measure, a measure on the
+  interior faces and — when the mesh defines boundary names — one on the boundary faces.
+  It can also be provided explicitly, as in `(dΩ, dΓ)`. Note that a `Measure` defined on a
+  periodic `BoundaryFaceDomain` is not supported yet (it currently raises an error).
+
+# Keyword arguments
+- `periodicBCs`: not yet supported: any value other than `nothing` currently raises an
+  error.
+- `bounds`: optional `(lower, upper)` strong physical bounds imposed on the solution. The
+  bounds are clipped to the range allowed by the local cell mean: if a cell mean does not
+  satisfy the bounds, the admissible window of that cell reduces to its mean and the
+  limiter degenerates to a first-order (piecewise constant) solution in that cell.
+- `DMPrelax`: non-negative relaxation parameter (possibly broadcastable to the number of
+  components) that enlarges the admissible range of neighboring cell mean values by
+  `- DMPrelax` / `+ DMPrelax` (default: `0`, i.e. strict DMP).
+- `coefmax`: upper bound of the limiter coefficient (default: `1`, i.e. the fluctuation is
+  never amplified).
+- `checkvalues`: if `true`, check that each cell mean lies within the min/max values of
+  `u` in the cell and within the admissible window, and error otherwise (default:
+  `false`). This is a safety net — e.g. against `NaN`s — as both ranges are initialized
+  from the cell means themselves and are thus consistent by construction.
+
+# Returns
+A tuple `(lim_u, u_lim)` where:
+- `lim_u` is a `MeshCellData` containing one limiter coefficient in `[0, coefmax]` per cell;
+- `u_lim` is the limited field `u_mean + lim_u * (u - u_mean)` given as a lazy expression
+  (`AbstractLazy`), and not as an `FEFunction`. It can be used directly inside a weak form
+  (e.g. `∫(u_lim ⋅ v)dΩ`); to obtain the dofs of the limited solution, project it for
+  instance with `projection_l2!`.
+
+# Example
+```julia
+mesh = rectangle_mesh(20, 4)
+degree = 2
+fes = TrialFESpace(FunctionSpace(:Lagrange, degree), mesh, :discontinuous)
+u = FEFunction(fes, mesh, PhysicalFunction(x -> x[1])) # the DG field to limit
+
+Ω = CellDomain(mesh)
+dΩ = Measure(Ω, 2 * degree + 1)
+
+u_mean = cell_mean(u, dΩ)
+lim_u, u_lim = linear_scaling_limiter(u, u_mean, Ω; bounds = (0.0, 1.0))
+
+u_limited = FEFunction(fes)
+projection_l2!(u_limited, u_lim, mesh)
+```
+"""
+function linear_scaling_limiter(
+    u::SingleFieldFEFunction,
+    u_mean::MeshData{<:CellData},
+    domainOrMeasure::Union{AbstractCellDomain, AbstractMeasure{<:AbstractCellDomain}};
+    targetMeasures::NTuple{N, AbstractMeasure} = default_target_measures(
+        u,
+        domainOrMeasure,
+    ),
+    periodicBCs::Union{NTuple{Nbc, BoundaryFaceDomain{M, <:PeriodicBCType}}, Nothing} = nothing,
+    bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
+    DMPrelax = zero(get_dof_type(u)),
+    coefmax = one(get_dof_type(u)),
+    checkvalues = false,
+) where {N, Nbc, M}
+    @assert is_discontinuous(get_fespace(u)) "linear_scaling_limiter only supports discontinuous FEFunction"
+    @assert all(DMPrelax .≥ 0) "DMPrelax must be non-negative"
+
+    domain = if isa(domainOrMeasure, AbstractCellDomain)
+        domainOrMeasure
+    else
+        get_domain(domainOrMeasure)
+    end
+    mean = get_values(u_mean)
     limiter = similar(mean)
 
-    minval = similar(mean)
-    minval .= typemax(eltype(minval))
-    maxval = similar(mean)
-    maxval .= -minval
-    _minmax_cells!(minval, maxval, v, dω)
-    _minmax_faces!(minval, maxval, v, dω)
-    if !isnothing(periodicBCs)
-        for domain in periodicBCs
-            _minmax_faces_periodic!(minval, maxval, v, degquad, domain)
-        end
+    minval = copy(mean)
+    maxval = copy(mean)
+
+    foreach(targetMeasures) do measure
+        _minmax_elements!(minval, maxval, u, get_domain(measure), get_quadrature(measure))
     end
 
-    minval_mean = similar(mean)
-    minval_mean .= typemax(eltype(minval))
-    maxval_mean = similar(mean)
-    maxval_mean .= -minval_mean
-    _mean_minmax_cells!(minval_mean, maxval_mean, mean, mesh)
+    minval_mean = copy(mean)
+    maxval_mean = copy(mean)
+    _mean_minmax_cells!(minval_mean, maxval_mean, mean, domain)
+    # deal with periodic BC for mean values
     if !isnothing(periodicBCs)
-        for domain in periodicBCs
-            _mean_minmax_cells_periodic!(minval_mean, maxval_mean, mean, domain)
-        end
+        error("PeriodicBC are not yet supported for limiters")
     end
 
     # relax DMP
     @. minval_mean = minval_mean - DMPrelax
     @. maxval_mean = maxval_mean + DMPrelax
 
-    # impose strong physical bounds
+    # Impose strong physical bounds, but clipped to the range allowed by the local cell means
     if !isnothing(bounds)
-        @. minval_mean = max(minval_mean, bounds[1])
-        @. maxval_mean = min(maxval_mean, bounds[2])
+        @. minval_mean = max(minval_mean, min(mean, bounds[1]))
+        @. maxval_mean = min(maxval_mean, max(mean, bounds[2]))
     end
 
-    for i in 1:ncells(mesh)
+    for i in eachindex(limiter)
         limiter[i] = _compute_scalar_limiter(
             mean[i],
             minval[i],
             maxval[i],
             minval_mean[i],
             maxval_mean[i],
-            check,
+            coefmax,
+            checkvalues,
         )
     end
 
-    MeshCellData(limiter), MeshCellData(mean)
+    lim_u = MeshCellData(limiter)
+    return lim_u, u_mean + lim_u*(u-u_mean)
 end
 
 """
-    _mean_minmax_cells!(minval_mean, maxval_mean, mean, mesh)
+    _mean_minmax_cells!(minval_mean, maxval_mean, mean, domain)
 
 For each cell, compute the min and max of mean values (in the `mean` array)
 of the neighbor cells.
 
-So `minval_mean[i]` is the minimum of the mean values of cells surrounding cell `i`.
+So `minval_mean[i]` is the minimum of the mean values of cells surrounding cell `i`,
+and `maxval_mean[i]` is the maximum.
 """
-function _mean_minmax_cells!(minval_mean, maxval_mean, mean, mesh)
+function _mean_minmax_cells!(minval_mean, maxval_mean, mean, domain)
+    mesh = get_mesh(domain)
     f2c = connectivities_indices(mesh, :f2c)
 
     minval_mean .= mean
@@ -95,7 +234,7 @@ function _mean_minmax_cells!(minval_mean, maxval_mean, mean, mesh)
 end
 
 function _mean_minmax_cells_periodic!(minval_mean, maxval_mean, mean, periodicBcDomain)
-    error("TODO")
+    error("PeriodicBCs are not yet supported by the limiter (TODO)")
     # # TODO : add a specific API for the domain cache:
     # perio_cache = get_cache(periodicBcDomain)
     # _1, _2, _3, bnd_f2c, _5, _6 = perio_cache
@@ -114,89 +253,106 @@ function _mean_minmax_cells_periodic!(minval_mean, maxval_mean, mean, periodicBc
     return nothing
 end
 
-function _minmax_cells(v, mesh, quadrature)
-    c2n = connectivities_indices(mesh, :c2n)
-    cellTypes = cells(mesh)
+"""
+    _minmax_elements!(minval, maxval, v, domain, quadrature)
 
-    val = map(1:ncells(mesh)) do i
-        # mᵢ, Mᵢ : min/max at cell quadrature points
-        ctypeᵢ = cellTypes[i]
-        cnodesᵢ = get_nodes(mesh, c2n[i])
-        cᵢ = CellInfo(i, ctypeᵢ, cnodesᵢ)
-        vᵢ = materialize(v, cᵢ)
-        fᵢ(ξ) = vᵢ(CellPoint(ξ, cᵢ, ReferenceDomain()))
-        quadrule = QuadratureRule(shape(ctypeᵢ), quadrature)
-        mᵢ, Mᵢ = _minmax(fᵢ, quadrule)
-        mᵢ, Mᵢ
-    end
-    return val
+Compute the min and max values of `v` (an `AbstractLazy` field) over the elements of
+`domain`. The specific behavior depends on the type of `domain`:
+
+- `AbstractCellDomain`: min/max are computed per cell using [`_minmax_cells!`](@ref).
+- `AbstractFaceDomain`: min/max are computed per face using [`_minmax_faces!`](@ref).
+- `BoundaryFaceDomain{<:PeriodicBCType}`: min/max are computed on periodic boundary
+  faces using [`_minmax_faces_periodic!`](@ref).
+
+The single `quadrature` value is passed as a 1-tuple to the underlying function.
+This dispatch wrapper allows callers to use a single quadrature object regardless of
+the domain type.
+"""
+function _minmax_elements!(minval, maxval, v, domain::AbstractCellDomain, quadrature)
+    _minmax_cells!(minval, maxval, v, domain, (quadrature,))
+end
+function _minmax_elements!(minval, maxval, v, domain::AbstractFaceDomain, quadrature)
+    _minmax_faces!(minval, maxval, v, domain, (quadrature,))
+end
+function _minmax_elements!(
+    minval,
+    maxval,
+    v,
+    domain::BoundaryFaceDomain{M, <:PeriodicBCType},
+    quadrature,
+) where {M}
+    _minmax_faces_periodic!(minval, maxval, v, domain, (quadrature,))
 end
 
 """
-    _minmax_cells!(minval, maxval, v, dω)
+    _minmax_cells!(minval, maxval, v, domain, quadratures)
 
-Compute the min and max values of `v` in each cell of `dω`
+Compute the min and max values of `v` (an `AbstractLazy` field) interpolated at
+`quadratures` points in each cell of `domain`.
+
+The `quadratures` argument is a tuple of quadrature degrees; for each one a
+`QuadratureRule` is built and the min/max of `v` at its nodes are used to update
+`minval[icell]` and `maxval[icell]`.
 """
-function _minmax_cells!(minval, maxval, v, dω)
-    domain = get_domain(dω)
-    quadrature = get_quadrature(dω)
-
+function _minmax_cells!(minval, maxval, v, domain, quadratures)
     foreach_element(domain) do cellInfo, _, _
         # mᵢ, Mᵢ : min/max at cell quadrature points
         vᵢ = materialize(v, cellInfo)
         fᵢ(ξ) = vᵢ(CellPoint(ξ, cellInfo, ReferenceDomain()))
-        quadrule = QuadratureRule(shape(celltype(cellInfo)), quadrature)
-        mᵢ, Mᵢ = _minmax(fᵢ, quadrule)
         icell = cellindex(cellInfo)
-        minval[icell] = min(mᵢ, minval[icell])
-        maxval[icell] = max(Mᵢ, maxval[icell])
+        for quadrature in quadratures
+            quadrule = QuadratureRule(shape(celltype(cellInfo)), quadrature)
+            mᵢ, Mᵢ = _minmax(fᵢ, quadrule)
+            minval[icell] = min(mᵢ, minval[icell])
+            maxval[icell] = max(Mᵢ, maxval[icell])
+        end
     end
     return nothing
 end
 
-function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractCellDomain})
-    mesh = get_mesh(get_domain(dω))
-    dΓ = Measure(InteriorFaceDomain(mesh), get_quadrature(dω))
-    _minmax_faces!(minval, maxval, v, dΓ)
-    bc_labels = values(boundary_names(mesh))
-    if length(bc_labels) > 0
-        dΓb = Measure(BoundaryFaceDomain(mesh, bc_labels), get_quadrature(dω))
-        _minmax_faces!(minval, maxval, v, dΓb)
-    end
-end
+"""
+    _minmax_faces!(minval, maxval, v, faceDomain::AbstractFaceDomain, quadratures)
 
-function _minmax_faces!(minval, maxval, v, dω::AbstractMeasure{<:AbstractFaceDomain})
-    quadrature = get_quadrature(dω)
+For each face in `faceDomain`, compute the min and max values of `v` (an `AbstractLazy`
+field evaluated on both sides of the face) at the quadrature points given by `quadratures`
+(a tuple of quadrature degrees).
 
-    foreach_element(get_domain(dω)) do faceInfo, _, _
+For each face, the min/max values of the `N` side (`mᵢⱼ, Mᵢⱼ`) are stored in `minval[i]`
+/ `maxval[i]` and those of the `P` side (`mⱼᵢ, Mⱼᵢ`) in `minval[j]` / `maxval[j]`
+(if an opposite side exists).
+"""
+function _minmax_faces!(minval, maxval, v, faceDomain::AbstractFaceDomain, quadratures)
+    foreach_element(faceDomain) do faceInfo, _, _
+        i = cellindex(get_cellinfo_n(faceInfo))
         if has_opposite_side(faceInfo)
             oppositeFaceInfo = opposite_side(faceInfo)
+            j = cellindex(get_cellinfo_p(faceInfo))
         else
             oppositeFaceInfo = nothing
+            j = -1
         end
 
-        mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ = _minmax_on_face(
-            side_n(v),
-            quadrature,
-            facetype(faceInfo),
-            faceInfo,
-            oppositeFaceInfo,
-        )
-
-        i = cellindex(get_cellinfo_n(faceInfo))
-        minval[i] = min(mᵢⱼ, minval[i])
-        maxval[i] = max(Mᵢⱼ, maxval[i])
-        if has_opposite_side(faceInfo)
-            j = cellindex(get_cellinfo_p(faceInfo))
-            minval[j] = min(mⱼᵢ, minval[j])
-            maxval[j] = max(Mⱼᵢ, maxval[j])
+        for quadrature in quadratures
+            mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ = _minmax_on_face(
+                side_n(v),
+                quadrature,
+                facetype(faceInfo),
+                faceInfo,
+                oppositeFaceInfo,
+            )
+            minval[i] = min(mᵢⱼ, minval[i])
+            maxval[i] = max(Mᵢⱼ, maxval[i])
+            if has_opposite_side(faceInfo)
+                minval[j] = min(mⱼᵢ, minval[j])
+                maxval[j] = max(Mⱼᵢ, maxval[j])
+            end
         end
     end
     return nothing
 end
 
-function _minmax_faces_periodic!(minval, maxval, v, degquad, periodicBcDomain)
-    error("TODO")
+function _minmax_faces_periodic!(minval, maxval, v, periodicBcDomain, quadratures)
+    error("PeriodicBCs are not yet supported by the limiter (TODO)")
     # mesh = get_mesh(v)
     # c2n = connectivities_indices(mesh,:c2n)
     # f2n = connectivities_indices(mesh,:f2n)
@@ -236,6 +392,20 @@ function _minmax_faces_periodic!(minval, maxval, v, degquad, periodicBcDomain)
     return nothing
 end
 
+"""
+    _minmax_on_face(v, quadrature, ftype, finfo_ij, finfo_ji)
+
+Compute the min/max values of the field `v` (an `AbstractLazy` field) evaluated on both
+sides of a face, at the quadrature points of `quadrature`.
+
+- `ftype` is the face element type.
+- `finfo_ij` is the `FaceInfo` for the `N`-side (cell `i`, face side `n`).
+- `finfo_ji` is the `FaceInfo` for the `P`-side (cell `j`, face side `p`), or `nothing`
+  if the face has no opposite side.
+
+Returns `(mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ)`: the min/max on the `N`-side and (if available) on the
+`P`-side. When there is no opposite side, `mⱼᵢ` and `Mⱼᵢ` are `nothing`.
+"""
 function _minmax_on_face(v, quadrature, ftype, finfo_ij, finfo_ji)
     quadrule = QuadratureRule(shape(ftype), quadrature)
 
@@ -292,64 +462,53 @@ function _minmax_on_face_periodic(
     return mᵢⱼ, Mᵢⱼ, mⱼᵢ, Mⱼᵢ
 end
 
-# here we assume that f is define in ref. space
+"""
+    _minmax(f, quadrule::AbstractQuadratureRule)
+
+Compute the minimum and maximum of the reference-space function `f` (a callable taking a
+`SVector` reference coordinate) at the nodes of the quadrature rule `quadrule`.
+
+Returns a tuple `(min, max)`.
+"""
 _minmax(f, quadrule::AbstractQuadratureRule) = extrema(f(ξ) for ξ in get_nodes(quadrule))
 
 """
-    _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, checkmean = true)
+    _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m̅, M̅, coefmax, checkvalues = false)
 
-v̅ᵢ = mean
-mᵢ = minval
-Mᵢ = maxval
-m = minval_mean
-M = maxval_mean
+Compute the limiter coefficient θᵢ of cell `i`:
+
+    θᵢ = max(0, min((M̅-v̅ᵢ)/(Mᵢ-v̅ᵢ), (v̅ᵢ-m̅)/(v̅ᵢ-mᵢ), coefmax))
+
+where:
+- `v̅ᵢ` is the cell mean value,
+- `mᵢ`/`Mᵢ` are the min/max values of `u` in the cell (at the quadrature nodes
+  of the target measures),
+- `m̅`/`M̅` are the min/max of the neighboring cell mean values (relaxed by
+  `DMPrelax`, and possibly clipped by the strong `bounds`).
+
+Each ratio is regularized by `eps(eltype(y))` in the denominator. If `checkvalues`
+is `true`, check that `v̅ᵢ` lies within `[mᵢ, Mᵢ]` and `[m̅, M̅]` and error otherwise.
+
+# Returns
+The limiter coefficient θᵢ ∈ [0, coefmax].
 """
-function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m, M, checkmean = true)
-    if checkmean
-        ((Mᵢ - v̅ᵢ) < (-10eps() * max(Mᵢ, one(Mᵢ)))) &&
-            error("Invalid max value :  Mᵢ=$Mᵢ, v̅ᵢ=$v̅ᵢ")
-        ((v̅ᵢ - mᵢ) < (-10eps() * max(v̅ᵢ, one(v̅ᵢ)))) &&
-            error("Invalid min value :  mᵢ=$mᵢ, v̅ᵢ=$v̅ᵢ")
+function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m̅, M̅, coefmax, checkvalues = false)
+    _0 = zero(eltype(v̅ᵢ))
+
+    if checkvalues
+        if !((m̅ ≤ v̅ᵢ ≤ M̅) && (mᵢ ≤ v̅ᵢ ≤ Mᵢ))
+            @show m̅ ≤ v̅ᵢ ≤ M̅
+            @show (M̅ - v̅ᵢ) ≥ _0
+            @show (Mᵢ - v̅ᵢ) ≥ _0
+            @show (v̅ᵢ - m̅) ≥ _0
+            @show (v̅ᵢ - mᵢ) ≥ _0
+            @show m̅, M̅
+            @show mᵢ, v̅ᵢ, Mᵢ
+            error("Limiter values are out of range")
+        end
     end
-    (Mᵢ - v̅ᵢ) < eps() && return zero(v̅ᵢ)
-    (v̅ᵢ - mᵢ) < eps() && return zero(v̅ᵢ)
-    _v̅ᵢ = max(mᵢ, min(Mᵢ, v̅ᵢ))
-    #abs(Mᵢ-v̅ᵢ) > 10*eps(typeof(M)) ? coef⁺ = abs((M-v̅ᵢ)/(Mᵢ-v̅ᵢ)) : coef⁺ = zero(M)
-    #abs(v̅ᵢ-mᵢ) > 10*eps(typeof(M)) ? coef⁻ = abs((v̅ᵢ-m)/(v̅ᵢ-mᵢ)) : coef⁻ = zero(M)
-    return min(_ratio(M - _v̅ᵢ, Mᵢ - _v̅ᵢ), _ratio(_v̅ᵢ - m, _v̅ᵢ - mᵢ), 1.0)
+
+    return max(_0, min(_ratio(M̅ - v̅ᵢ, Mᵢ - v̅ᵢ), _ratio(v̅ᵢ - m̅, v̅ᵢ - mᵢ), coefmax))
 end
 
-_ratio(x, y) = abs(x / (y + eps(y)))
-
-"""
-    linear_scaling_limiter(
-        u::SingleFieldFEFunction,
-        dω::Measure;
-        bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
-        DMPrelax = 0.0,
-        periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}} = nothing,
-        mass = nothing,
-        checkmean = true
-    ) where {N, Me, BC <: PeriodicBCType}
-
-Apply the linear scaling limiter (see "Maximum-principle-satisfying and positivity-preserving high order schemes for
-conservation laws: Survey and new developments", Zhang & Shu).
-
-`u_limited = u̅ + lim_u * (u - u̅)`
-
-The first returned argument is the coefficient `lim_u`, and the second is `u_limited`.
-"""
-function linear_scaling_limiter(
-    u::SingleFieldFEFunction,
-    dω::Measure;
-    bounds::Union{Tuple{<:Number, <:Number}, Nothing} = nothing,
-    DMPrelax = 0.0,
-    periodicBCs::Union{Nothing, NTuple{N, <:BoundaryFaceDomain{Me, BC}}} = nothing,
-    mass = nothing,
-    checkmean = true,
-) where {N, Me, BC <: PeriodicBCType}
-    lim_u, u̅ = linear_scaling_limiter_coef(u, dω, bounds, DMPrelax, periodicBCs, checkmean)
-    u_lim = FEFunction(get_fespace(u), get_dof_type(u))
-    projection_l2!(u_lim, u̅ + lim_u * (u - u̅), dω; mass = mass)
-    lim_u, u_lim, u̅
-end
+_ratio(x, y) = (x / (y + eps(eltype(y))))
