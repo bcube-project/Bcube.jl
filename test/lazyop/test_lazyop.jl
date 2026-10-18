@@ -77,9 +77,44 @@
     end
 
     @testset "lazy_compose materialize_op" begin
-        import Bcube.LazyOperators: LazyOperator, materialize, lazy_compose
+        import Bcube.LazyOperators: LazyOperator, materialize, lazy_compose, MapOver
 
         op = LazyOperator(lazy_compose, (x -> x + 1), 5)
         @test materialize(op) == 6
+
+        # `MapOver` arguments : the function is applied on each leaf
+        # (`>` is not defined on `MapOver`)
+        f(x, y) = ifelse(x > 1, x * y, -1)
+        op = lazy_compose(f, (MapOver(1, 2, 3), 10))
+        @test materialize(op) === MapOver(-1, 20, 30)
+    end
+
+    @testset "map_over_leaves" begin
+        import Bcube.LazyOperators: map_over_leaves, MapOver, NullOperator
+
+        f(x, y) = x * y + 1
+        @test map_over_leaves(f, 2, 3) === 7
+        @test map_over_leaves(f, MapOver(1, 2, 3), 2) === MapOver(3, 5, 7)
+        @test map_over_leaves(f, MapOver(1, 2), MapOver(3, 4)) === MapOver(4, 9)
+
+        # nested `MapOver`s
+        a = MapOver(MapOver(1, 2), MapOver(3, 4))
+        @test map_over_leaves(f, a, 2) === MapOver(MapOver(3, 5), MapOver(7, 9))
+
+        # leaves that are all `NullOperator` are collapsed
+        g(x, y) = x * y
+        @test map_over_leaves(g, MapOver(1, 2), NullOperator()) === NullOperator()
+        b = MapOver(MapOver(1, 2), NullOperator())
+        @test map_over_leaves(g, b, 3) === MapOver(MapOver(3, 6), NullOperator())
+
+        # a function returning a `Tuple` gives a `Tuple` of `MapOver`s
+        h(x) = (x, 2 * x, x * NullOperator())
+        @test map_over_leaves(h, MapOver(1, 2)) ===
+              (MapOver(1, 2), MapOver(2, 4), NullOperator())
+        @test map_over_leaves(h, a) === (
+            MapOver(MapOver(1, 2), MapOver(3, 4)),
+            MapOver(MapOver(2, 4), MapOver(6, 8)),
+            NullOperator(),
+        )
     end
 end

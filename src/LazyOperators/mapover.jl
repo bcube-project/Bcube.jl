@@ -174,6 +174,56 @@ end
 __map_over(f::F, a::Vararg{Any, N}) where {F, N} = f(a...)
 __map_over(f::F, a::Vararg{AbstractMapOver, N}) where {F, N} = map_over(f, a...)
 
+"""
+    map_over_leaves(f, args...)
+
+Apply `f` on the leaves of the (possibly nested) `MapOver` arguments, the other
+arguments being passed unchanged to each call of `f`. It is used to materialize
+a composition `f ∘ (a, b, ...)` when some of the materialized arguments are `MapOver`
+(for instance shape functions in an assembly).
+
+The result has the same structure as `f(args...)` evaluated operator by operator
+on the `MapOver`s:
+- a `MapOver` whose leaves are all `NullOperator`s is collapsed into a `NullOperator`,
+- if `f` returns a `Tuple`, the result is a `Tuple` of `MapOver`s.
+
+# Dev notes
+Evaluating `f(args...)` directly on the `MapOver`s performs each operation of `f`
+on the whole `MapOver` structure (for a bilinear face integration, `4 × M × N` leaves),
+building a full intermediate structure for each operation. Applying `f` on the leaves
+evaluates it in one pass instead, which is much faster for non-trivial functions.
+"""
+function map_over_leaves(f::F, args::Vararg{Any, N}) where {F, N}
+    _map_over_leaves(_any_map_over(args...), f, args...)
+end
+
+@generated function _any_map_over(args::Vararg{Any, N}) where {N}
+    any(T -> T <: AbstractMapOver, args) ? :(Val(true)) : :(Val(false))
+end
+
+_map_over_leaves(::Val{false}, f::F, args::Vararg{Any, N}) where {F, N} = f(args...)
+
+@generated function _map_over_leaves(::Val{true}, f::F, args::Vararg{Any, N}) where {F, N}
+    imo = findall(T -> T <: AbstractMapOver, args)
+    lengths = map(i -> fieldcount(fieldtype(args[i], 1)), imo)
+    # `MapOver`s of different lengths : fallback to the operator-by-operator evaluation
+    all(==(first(lengths)), lengths) || return :(f(args...))
+    calls = map(1:first(lengths)) do i
+        _args = map(1:N) do j
+            args[j] <: AbstractMapOver ? :(unwrap(args[$j])[$i]) : :(args[$j])
+        end
+        :(map_over_leaves(f, $(_args...)))
+    end
+    return :(_rebuild_map_over(($(calls...),)))
+end
+
+_rebuild_map_over(a::Tuple) = MapOver(a)
+_rebuild_map_over(a::Tuple{}) = MapOver(a)
+_rebuild_map_over(::Tuple{Vararg{NullOperator}}) = NullOperator()
+function _rebuild_map_over(a::Tuple{Vararg{Tuple{Vararg{Any, K}}}}) where {K}
+    ntuple(k -> _rebuild_map_over(map(Base.Fix2(getindex, k), a)), Val(K))
+end
+
 pretty_name(a::AbstractMapOver) = string(get_basetype(a))
 pretty_name_style(a::AbstractMapOver) = Dict(:color => :blue)
 function show_lazy_operator(a::AbstractMapOver; level = 1, indent = 4, islast = (true,))
