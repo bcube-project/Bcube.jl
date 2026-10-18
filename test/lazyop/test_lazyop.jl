@@ -100,6 +100,10 @@
         # nested `MapOver`s
         a = MapOver(MapOver(1, 2), MapOver(3, 4))
         @test map_over_leaves(f, a, 2) === MapOver(MapOver(3, 5), MapOver(7, 9))
+        # the nested `MapOver`s must not prevent the inference (it did with julia 1.10)
+        f3(x, y, z) = x * y + z
+        @test @inferred(map_over_leaves(f3, a, 2, 1)) ===
+              MapOver(MapOver(3, 5), MapOver(7, 9))
 
         # leaves that are all `NullOperator` are collapsed
         g(x, y) = x * y

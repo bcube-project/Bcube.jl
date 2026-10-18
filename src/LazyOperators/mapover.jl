@@ -192,6 +192,10 @@ Evaluating `f(args...)` directly on the `MapOver`s performs each operation of `f
 on the whole `MapOver` structure (for a bilinear face integration, `4 × M × N` leaves),
 building a full intermediate structure for each operation. Applying `f` on the leaves
 evaluates it in one pass instead, which is much faster for non-trivial functions.
+
+The nested `MapOver`s are unrolled at generation time (see `gen_map_over_leaves`) rather
+than by a recursive call to `map_over_leaves` on the inner leaves: julia 1.10 fails to infer
+this recursion (return type `Any`, allocations at each call).
 """
 function map_over_leaves(f::F, args::Vararg{Any, N}) where {F, N}
     _map_over_leaves(_any_map_over(args...), f, args...)
@@ -204,15 +208,29 @@ end
 _map_over_leaves(::Val{false}, f::F, args::Vararg{Any, N}) where {F, N} = f(args...)
 
 @generated function _map_over_leaves(::Val{true}, f::F, args::Vararg{Any, N}) where {F, N}
-    imo = findall(T -> T <: AbstractMapOver, args)
-    lengths = map(i -> fieldcount(fieldtype(args[i], 1)), imo)
+    gen_map_over_leaves(args, [:(args[$j]) for j in 1:N])
+end
+
+"""
+    gen_map_over_leaves(types, exprs)
+
+Build the `Expr` applying `f` on the leaves of the arguments whose types are `types`
+and whose values are given by the expressions `exprs`. The nested `MapOver`s are
+traversed recursively here, at generation time, so that the generated code contains
+no recursive call.
+"""
+function gen_map_over_leaves(types, exprs)
+    imo = findall(T -> T <: AbstractMapOver, types)
+    isempty(imo) && return :(f($(exprs...)))
+    lengths = map(i -> fieldcount(fieldtype(types[i], 1)), imo)
     # `MapOver`s of different lengths : fallback to the operator-by-operator evaluation
-    all(==(first(lengths)), lengths) || return :(f(args...))
+    all(==(first(lengths)), lengths) || return :(f($(exprs...)))
     calls = map(1:first(lengths)) do i
-        _args = map(1:N) do j
-            args[j] <: AbstractMapOver ? :(unwrap(args[$j])[$i]) : :(args[$j])
+        _types = map(T -> T <: AbstractMapOver ? fieldtype(fieldtype(T, 1), i) : T, types)
+        _exprs = map(zip(types, exprs)) do (T, ex)
+            T <: AbstractMapOver ? :(unwrap($ex)[$i]) : ex
         end
-        :(map_over_leaves(f, $(_args...)))
+        gen_map_over_leaves(_types, _exprs)
     end
     return :(_rebuild_map_over(($(calls...),)))
 end
