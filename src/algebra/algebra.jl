@@ -151,6 +151,9 @@ for f in (:otimes, :dcontract)
     @eval ($f)(a::MapOver, b::MapOver) = LazyOperators.map_over($f, a, b)
     @eval ($f)(a::MapOver, b) = LazyOperators.map_over(Base.Fix2($f, b), a)
     @eval ($f)(a, b::MapOver) = LazyOperators.map_over(Base.Fix1($f, a), b)
+
+    # deal with `DofMap` and `BlockMap`
+    eval(LazyOperators.dofmap_binary_operator_rules(f))
 end
 
 # SPECIFIC PART : rules depend on how `NullOperator` acts with each operator.
@@ -164,4 +167,5 @@ for f in (:otimes, :dcontract)
     @eval ($f)(::NullOperator, ::NullOperator) = NullOperator()
     @eval ($f)(::AbstractLazy, ::NullOperator) = NullOperator()
     @eval ($f)(::NullOperator, ::AbstractLazy) = NullOperator()
+    eval(LazyOperators.dofmap_absorbing_null_rules(f))
 end

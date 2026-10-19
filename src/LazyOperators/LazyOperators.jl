@@ -42,6 +42,8 @@ export lazy_compose
 
 export LazyMapOver
 export MapOver
+export DofMap
+export BlockMap
 
 any_of_type(a::T, ::Type{T}) where {T} = Val(true)
 any_of_type(a, ::Type{T}) where {T} = Val(false)
@@ -59,5 +61,6 @@ function lazy_compose end
 include("lazy_operator.jl")
 include("algebra.jl")
 include("mapover.jl")
+include("dofmap.jl")
 
 end
