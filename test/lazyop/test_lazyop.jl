@@ -120,6 +120,22 @@
             MapOver(MapOver(2, 4), MapOver(6, 8)),
             NullOperator(),
         )
+        # ... and is inferred, even when the components of the `Tuple` have different types
+        h2(x) = (x, 2.0 * x, x * NullOperator())
+        @test @inferred(map_over_leaves(h2, a)) === (
+            MapOver(MapOver(1, 2), MapOver(3, 4)),
+            MapOver(MapOver(2.0, 4.0), MapOver(6.0, 8.0)),
+            NullOperator(),
+        )
+
+        # the other subtypes of `AbstractMapOver` are evaluated operator by operator
+        struct OtherMapOver{A <: Tuple} <: Bcube.LazyOperators.AbstractMapOver{A}
+            args::A
+        end
+        Bcube.LazyOperators.get_basetype(::Type{<:OtherMapOver}) = OtherMapOver
+        o = OtherMapOver((3, 4))
+        @test map_over_leaves(f, o, 2) === OtherMapOver((7, 9))
+        @test map_over_leaves(f, o, MapOver(1, 2)) === OtherMapOver((4, 9))
 
         # The generator of `_map_over_leaves` must find its helpers when `LazyOperators` is
         # loaded from source: the pkgimage of Bcube hides a wrong definition order

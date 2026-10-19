@@ -187,6 +187,11 @@ on the `MapOver`s:
 - a `MapOver` whose leaves are all `NullOperator`s is collapsed into a `NullOperator`,
 - if `f` returns a `Tuple`, the result is a `Tuple` of `MapOver`s.
 
+Only the `MapOver` type is traversed leaf by leaf. At a level where an argument is
+another subtype of `AbstractMapOver`, `f` is evaluated operator by operator on the
+arguments of this level (as `f(args...)`), since the structure of these subtypes is not
+known here.
+
 # Dev notes
 Evaluating `f(args...)` directly on the `MapOver`s performs each operation of `f`
 on the whole `MapOver` structure (for a bilinear face integration, `4 × M × N` leaves),
@@ -196,9 +201,15 @@ evaluates it in one pass instead, which is much faster for non-trivial functions
 The nested `MapOver`s are unrolled at generation time (see `gen_map_over_leaves`) rather
 than by a recursive call to `map_over_leaves` on the inner leaves: julia 1.10 fails to infer
 this recursion (return type `Any`, allocations at each call).
+
+On the leaves, the `NullOperator` shortcuts of the operator-by-operator evaluation (for
+instance `dot(::AbstractMapOver, ::NullOperator)`) do not apply to the whole structure:
+`f` is called with some `NullOperator` arguments, and the terms that do not depend on them
+are computed and then discarded. This dead code is left to the compiler: skipping these
+leaves explicitly brought no gain (boundary term of the Navier-Stokes viscous DG benchmark).
 """
 function map_over_leaves(f::F, args::Vararg{Any, N}) where {F, N}
-    _map_over_leaves(any_of_type(args, AbstractMapOver), f, args...)
+    _map_over_leaves(any_of_type(args, MapOver), f, args...)
 end
 
 _map_over_leaves(::Val{false}, f::F, args::Vararg{Any, N}) where {F, N} = f(args...)
@@ -212,15 +223,17 @@ traversed recursively here, at generation time, so that the generated code conta
 no recursive call.
 """
 function gen_map_over_leaves(types, exprs)
-    imo = findall(T -> T <: AbstractMapOver, types)
+    imo = findall(T -> T <: MapOver, types)
     isempty(imo) && return :(f($(exprs...)))
-    lengths = map(i -> fieldcount(fieldtype(types[i], 1)), imo)
+    # Other subtypes of `AbstractMapOver` : fallback to the operator-by-operator evaluation
+    any(T -> T <: AbstractMapOver && !(T <: MapOver), types) && return :(f($(exprs...)))
+    lengths = map(i -> fieldcount(fieldtype(types[i], :args)), imo)
     # `MapOver`s of different lengths : fallback to the operator-by-operator evaluation
     all(==(first(lengths)), lengths) || return :(f($(exprs...)))
     calls = map(1:first(lengths)) do i
-        _types = map(T -> T <: AbstractMapOver ? fieldtype(fieldtype(T, 1), i) : T, types)
+        _types = map(T -> T <: MapOver ? fieldtype(fieldtype(T, :args), i) : T, types)
         _exprs = map(zip(types, exprs)) do (T, ex)
-            T <: AbstractMapOver ? :(unwrap($ex)[$i]) : ex
+            T <: MapOver ? :(unwrap($ex)[$i]) : ex
         end
         gen_map_over_leaves(_types, _exprs)
     end
@@ -236,8 +249,16 @@ end
 _rebuild_map_over(a::Tuple) = MapOver(a)
 _rebuild_map_over(a::Tuple{}) = MapOver(a)
 _rebuild_map_over(::Tuple{Vararg{NullOperator}}) = NullOperator()
-function _rebuild_map_over(a::Tuple{Vararg{Tuple{Vararg{Any, K}}}}) where {K}
-    ntuple(k -> _rebuild_map_over(map(Base.Fix2(getindex, k), a)), Val(K))
+# Leaves that are `Tuple`s of length `K` : `K` `MapOver`s are rebuilt. The indices are
+# literals in the generated code so that the result is inferred, even for leaves of
+# different types.
+@generated function _rebuild_map_over(
+    a::Tuple{Vararg{Tuple{Vararg{Any, K}}, N}},
+) where {K, N}
+    exprs = map(1:K) do k
+        :(_rebuild_map_over(($((:(a[$i][$k]) for i in 1:N)...),)))
+    end
+    return :(($(exprs...),))
 end
 
 pretty_name(a::AbstractMapOver) = string(get_basetype(a))
