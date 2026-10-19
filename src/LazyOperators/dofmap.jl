@@ -109,7 +109,7 @@ const DofLike = Union{DofMap, DofBroadcasted}
 """
     FixedArg{T}
 
-Wrap an argument which is not a `DofMap` in a `Broadcasted{DofMapStyle}`: it is passed
+Wrapper of an argument of a `Broadcasted{DofMapStyle}` which is not a `DofMap`: it is passed
 unchanged to each dof. It prevents the broadcasting inside the argument (for instance an
 `SVector`). `Base.RefValue` is not used because it is mutable: it escapes in `dof_copy` and
 allocates.
@@ -370,7 +370,9 @@ dof by dof on the `DofMap`s (see `dof_broadcasted`), the other arguments being p
 unchanged to each call of `f`. Without `BlockMap` nor `DofMap` argument, `f(args...)` is
 returned. It is used to materialize a composition `f ∘ (a, b, ...)`.
 
-All the `BlockMap` arguments must have the same number of blocks.
+All the `BlockMap` arguments must have the same number of blocks. On a block without
+`DofMap` argument (for instance the opposite side of a boundary face), `f` is called directly,
+possibly with `NullOperator` arguments: `f` must accept them.
 """
 @generated function dofwise(f::F, args::Vararg{Any, N}) where {F, N}
     _gen_blockwise(:_dofwise_on_block, args, [:(args[$j]) for j in 1:N])

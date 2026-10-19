@@ -139,8 +139,8 @@ end
         ::MapComputeQuadratureStyle,
     )
 
-Alternative version of `apply_quadrature` thats seems to be more efficient
-for face integration (this observation is not really understood)
+Version of `apply_quadrature` used for surfacic and curvilinear entities (faces): the values
+are accumulated node by node with `_accumulate_quadrature`, whatever their type.
 """
 function apply_quadrature_v2(
     g_ref::G,

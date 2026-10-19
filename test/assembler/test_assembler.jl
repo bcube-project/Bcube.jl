@@ -814,6 +814,12 @@
             0.0;
             atol = 1e-12,
         )
+        # each side lands on its own dofs
+        h = PhysicalFunction(x -> 2 - x[1] * x[2])
+        b⁻ = assemble_linear(v -> ∫(side⁻(v) * side⁻(g))dΓ, V)
+        b⁺ = assemble_linear(v -> ∫(side⁺(v) * side⁺(h))dΓ, V)
+        @test b⁻ + b⁺ ≈
+              assemble_linear(v -> ∫(side⁻(v) * side⁻(g) + side⁺(v) * side⁺(h))dΓ, V)
     end
 
     @testset "Tangential gradient on faces" begin
