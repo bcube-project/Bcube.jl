@@ -680,14 +680,16 @@ end
 
 """
     _recursive_unwrap(a::LazyOperators.AbstractMapOver)
+    _recursive_unwrap(a::BlockMap)
     _recursive_unwrap(a)
 
 Recursively unwrap lazy map operations to extract concrete values.
 
-For `AbstractMapOver` objects, maps `_recursive_unwrap` over the elements.
+For `AbstractMapOver` and `BlockMap` objects, maps `_recursive_unwrap` over the elements.
 For other types, applies `unwrap` once.
 """
 _recursive_unwrap(a::LazyOperators.AbstractMapOver) = map(_recursive_unwrap, unwrap(a))
+_recursive_unwrap(a::BlockMap) = map(_recursive_unwrap, unwrap(a))
 _recursive_unwrap(a) = unwrap(a)
 
 """
@@ -1245,7 +1247,7 @@ function LazyOperators.materialize(
 ) where {O}
     args = get_args(get_args(lOp)...)
     grad = materialize(Gradient(LazyMapOver(args...), gradient_style(lOp)), cPoint)
-    return generate_bilinear(get_args(lOp)..., grad.args)
+    return generate_bilinear(get_args(lOp)..., unwrap(grad))
 end
 
 function LazyOperators.materialize(
@@ -1488,7 +1490,7 @@ side_p(a::FaceSidePair) = Side⁺(LazyMapOver(NullOperator(), a.data[2]))
 
 function LazyOperators.materialize(a::FaceSidePair, cPoint::CellPoint)
     _a = (materialize(a.data[1], cPoint), materialize(a.data[2], cPoint))
-    return MapOver(_a)
+    return BlockMap(_a)
 end
 
 function LazyOperators.materialize(a::FaceSidePair, side::Side⁻{Nothing, <:Tuple{FaceInfo}})
@@ -1503,14 +1505,14 @@ function LazyOperators.materialize(
     a::FaceSidePair,
     side::Side⁻{Nothing, <:Tuple{FacePoint}},
 )
-    return MapOver(materialize(a.data[1], side), NullOperator())
+    return BlockMap(materialize(a.data[1], side), NullOperator())
 end
 
 function LazyOperators.materialize(
     a::FaceSidePair,
     side::Side⁺{Nothing, <:Tuple{FacePoint}},
 )
-    return MapOver(NullOperator(), materialize(a.data[2], side))
+    return BlockMap(NullOperator(), materialize(a.data[2], side))
 end
 
 function LazyOperators.materialize(
@@ -1519,7 +1521,11 @@ function LazyOperators.materialize(
 ) where {O}
     _args, = get_operator(point)(get_args(a))
     __args, = get_args(_args)
-    return materialize(∇(__args), point)
+    # The gradient of each side is materialized directly: going through the generic
+    # `materialize(::Gradient{O, <:Tuple{LazyMapOver}}, point)` again makes the inference
+    # fail (recursion), and the values are boxed.
+    gs = gradient_style(a)
+    return BlockMap(map(x -> materialize(Gradient(x, gs), point), get_args(__args)))
 end
 
 """
@@ -1544,7 +1550,7 @@ function LazyOperators.materialize(
     point::AbstractSide{Nothing, <:Tuple{FacePoint}},
 )
     args = tuplemap(x -> materialize(x, point), get_args(a))
-    return MapOver(args)
+    return BlockMap(args)
 end
 
 function LazyOperators.materialize(
@@ -1553,7 +1559,7 @@ function LazyOperators.materialize(
 )
     op_side = get_operator(point)
     args, = get_args(op_side(get_args(a))...)
-    return materialize(∇(args), point)
+    return materialize(Gradient(args, gradient_style(a)), point)
 end
 
 function LazyOperators.materialize(

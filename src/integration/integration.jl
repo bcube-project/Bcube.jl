@@ -57,7 +57,7 @@ function integrate_on_ref_element(
 )
     # Whatever the "reference coordinate" ξ that we choose, it will always map to the correct
     # node physical coordinate. So we chose to evaluate in ξ = 0.
-    return g(0.0)
+    return LazyOperators.dof_copy(g(0.0))
 end
 
 function _apply_metric(g_and_c::T, qnode::T1) where {T, T1}
@@ -99,10 +99,16 @@ end
     wu = map(_mapquad, ω, u)
     _apply_quadrature2(wu)
 end
-_apply_quadrature2(wu) = reduce(_mapsum, wu)
+_apply_quadrature2(wu) = LazyOperators.dof_copy(reduce(_mapsum, wu))
 _mapsum(a, b) = map(+, a, b)
 _mapsum(a::NullOperator, b::NullOperator) = a
 _mapquad(ω, u) = map(Base.Fix1(*, ω), u)
+
+# `DofMap` and `BlockMap` values are lazy (`Broadcasted`): the sum is evaluated at each
+# quadrature node, so that the integrand is evaluated in a single fused loop per node
+const _DofValues = Union{LazyOperators.DofLike, BlockMap}
+_mapsum(a::_DofValues, b::_DofValues) = LazyOperators.dof_copy(a + b)
+_mapquad(ω, u::_DofValues) = ω * u
 
 """
     apply_quadrature_v2(
@@ -130,7 +136,7 @@ end
 # splitting the previous function to have function barrier...
 function _apply_quadrature_v2(g_ref, ω, xq)
     fquad(w, x) = _mapquad(w, g_ref(x))
-    mapreduce(fquad, _mapsum, ω, xq)
+    LazyOperators.dof_copy(mapreduce(fquad, _mapsum, ω, xq))
 end
 
 # Below are "dispatch functions" to select the more appropriate quadrature function

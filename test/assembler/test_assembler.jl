@@ -728,6 +728,68 @@
         @test err_L2 ≤ 0.09
     end
 
+    @testset "Linear forms: no allocation per element" begin
+        # The integrand must be inferred: otherwise the values are boxed at each
+        # quadrature node and the allocations grow with the number of elements.
+        function linear_allocations(n)
+            mesh = rectangle_mesh(n, n)
+            fs = FunctionSpace(:Lagrange, 2)
+            V = TestFESpace(TrialFESpace(fs, mesh, :discontinuous))
+            Vv = TestFESpace(TrialFESpace(FunctionSpace(:Lagrange, 1), mesh; size = 2))
+            M = MultiFESpace(V, Vv)
+            dΩ = Measure(CellDomain(mesh), 4)
+            dΓ = Measure(InteriorFaceDomain(mesh), 4)
+            dΓb = Measure(BoundaryFaceDomain(mesh), 4)
+            nΓ = get_face_normals(dΓ)
+            nΓb = get_face_normals(dΓb)
+            g = PhysicalFunction(x -> x[1] + x[2]^2)
+            f(v, ∇v, n, g) = -(∇v ⋅ n) * g + 3.0 * v * g
+            forms = (
+                (v -> ∫(f ∘ map(side⁻, (v, ∇(v), nΓb, g)))dΓb, V),
+                (
+                    v ->
+                        ∫(-(side⁻(∇(v)) ⋅ side⁻(nΓb)) * side⁻(g) + side⁻(v) * side⁻(g))dΓb,
+                    V,
+                ),
+                (v -> ∫(jump(v) * side⁻(g) + side⁺(∇(v)) ⋅ side⁺(nΓ))dΓ, V),
+                (v -> ∫(g * v + ∇(v) ⋅ SA[1.0, 2.0])dΩ, V),
+                (((v1, v2),) -> ∫(v1 * g + tr(∇(v2)))dΩ, M),
+                (
+                    ((v1, v2),) ->
+                        ∫(side⁻(∇(v1)) ⋅ side⁻(nΓb) + side⁻(v2) ⋅ side⁻(nΓb))dΓb,
+                    M,
+                ),
+            )
+            map(forms) do (l, W)
+                b = zeros(Bcube.get_ndofs(W))
+                assemble_linear!(b, l, W)
+                @allocated assemble_linear!(b, l, W)
+            end
+        end
+        @test linear_allocations(3) == linear_allocations(6)
+    end
+
+    @testset "Tangential gradient on faces" begin
+        # curve in 2D: the faces are nodes
+        mesh = circle_mesh(8)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh, :discontinuous)
+        V = TestFESpace(U)
+        dΓ = Measure(InteriorFaceDomain(mesh), 3)
+        c =
+            (x -> normalize(x)) ∘
+            (Bcube.tangential_projector() * PhysicalFunction(x -> SA[-x[2], x[1]]))
+        q = collect(1.0:Bcube.get_ndofs(U)) ./ 10
+        qh = FEFunction(U, q)
+
+        l(v) = ∫(side⁻(∇ₛ(v)) ⋅ side⁻(c) + 2 * side⁺(∇ₛ(v)) ⋅ side⁺(c))dΓ
+        int = ∫(side⁻(∇ₛ(qh)) ⋅ side⁻(c) + 2 * side⁺(∇ₛ(qh)) ⋅ side⁺(c))dΓ
+        @test dot(assemble_linear(l, V), q) ≈ sum(Bcube.compute(int))
+
+        a(u, v) = ∫(side⁻(∇ₛ(u)) ⋅ side⁻(c) * jump(v))dΓ
+        lq(v) = ∫(side⁻(∇ₛ(qh)) ⋅ side⁻(c) * jump(v))dΓ
+        @test assemble_bilinear(a, U, V) * q ≈ assemble_linear(lq, V)
+    end
+
     # @testset "Symbolic (to be completed)" begin
     #     using MultivariatePolynomials
     #     using TypedPolynomials

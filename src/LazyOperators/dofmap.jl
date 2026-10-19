@@ -58,15 +58,41 @@ unwrap(a::BlockMap) = a.blocks
 _blockmap(blocks::Tuple) = BlockMap(blocks)
 _blockmap(::Tuple{NullOperator, Vararg{NullOperator}}) = NullOperator()
 
-function _map_blocks(
-    f::F,
-    a::BlockMap{<:NTuple{N, Any}},
-    b::BlockMap{<:NTuple{N, Any}},
-) where {F, N}
-    _blockmap(map(f, a.blocks, b.blocks))
+"""
+    _gen_blockwise(leaf::Symbol, types, exprs)
+
+Build the `Expr` applying `leaf(f, ...)` block by block on the arguments whose types are
+`types` and whose values are given by the expressions `exprs`. The nested `BlockMap`s are
+traversed here, at generation time, so that the generated code does not call itself
+(a recursive call through `map` defeats the inference in long `materialize` chains). The
+other arguments are passed unchanged to each block.
+"""
+function _gen_blockwise(leaf::Symbol, types, exprs)
+    ib = findall(T -> T <: BlockMap, types)
+    isempty(ib) && return :($leaf(f, $(exprs...)))
+    K = fieldcount(fieldtype(types[first(ib)], :blocks))
+    if any(i -> fieldcount(fieldtype(types[i], :blocks)) != K, ib)
+        return :(throw(DimensionMismatch("BlockMaps of different lengths")))
+    end
+    blocks = map(1:K) do k
+        _types = [T <: BlockMap ? fieldtype(fieldtype(T, :blocks), k) : T for T in types]
+        _exprs =
+            [T <: BlockMap ? :($ex.blocks[$k]) : ex for (T, ex) in zip(types, exprs)]
+        _gen_blockwise(leaf, _types, _exprs)
+    end
+    return :(_blockmap(($(blocks...),)))
 end
-function _map_blocks(f, a::BlockMap, b::BlockMap)
-    throw(DimensionMismatch("BlockMaps of different lengths"))
+
+_apply_on_block(f::F, args::Vararg{Any, N}) where {F, N} = f(args...)
+
+"""
+    blockwise(f, args...)
+
+Apply `f` block by block on the (possibly nested) `BlockMap` arguments, the other arguments
+being passed unchanged to each block.
+"""
+@generated function blockwise(f::F, args::Vararg{Any, N}) where {F, N}
+    _gen_blockwise(:_apply_on_block, args, [:(args[$j]) for j in 1:N])
 end
 
 """
@@ -271,12 +297,12 @@ function dofmap_binary_operator_rules(f)
         ($f)(a::$DofLike, b) = $dof_broadcasted($f, a, b)
         ($f)(a, b::$DofLike) = $dof_broadcasted($f, a, b)
 
-        ($f)(a::$BlockMap, b::$BlockMap) = $_map_blocks($f, a, b)
-        ($f)(a::$BlockMap, b) = $_blockmap(map(Base.Fix2($f, b), a.blocks))
-        ($f)(a, b::$BlockMap) = $_blockmap(map(Base.Fix1($f, a), b.blocks))
+        ($f)(a::$BlockMap, b::$BlockMap) = $blockwise($f, a, b)
+        ($f)(a::$BlockMap, b) = $blockwise($f, a, b)
+        ($f)(a, b::$BlockMap) = $blockwise($f, a, b)
         # the blocks are the outer level
-        ($f)(a::$BlockMap, b::$DofLike) = $_blockmap(map(Base.Fix2($f, b), a.blocks))
-        ($f)(a::$DofLike, b::$BlockMap) = $_blockmap(map(Base.Fix1($f, a), b.blocks))
+        ($f)(a::$BlockMap, b::$DofLike) = $blockwise($f, a, b)
+        ($f)(a::$DofLike, b::$BlockMap) = $blockwise($f, a, b)
 
         # remove ambiguities with `AbstractLazy` (lazy operators win)
         ($f)(a::$AbstractLazy, b::$DofLike) = ($f)(a, $LazyWrap(b))
@@ -328,7 +354,7 @@ end
 
 for f in LazyUnaryOp
     @eval ($f)(a::DofLike) = dof_broadcasted($f, a)
-    @eval ($f)(a::BlockMap) = _blockmap(map($f, a.blocks))
+    @eval ($f)(a::BlockMap) = blockwise($f, a)
 end
 
 ###############################################################
@@ -344,22 +370,22 @@ unchanged to each call of `f`. Without `BlockMap` nor `DofMap` argument, `f(args
 returned. It is used to materialize a composition `f ∘ (a, b, ...)`.
 
 All the `BlockMap` arguments must have the same number of blocks.
+
+# Dev notes
+Until the bilinear forms use `DofMap`s, their shape functions are nested `MapOver`s (possibly
+in the blocks of a `BlockMap`): without `DofMap` argument, `f` is applied with
+`map_over_leaves`, which is `f(args...)` without `MapOver` argument.
 """
 @generated function dofwise(f::F, args::Vararg{Any, N}) where {F, N}
-    ib = findfirst(T -> T <: BlockMap, args)
-    if ib !== nothing
-        K = fieldcount(fieldtype(args[ib], :blocks))
-        if any(T -> T <: BlockMap && fieldcount(fieldtype(T, :blocks)) != K, args)
-            return :(throw(DimensionMismatch("dofwise: BlockMaps of different lengths")))
-        end
-        blocks = map(1:K) do k
-            _args = [args[j] <: BlockMap ? :(args[$j].blocks[$k]) : :(args[$j]) for j in 1:N]
-            :(dofwise(f, $(_args...)))
-        end
-        return :(_blockmap(($(blocks...),)))
-    elseif any(T -> T <: DofLike, args)
-        return :(dof_broadcasted(f, args...))
-    else
-        return :(f(args...))
-    end
+    _gen_blockwise(:_dofwise_on_block, args, [:(args[$j]) for j in 1:N])
+end
+
+@inline function _dofwise_on_block(f::F, args::Vararg{Any, N}) where {F, N}
+    _dofwise_on_block(any_of_type(args, DofLike), f, args...)
+end
+@inline function _dofwise_on_block(::Val{true}, f::F, args::Vararg{Any, N}) where {F, N}
+    dof_broadcasted(f, args...)
+end
+@inline function _dofwise_on_block(::Val{false}, f::F, args::Vararg{Any, N}) where {F, N}
+    map_over_leaves(f, args...)
 end

@@ -278,7 +278,7 @@ function LazyOperators.materialize(
     x::CellPoint,
 )
     f = get_args(a)
-    MapOver(f(x))
+    DofMap(f(x))
 end
 function LazyOperators.lazy_map_over(
     f::Function,
@@ -287,7 +287,7 @@ function LazyOperators.lazy_map_over(
     f(get_args(a))
 end
 function LazyOperators.materialize(a::LazyMapOver, x::CellPoint)
-    MapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
+    BlockMap(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
 end
 #LazyOperators.materialize(a::LazyMapOver{<:CellShapeFunctions}, x::CellPoint) = a
 
@@ -352,7 +352,13 @@ function materialize(a::LazyMapOver, x::AbstractSide{Nothing, <:Tuple{FaceInfo}}
     LazyMapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
 end
 function materialize(a::LazyMapOver, x::AbstractSide{Nothing, <:Tuple{FacePoint}})
-    MapOver(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
+    BlockMap(LazyOperators.lazy_map_over(Base.Fix2(materialize, x), a))
+end
+function materialize(
+    a::LazyMapOver{<:AbstractCellShapeFunctions},
+    x::AbstractSide{Nothing, <:Tuple{FacePoint}},
+)
+    DofMap(materialize(get_args(a), x))
 end
 materialize(::NullOperator, ::AbstractSide) = NullOperator()
 

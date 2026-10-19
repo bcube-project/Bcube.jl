@@ -187,10 +187,10 @@ end
 ) where {T1, N}
     _may_apply_on_splat(arg1, args...)
 end
-# The function is applied on the leaves of the `MapOver` arguments (if any),
-# see `map_over_leaves`
-_may_apply_on_splat(f, a::Tuple) = map_over_leaves(f, a...)
-_may_apply_on_splat(f, a) = map_over_leaves(f, a)
+# The function is applied dof by dof on the `BlockMap` and `DofMap` arguments (if any),
+# see `dofwise`
+_may_apply_on_splat(f, a::Tuple) = dofwise(f, a...)
+_may_apply_on_splat(f, a) = dofwise(f, a)
 
 # avoid:
 # @inline materialize_args(args::Tuple, x ) = map(Base.Fix2(materialize, x), args)

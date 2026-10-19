@@ -151,7 +151,7 @@ function gradient(
     ξ = get_coords(cPoint)
     fs = get_function_space(cellFunction)
     n = Val(get_size(cellFunction))
-    MapOver(_grad_shape_functions(gs, fs, n, ctype, cnodes, ξ))
+    DofMap(_grad_shape_functions(gs, fs, n, ctype, cnodes, ξ))
 end
 
 ∂λξ_∂x(::VolumicGradientStyle, args...) = ∂λξ_∂x(args...)
@@ -264,7 +264,7 @@ function LazyOperators.materialize(
         x -> materialize(Gradient(x, gradient_style(lOp)), cPoint),
         get_args(get_args(lOp)...),
     )
-    return MapOver(∇x)
+    return BlockMap(∇x)
 end
 
 # Specialize the previous method when `Gradient` is applied
@@ -280,7 +280,7 @@ function LazyOperators.materialize(
         x -> materialize(Gradient(x, gradient_style(lOp)), cPoint),
         get_args(get_args(lOp)...),
     )
-    return MapOver(∇x)
+    return BlockMap(∇x)
 end
 
 function LazyOperators.materialize(
@@ -305,7 +305,7 @@ function LazyOperators.materialize(
 ) where {O}
     f(x) = materialize(Gradient(x, gradient_style(lOp)), sidePoint)
     ∇x = tuplemap(f, get_args(get_args(lOp)...))
-    return MapOver(∇x)
+    return BlockMap(∇x)
 end
 
 function LazyOperators.materialize(
