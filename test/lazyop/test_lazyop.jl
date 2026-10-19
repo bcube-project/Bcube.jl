@@ -137,6 +137,14 @@
         @test map_over_leaves(f, o, 2) === OtherMapOver((7, 9))
         @test map_over_leaves(f, o, MapOver(1, 2)) === OtherMapOver((4, 9))
 
+        # above `MAX_UNROLLED_LEAVES` leaves, `f` is evaluated operator by operator
+        which_path(x, _) = x isa MapOver ? :operator_by_operator : :leaves
+        @test map_over_leaves(which_path, MapOver(1, 2), 2) === MapOver(:leaves, :leaves)
+        n = isqrt(Bcube.LazyOperators.MAX_UNROLLED_LEAVES) + 1
+        big = MapOver(ntuple(i -> MapOver(ntuple(j -> i + j, n)), n))
+        @test map_over_leaves(which_path, big, 2) === :operator_by_operator
+        @test map_over_leaves(f, big, 2) == f(big, 2)
+
         # The generator of `_map_over_leaves` must find its helpers when `LazyOperators` is
         # loaded from source: the pkgimage of Bcube hides a wrong definition order
         # ("method too new", or an undefined binding for julia >= 1.12). It runs in a new

@@ -227,7 +227,10 @@ evaluates it in one pass instead, which is much faster for non-trivial functions
 
 The nested `MapOver`s are unrolled at generation time (see `gen_map_over_leaves`) rather
 than by a recursive call to `map_over_leaves` on the inner leaves: julia 1.10 fails to infer
-this recursion (return type `Any`, allocations at each call).
+this recursion (return type `Any`, allocations at each call). The size of the generated
+code grows with the number of leaves, so the unrolling is limited to
+`MAX_UNROLLED_LEAVES` calls to `f`: above it, `f(args...)` is evaluated operator by
+operator.
 
 On the leaves, the `NullOperator` shortcuts of the operator-by-operator evaluation (for
 instance `dot(::AbstractMapOver, ::NullOperator)`) do not apply to the whole structure:
@@ -248,15 +251,17 @@ Build the `Expr` applying `f` on the leaves of the arguments whose types are `ty
 and whose values are given by the expressions `exprs`. The nested `MapOver`s are
 traversed recursively here, at generation time, so that the generated code contains
 no recursive call.
+
+Return the `Expr` and the number of calls to `f` that it contains.
 """
 function gen_map_over_leaves(types, exprs)
     imo = findall(T -> T <: MapOver, types)
-    isempty(imo) && return :(f($(exprs...)))
+    isempty(imo) && return :(f($(exprs...))), 1
     # Other subtypes of `AbstractMapOver` : fallback to the operator-by-operator evaluation
-    any(T -> T <: AbstractMapOver && !(T <: MapOver), types) && return :(f($(exprs...)))
+    any(T -> T <: AbstractMapOver && !(T <: MapOver), types) && return :(f($(exprs...))), 1
     lengths = map(i -> fieldcount(fieldtype(types[i], :args)), imo)
     # `MapOver`s of different lengths : fallback to the operator-by-operator evaluation
-    all(==(first(lengths)), lengths) || return :(f($(exprs...)))
+    all(==(first(lengths)), lengths) || return :(f($(exprs...))), 1
     calls = map(1:first(lengths)) do i
         _types = map(T -> T <: MapOver ? fieldtype(fieldtype(T, :args), i) : T, types)
         _exprs = map(zip(types, exprs)) do (T, ex)
@@ -264,14 +269,27 @@ function gen_map_over_leaves(types, exprs)
         end
         gen_map_over_leaves(_types, _exprs)
     end
-    return :(_rebuild_map_over(($(calls...),)))
+    return :(_rebuild_map_over(($(map(first, calls)...),))), sum(last, calls; init = 0)
 end
 
-# `gen_map_over_leaves`, and `MapOver` that it uses, must be defined before this generated
-# function: the generator runs in the world age of the definition of the generated function
-# (for julia >= 1.12, this also applies to the bindings such as `MapOver`).
+"""
+Maximum number of calls to `f` unrolled by `map_over_leaves`. Above it, the generated
+code is too long to compile in a reasonable time, and `f` is evaluated operator by
+operator on the `MapOver`s instead.
+
+For the SIPG viscous term of the Navier-Stokes equations on interior faces (julia 1.10),
+the first assembly takes 41 s with 1296 leaves (Lagrange P2, `size = 2`, quadrangles),
+121 s with 2304 leaves (P1, `size = 3`, hexahedra) and 478 s with 4096 leaves
+(P3, `size = 2`, quadrangles), against 20 s, 75 s and 72 s operator by operator.
+"""
+const MAX_UNROLLED_LEAVES = 2500
+
+# `gen_map_over_leaves`, `MAX_UNROLLED_LEAVES` and `MapOver` must be defined before this
+# generated function: the generator runs in the world age of the definition of the
+# generated function (for julia >= 1.12, this also applies to the bindings).
 @generated function _map_over_leaves(::Val{true}, f::F, args::Vararg{Any, N}) where {F, N}
-    gen_map_over_leaves(args, [:(args[$j]) for j in 1:N])
+    ex, nleaves = gen_map_over_leaves(args, [:(args[$j]) for j in 1:N])
+    return nleaves <= MAX_UNROLLED_LEAVES ? ex : :(f(args...))
 end
 
 _rebuild_map_over(a::Tuple) = MapOver(a)
