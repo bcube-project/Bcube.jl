@@ -267,22 +267,6 @@ function LazyOperators.materialize(
     return BlockMap(∇x)
 end
 
-# Specialize the previous method when `Gradient` is applied
-# to two levels of LazyMapOver in order to help compiler inference
-# to deal with recursion.
-# This may be used by `bilinear_assemble` when a bilinear form
-# containing a `Gradient` is evaluated at a `CellPoint`
-function LazyOperators.materialize(
-    lOp::Gradient{O, <:Tuple{LazyMapOver{<:NTuple{N, LazyMapOver}}}},
-    cPoint::CellPoint,
-) where {O, N}
-    ∇x = tuplemap(
-        x -> materialize(Gradient(x, gradient_style(lOp)), cPoint),
-        get_args(get_args(lOp)...),
-    )
-    return BlockMap(∇x)
-end
-
 function LazyOperators.materialize(
     lOp::Gradient{O, <:Tuple{LazyMapOver{<:CellShapeFunctions}}},
     cPoint::CellPoint,

@@ -37,15 +37,6 @@ function lazy_map_over(f::F, a::Vararg{LazyMapOver, N}) where {F <: Function, N}
     _tuplemap(f, _tuplemap(get_args, a)...)
 end
 
-# Specialize the previous method for two levels of LazyMapOver
-# in order to help compiler inference to deal with recursion.
-function lazy_map_over(
-    f::F,
-    a::Vararg{LazyMapOver{<:NTuple{N1, LazyMapOver}}, N},
-) where {F <: Function, N, N1}
-    _tuplemap(f, _tuplemap(get_args, a)...)
-end
-
 """
     _tuplemap(f::F, t::Vararg{NTuple{N1, Any}, N})
 
