@@ -948,17 +948,6 @@ maywrap(x) = LazyWrap(x)
 maywrap(x::AbstractLazyOperator) = x
 
 """
-    _get_tuple_var(::Val{N}, k)
-
-Create a function that wraps a value into a tuple of length N with NullOperators.
-
-The wrapped value is placed at position k, other positions are filled with NullOperators.
-"""
-function _get_tuple_var(::Val{N}, k) where {N}
-    x -> ntuple(i -> i == k ? x : NullOperator(), Val(N))
-end
-
-"""
     _get_tuple_var1_impl(N, K)
 
 Generate code expression for creating a tuple with value at position K.
@@ -974,32 +963,16 @@ end
 end
 
 """
-    _get_tuple_var(λ::Tuple, k)
-    _get_tuple_var(λ, k)
-
-Create a function that wraps a value into a tuple of NullOperators except at position k.
-
-For tuple input, returns a function creating tuple of same length.
-For other inputs, returns identity.
-"""
-_get_tuple_var(λ::Tuple, k) = x -> ntuple(i -> i == k ? x : NullOperator(), length(λ))
-_get_tuple_var(λ, k) = identity
-
-"""
     _get_tuple_var_impl(k, N)
 
 Generate code expression for creating a tuple selecting from diagonal or background value.
 
-Used by `@generated` function to efficiently create diagonal-like tuple.
+Used by `_get_all_tuple_var_impl` to efficiently create diagonal-like tuples.
 """
 function _get_tuple_var_impl(k, N)
     exprs = [i == k ? :(diag[$i]) : :(b) for i in 1:N]
     return :(tuple($(exprs...)))
 end
-@generated function _get_tuple_var(x, ::Val{I}, ::Val{N}) where {I, N}
-    _get_tuple_var_impl(I, N)
-end
-
 """
     _get_all_tuple_var_impl(N)
 
@@ -1027,10 +1000,6 @@ The result can be seen as a dense diagonal-like array using tuple.
 """
 @generated function _diag_tuples(diag::Tuple{Vararg{Any, N}}, b) where {N}
     _get_all_tuple_var_impl(N)
-end
-
-function _diag_tuples(n::Val{N}, ::Val{i}, a, b) where {N, i}
-    _diag_tuples(ntuple(k -> a, n), b)[i]
 end
 
 """
