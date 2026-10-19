@@ -99,7 +99,7 @@ end
     wu = map(_mapquad, ω, u)
     _apply_quadrature2(wu)
 end
-_apply_quadrature2(wu) = LazyOperators.dof_copy(reduce(_mapsum, wu))
+_apply_quadrature2(wu) = reduce(_mapsum, wu)
 _mapsum(a, b) = map(+, a, b)
 _mapsum(a::NullOperator, b::NullOperator) = a
 _mapquad(ω, u) = map(Base.Fix1(*, ω), u)
@@ -109,6 +109,27 @@ _mapquad(ω, u) = map(Base.Fix1(*, ω), u)
 const _DofValues = Union{LazyOperators.DofLike, BlockMap}
 _mapsum(a::_DofValues, b::_DofValues) = LazyOperators.dof_copy(a + b)
 _mapquad(ω, u::_DofValues) = ω * u
+
+# The lazy integrands are not stored for all the quadrature nodes (as `map(g_ref, xq)` does):
+# their type can be large, and they were boxed.
+@inline function _apply_quadrature(g_ref, ω, xq::SVector, g1::_DofValues)
+    _accumulate_quadrature(g_ref, ω, xq, g1)
+end
+
+"""
+    _accumulate_quadrature(g_ref, ω, xq, [g1 = g_ref(xq[1])])
+
+Return `∑ᵢ ωᵢ g_ref(xqᵢ)`, accumulated node by node. The (lazy) values of a `DofMap` or a
+`BlockMap` are evaluated at each node, fused with the running sum (see `_mapsum`). `g1` is
+the value at the first node, when it is already known.
+"""
+function _accumulate_quadrature(g_ref, ω, xq, g1 = g_ref(xq[1]))
+    acc = LazyOperators.dof_copy(_mapquad(ω[1], g1))
+    for i in 2:length(ω)
+        acc = _mapsum(acc, _mapquad(ω[i], g_ref(xq[i])))
+    end
+    return acc
+end
 
 """
     apply_quadrature_v2(
@@ -134,10 +155,7 @@ function apply_quadrature_v2(
     _apply_quadrature_v2(g_ref, get_weights(quadrule), quadnodes)
 end
 # splitting the previous function to have function barrier...
-function _apply_quadrature_v2(g_ref, ω, xq)
-    fquad(w, x) = _mapquad(w, g_ref(x))
-    LazyOperators.dof_copy(mapreduce(fquad, _mapsum, ω, xq))
-end
+_apply_quadrature_v2(g_ref, ω, xq) = _accumulate_quadrature(g_ref, ω, xq)
 
 # Below are "dispatch functions" to select the more appropriate quadrature function
 function apply_quadrature(

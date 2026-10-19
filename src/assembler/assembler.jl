@@ -603,20 +603,56 @@ function _append_contribution!(
     col_dofs_U_n = get_dofs(U, cellindex_n, nU_n) # columns correspond to the TrialFunction on side⁻
     row_dofs_V_n = get_dofs(V, cellindex_n, nV_n) # lines correspond to the TestFunction on side⁻
 
+    # The blocks (nn, pn, np, pp) are indexed with literal indices: they can have different
+    # types (`NullOperator` blocks on a boundary face), and a dynamic index boxes the values.
     _offset = offset
-    iterator = if has_opposite_side(elementInfo)
+    _offset = _append_bilinear!(
+        I,
+        J,
+        X,
+        _offset,
+        row_dofs_V_n,
+        col_dofs_U_n,
+        unwrapValues[1],
+        backend,
+    )
+    if has_opposite_side(elementInfo)
         cellinfo_p = get_cellinfo_p(elementInfo)
         cellindex_p = cellindex(cellinfo_p)
         nU_p = Val(get_ndofs(U, shape(celltype(cellinfo_p))))
         nV_p = Val(get_ndofs(V, shape(celltype(cellinfo_p))))
         col_dofs_U_p = get_dofs(U, cellindex_p, nU_p) # columns correspond to the TrialFunction on side⁺
         row_dofs_V_p = get_dofs(V, cellindex_p, nV_p) # lines correspond to the TestFunction on side⁺
-        Iterators.product((row_dofs_V_n, row_dofs_V_p), (col_dofs_U_n, col_dofs_U_p))
-    else
-        Iterators.product((row_dofs_V_n,), (col_dofs_U_n,))
-    end
-    for (k, (row, col)) in enumerate(iterator)
-        _offset = _append_bilinear!(I, J, X, _offset, row, col, unwrapValues[k], backend)
+        _offset = _append_bilinear!(
+            I,
+            J,
+            X,
+            _offset,
+            row_dofs_V_p,
+            col_dofs_U_n,
+            unwrapValues[2],
+            backend,
+        )
+        _offset = _append_bilinear!(
+            I,
+            J,
+            X,
+            _offset,
+            row_dofs_V_n,
+            col_dofs_U_p,
+            unwrapValues[3],
+            backend,
+        )
+        _offset = _append_bilinear!(
+            I,
+            J,
+            X,
+            _offset,
+            row_dofs_V_p,
+            col_dofs_U_p,
+            unwrapValues[4],
+            backend,
+        )
     end
     return nothing
 end
@@ -626,25 +662,23 @@ end
 
 Append a bilinear contribution to the COO format arrays.
 
-Takes row and column DoF arrays and computes their Cartesian product,
-then appends the resulting indices and values to the sparse matrix arrays.
+Appends the Cartesian product of the row (Test) and column (Trial) DoF arrays and the
+corresponding values to the sparse matrix arrays. `vals` is stored column-major (Test
+functions first).
+
+# Dev notes
+The loops have a dynamic index: building the Cartesian product as static arrays made the
+compilation time grow quickly with the number of dofs.
 """
 function _append_bilinear!(I, J, X, offset, row, col, vals, backend::AbstractBcubeBackend)
-    _rows, _cols = Bcube._cartesian_product(row, col)
-    for k in eachindex(_rows)
-        I[offset + k] = _rows[k]
+    m = length(row)
+    for j in eachindex(col), i in eachindex(row)
+        k = offset + i + (j - 1) * m
+        I[k] = row[i]
+        J[k] = col[j]
+        X[k] += vals[i + (j - 1) * m]
     end
-    for k in eachindex(_rows)
-        J[offset + k] = _cols[k]
-    end
-    k = 0
-    for vi in vals
-        for vij in vi
-            k += 1
-            X[offset + k] += vij
-        end
-    end
-    return offset + length(_rows)
+    return offset + m * length(col)
 end
 
 function _append_bilinear!(
@@ -754,10 +788,12 @@ end
 
 Unwrap lazy evaluation structures for cell integrations.
 
-Maps `unwrap` twice over the lazy structure to extract computed values.
+Recursively unwraps the `BlockMap`s (one block per FESpace for a `AbstractMultiTestFESpace`)
+and the `DofMap`s to extract computed values. Note that `map` on the values of a `DofMap`
+would allocate for more than 32 values.
 """
-_unwrap_cell_integrate(::TestFESpace, a) = map(unwrap, unwrap(a))
-_unwrap_cell_integrate(::AbstractMultiTestFESpace, a) = map(unwrap, unwrap(a))
+_unwrap_cell_integrate(::TestFESpace, a) = _recursive_unwrap(a)
+_unwrap_cell_integrate(::AbstractMultiTestFESpace, a) = _recursive_unwrap(a)
 
 """
     _update_b!(b, V, values, elementInfo::FaceInfo, domain, backend)
@@ -1169,67 +1205,20 @@ function LazyOperators.materialize(a::AbstractLazyBilinearWrap, fside::AbstractS
 end
 
 """
-    generate_bilinear(::LazyBilinearWrap{:U, M}, λ) where M
+    generate_bilinear(::LazyBilinearWrap{:U}, λ)
+    generate_bilinear(::LazyBilinearWrap{:V}, λ)
 
-Generate the bilinear matrix structure for Trial functions (`:U`) corresponding to:
+Wrap the values `λ` of the shape functions of the Trial (`:U`) or Test (`:V`) FESpace in a
+`DofMap` whose axes give the structure of the local matrix of the bilinear form:
+`(1, n)` for the `n` Trial functions (columns) and `(m, 1)` for the `m` Test functions
+(lines). An operation between them gives the `(m, n)` matrix
 ```math
-U \\equiv \\begin{pmatrix}
-u_1 & u_2 & ⋯ & u_n\\\\
-u_1 & u_2 & ⋯ & u_n\\\\
- ⋮  &  ⋮  & ⋮ & ⋮  \\\\
-u_1 & u_2 & ⋯ & u_n
-\\end{pmatrix}
+A_{ij} = a(u_j, v_i)
 ```
-where `M=size(U,1)` and `n` are the number of lines and columns
-and correspond to the number of DoFs of the TestFESpace
-and the TrialFESpace, respectively.
-
-`U` is wrapped in `LazyMapOver` structures so that
-all operations on them are done elementwise by default (in other words,
-it can be considered that the operations are automatically broadcasted).
-
-# Dev note :
-`U` is stored as a tuple of tuples, wrapped by `LazyMapOver`, where
-inner tuples correspond to each columns of a matrix.
-This hierarchical structure reduces both inference and compile times
-by avoiding the use of large tuples.
+lazily (see `DofMap`), without duplicating the values of the shape functions.
 """
-function generate_bilinear(::LazyBilinearWrap{:U, M}, λ) where {M}
-    MapOver(ntuple(j -> begin
-        MapOver(ntuple(i -> λ[j], Val(M)))
-    end, Val(length(λ))))
-end
-
-"""
-    generate_bilinear(::LazyBilinearWrap{:V, N}, λ) where N
-
-Generate the bilinear matrix structure for TestFESpace (`:V`) corresponding to:
-```math
-V \\equiv \\begin{pmatrix}
-v_1 & v_1 & ⋯ & v_1\\\\
-v_2 & v_2 & ⋯ & v_2\\\\
- ⋮  &  ⋮  & ⋮ & ⋮  \\\\
-v_m & v_m & ⋯ & v_m
-\\end{pmatrix}
-```
-where `m` and `N=size(V,2)` are the number of lines and columns
-and correspond to the number of DoFs of the TestFESpace
-and the TrialFESpace, respectively.
-
-`V` is wrapped in `LazyMapOver` structures so that
-all operations on them are done elementwise by default (in other words,
-it can be considered that the operations are automatically broadcasted).
-
-# Dev note :
-`V` is stored as a tuple of tuples, wrapped by `LazyMapOver`, where
-inner tuples correspond to each columns of a matrix.
-This hierarchical structure reduces both inference and compile times
-by avoiding the use of large tuples.
-"""
-function generate_bilinear(::LazyBilinearWrap{:V, N}, λ) where {N}
-    a = MapOver(Tuple(λ))
-    MapOver(ntuple(j -> a, Val(N)))
-end
+generate_bilinear(::LazyBilinearWrap{:U}, λ) = DofMap{(1, length(λ))}(Tuple(λ))
+generate_bilinear(::LazyBilinearWrap{:V}, λ) = DofMap{(length(λ), 1)}(Tuple(λ))
 
 """
     LazyOperators.materialize(a::AbstractLazyBilinearWrap, cpoint::CellPoint)
@@ -1286,16 +1275,13 @@ the local matrix corresponding to the bilinear form :
 ```
 where `λᵤ` and `λᵥ` are the shape functions associated with
 the trial `U` and the test `V` function spaces respectively.
-In a "map-over" version, it can be written :
+It can be written :
 ```math
     A = a(blockU, blockV)
 ```
-where `blockU` and `blockV` correspond formally to
-the lazy-map-over matrices :
-```math
-    ∀k, blockU[k,j] = λᵤ[j],
-        blockV[i,k] = λᵥ[i]
-```
+where, once materialized on a point, `blockU` and `blockV` are `DofMap`s of axes `(1, n)` and
+`(m, 1)` (see `generate_bilinear`): the operations between them give the `(m, n)` matrix
+`A`, lazily.
 """
 function blockmap_bilinear_shape_functions(
     U::AbstractFESpace,
@@ -1356,37 +1342,6 @@ function blockmap_bilinear_shape_functions(
         LazyWrap(BilinearTestFaceSidePair(V_nn, V_pn, V_np, V_pp)),
     )
 end
-
-"""
-    _cartesian_product(a::NTuple{N1}, b::NTuple{N2})
-    _cartesian_product(a::SVector{N1}, b::SVector{N2})
-
-Compute the Cartesian product of two tuples or static vectors.
-
-Returns two tuples where the first contains all combinations from `a` repeated,
-and the second contains all combinations from `b` with proper ordering.
-"""
-function _cartesian_product(a::NTuple{N1}, b::NTuple{N2}) where {N1, N2}
-    _a, _b = _cartesian_product(SVector{N1}(a), SVector{N2}(b))
-    Tuple(_a), Tuple(_b)
-end
-
-function _cartesian_product(a::SVector{N1}, b::SVector{N2}) where {N1, N2}
-    # Return `_a` and `__b` defined as :
-    # _a = SVector{N1 * N2}(a[i] for i in 1:N1, j in 1:N2)
-    # __b = SVector{N1 * N2}(b[j] for i in 1:N1, j in 1:N2)
-    _a = repeat(a, Val(N2))
-    _b = repeat(b, Val(N1))
-    __b = vec(permutedims(reshape(_b, Size(N2, N1))))
-    _a, __b
-end
-
-"""
-    Base.repeat(a::SVector, ::Val{N})
-
-Repeat a static vector N times by vertical concatenation.
-"""
-Base.repeat(a::SVector, ::Val{N}) where {N} = reduce(vcat, ntuple(i -> a, Val(N)))
 
 """
     compute(integration::Integration)

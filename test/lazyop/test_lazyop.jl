@@ -77,16 +77,17 @@
     end
 
     @testset "lazy_compose materialize_op" begin
-        import Bcube.LazyOperators: LazyOperator, materialize, lazy_compose, MapOver
+        import Bcube.LazyOperators:
+            LazyOperator, materialize, lazy_compose, DofMap, dof_copy
 
         op = LazyOperator(lazy_compose, (x -> x + 1), 5)
         @test materialize(op) == 6
 
-        # `MapOver` arguments : the function is applied on each leaf
-        # (`>` is not defined on `MapOver`)
+        # `DofMap` arguments : the function is applied on each dof
+        # (`>` is not defined on `DofMap`)
         f(x, y) = ifelse(x > 1, x * y, -1)
-        op = lazy_compose(f, (MapOver(1, 2, 3), 10))
-        @test materialize(op) === MapOver(-1, 20, 30)
+        op = lazy_compose(f, (DofMap((1, 2, 3)), 10))
+        @test dof_copy(materialize(op)) === DofMap((-1, 20, 30))
     end
 
     @testset "map_over_leaves" begin

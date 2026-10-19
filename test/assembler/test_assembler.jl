@@ -766,7 +766,37 @@
                 @allocated assemble_linear!(b, l, W)
             end
         end
-        @test linear_allocations(3) == linear_allocations(6)
+        @test linear_allocations(6) == linear_allocations(12)
+    end
+
+    @testset "Bilinear forms: no allocation per element" begin
+        # Number of allocations (not bytes: the arrays of offsets grow with the mesh)
+        function bilinear_allocations(n)
+            mesh = rectangle_mesh(n, n)
+            fs = FunctionSpace(:Lagrange, 2)
+            U = TrialFESpace(fs, mesh, :discontinuous; size = 2)
+            V = TestFESpace(U)
+            μ = FEFunction(TrialFESpace(fs, mesh, :discontinuous), 1.0)
+            dΩ = Measure(CellDomain(mesh), 5)
+            dΓ = Measure(InteriorFaceDomain(mesh), 5)
+            dΓb = Measure(BoundaryFaceDomain(mesh), 5)
+            nΓ = get_face_normals(dΓ)
+            nΓb = get_face_normals(dΓb)
+            τ(μ, ∇u) = μ * (∇u + transpose(∇u) - (2 / 3) * tr(∇u) * I)
+            fb(u, ∇u, v, ∇v, μ, n) = -(τ(μ, ∇u) * n) ⋅ v + 3.0 * μ * (v ⋅ u)
+            forms = (
+                (u, v) -> ∫(τ(μ, ∇(u)) ⊡ ∇(v))dΩ,
+                (u, v) -> ∫(jump(u) ⋅ jump(v) + side⁻(∇(u)) ⊡ (jump(v) ⊗ side⁻(nΓ)))dΓ,
+                (u, v) -> ∫(fb ∘ map(side⁻, (u, ∇(u), v, ∇(v), μ, nΓb)))dΓb,
+            )
+            map(forms) do a
+                backend = Bcube.get_bcube_backend(Bcube._bilinear_integration_type(a, U, V))
+                Iv, Jv, Xv = Bcube.allocate_bilinear(backend, a, U, V, Float64)
+                Bcube.assemble_bilinear!(Iv, Jv, Xv, a, U, V)
+                @allocations Bcube.assemble_bilinear!(Iv, Jv, Xv, a, U, V)
+            end
+        end
+        @test bilinear_allocations(6) == bilinear_allocations(12)
     end
 
     @testset "Linear forms on one side of interior faces" begin

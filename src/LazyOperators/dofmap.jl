@@ -10,8 +10,9 @@ operators are applied dof by dof, lazily and with fusion (see `dof_broadcasted`)
 - `T` is the type of the values, which must be the same for all the dofs.
 - `L = prod(D)` is the number of values, stored column-major in `data`.
 
-The trial and test functions of a bilinear form share the same tuple of values: only the
-axes differ, the values are not duplicated.
+For a bilinear form, the values of the trial and test functions are stored once (`n` and
+`m` values): the `m × n` structure only comes from their axes, the values are not copied
+for each line or column.
 
 # Dev notes
 The operators on a `DofMap` return a `Broadcasted{DofMapStyle}` instead of computing a new
@@ -370,11 +371,6 @@ unchanged to each call of `f`. Without `BlockMap` nor `DofMap` argument, `f(args
 returned. It is used to materialize a composition `f ∘ (a, b, ...)`.
 
 All the `BlockMap` arguments must have the same number of blocks.
-
-# Dev notes
-Until the bilinear forms use `DofMap`s, their shape functions are nested `MapOver`s (possibly
-in the blocks of a `BlockMap`): without `DofMap` argument, `f` is applied with
-`map_over_leaves`, which is `f(args...)` without `MapOver` argument.
 """
 @generated function dofwise(f::F, args::Vararg{Any, N}) where {F, N}
     _gen_blockwise(:_dofwise_on_block, args, [:(args[$j]) for j in 1:N])
@@ -387,5 +383,5 @@ end
     dof_broadcasted(f, args...)
 end
 @inline function _dofwise_on_block(::Val{false}, f::F, args::Vararg{Any, N}) where {F, N}
-    map_over_leaves(f, args...)
+    f(args...)
 end
