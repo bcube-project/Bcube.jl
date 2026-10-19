@@ -139,8 +139,10 @@
 
         # The generator of `_map_over_leaves` must find its helpers when `LazyOperators` is
         # loaded from source: the pkgimage of Bcube hides a wrong definition order
-        # ("method too new"). It runs in a new process: loading `LazyOperators` again here
-        # would overwrite the methods it defines on functions of `Base`.
+        # ("method too new", or an undefined binding for julia >= 1.12). It runs in a new
+        # process: loading `LazyOperators` again here would overwrite the methods it defines
+        # on functions of `Base`. The new process has no project: `LazyOperators` only
+        # depends on standard libraries.
         path = joinpath(pkgdir(Bcube), "src", "LazyOperators", "LazyOperators.jl")
         code = """
         include($(repr(path)))

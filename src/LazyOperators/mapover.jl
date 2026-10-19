@@ -174,6 +174,33 @@ end
 __map_over(f::F, a::Vararg{Any, N}) where {F, N} = f(a...)
 __map_over(f::F, a::Vararg{AbstractMapOver, N}) where {F, N} = map_over(f, a...)
 
+pretty_name(a::AbstractMapOver) = string(get_basetype(a))
+pretty_name_style(a::AbstractMapOver) = Dict(:color => :blue)
+function show_lazy_operator(a::AbstractMapOver; level = 1, indent = 4, islast = (true,))
+    print_tree_prefix(level, indent, islast)
+    printstyled(pretty_name(a) * ": "; pretty_name_style(a)...)
+    printstyled(pretty_name(a) * "  \n"; pretty_name_style(a)...)
+    args = unwrap(a)
+    for (i, arg) in enumerate(args)
+        _islast = (islast..., i == length(args))
+        arg ≠ nothing && show_lazy_operator(arg; level = (level + 1), islast = _islast)
+    end
+end
+
+"""
+    MapOver{A} <: AbstractMapOver{A}
+
+A container used to wrap data for which all materialized
+operators on that data must be map over it.
+This corresponds to the non-lazy version of `LazyMapOver`.
+"""
+struct MapOver{A <: Tuple} <: AbstractMapOver{A}
+    args::A
+end
+
+MapOver(args::Vararg{Any, N}) where {N} = MapOver{typeof(args)}(args)
+get_basetype(::Type{<:MapOver}) = MapOver
+
 """
     map_over_leaves(f, args...)
 
@@ -240,8 +267,9 @@ function gen_map_over_leaves(types, exprs)
     return :(_rebuild_map_over(($(calls...),)))
 end
 
-# `gen_map_over_leaves` must be defined before this generated function: the generator
-# runs in the world age of the definition of the generated function.
+# `gen_map_over_leaves`, and `MapOver` that it uses, must be defined before this generated
+# function: the generator runs in the world age of the definition of the generated function
+# (for julia >= 1.12, this also applies to the bindings such as `MapOver`).
 @generated function _map_over_leaves(::Val{true}, f::F, args::Vararg{Any, N}) where {F, N}
     gen_map_over_leaves(args, [:(args[$j]) for j in 1:N])
 end
@@ -260,30 +288,3 @@ _rebuild_map_over(::Tuple{Vararg{NullOperator}}) = NullOperator()
     end
     return :(($(exprs...),))
 end
-
-pretty_name(a::AbstractMapOver) = string(get_basetype(a))
-pretty_name_style(a::AbstractMapOver) = Dict(:color => :blue)
-function show_lazy_operator(a::AbstractMapOver; level = 1, indent = 4, islast = (true,))
-    print_tree_prefix(level, indent, islast)
-    printstyled(pretty_name(a) * ": "; pretty_name_style(a)...)
-    printstyled(pretty_name(a) * "  \n"; pretty_name_style(a)...)
-    args = unwrap(a)
-    for (i, arg) in enumerate(args)
-        _islast = (islast..., i == length(args))
-        arg ≠ nothing && show_lazy_operator(arg; level = (level + 1), islast = _islast)
-    end
-end
-
-"""
-    MapOver{A} <: AbstractMapOver{A}
-
-A container used to wrap data for which all materialized
-operators on that data must be map over it.
-This corresponds to the non-lazy version of `LazyMapOver`.
-"""
-struct MapOver{A <: Tuple} <: AbstractMapOver{A}
-    args::A
-end
-
-MapOver(args::Vararg{Any, N}) where {N} = MapOver{typeof(args)}(args)
-get_basetype(::Type{<:MapOver}) = MapOver
