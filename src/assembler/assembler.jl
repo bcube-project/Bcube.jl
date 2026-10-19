@@ -713,16 +713,14 @@ function _unwrap_face_integrate(
 end
 
 """
-    _recursive_unwrap(a::LazyOperators.AbstractMapOver)
     _recursive_unwrap(a::BlockMap)
     _recursive_unwrap(a)
 
 Recursively unwrap lazy map operations to extract concrete values.
 
-For `AbstractMapOver` and `BlockMap` objects, maps `_recursive_unwrap` over the elements.
-For other types, applies `unwrap` once.
+For `BlockMap` objects, maps `_recursive_unwrap` over the blocks.
+For other types (for instance a `DofMap`), applies `unwrap` once.
 """
-_recursive_unwrap(a::LazyOperators.AbstractMapOver) = map(_recursive_unwrap, unwrap(a))
 _recursive_unwrap(a::BlockMap) = map(_recursive_unwrap, unwrap(a))
 _recursive_unwrap(a) = unwrap(a)
 
@@ -1036,25 +1034,6 @@ function _diag_tuples(n::Val{N}, ::Val{i}, a, b) where {N, i}
 end
 
 """
-    _get_multi_tuple_var(V::Tuple{Vararg{Any, N}})
-    _get_multi_tuple_var(a::LazyMapOver)
-
-Create block-diagonal tuple structure for multi-space shape functions.
-
-For use in MultiFESpace assembly, where each component space is
-mapped in a diagonal block pattern with NullOperators elsewhere.
-
-For N=3 for example:
-    (LazyMapOver((LazyMapOver(V[1]), NullOperator(),  NullOperator())),
-     LazyMapOver((NullOperator(),  LazyMapOver(V[2]), NullOperator())),
-     LazyMapOver((NullOperator(),  NullOperator(),  LazyMapOver(V[3]))))
-"""
-function _get_multi_tuple_var(V::Tuple{Vararg{Any, N}}) where {N}
-    map(LazyMapOver, _diag_tuples(map(LazyMapOver, V), NullOperator()))
-end
-_get_multi_tuple_var(a::LazyMapOver) = _get_multi_tuple_var(unwrap(a))
-
-"""
     blockmap_shape_functions(fespace::AbstractFESpace, cellinfo::AbstractCellInfo)
 
 Return all shape functions `a = LazyMapOver((λ₁, λ₂, …, λₙ))` corresponding to `fespace` in cell
@@ -1151,34 +1130,33 @@ function _cellpair_blockmap_shape_functions(
 end
 
 """
-    AbstractLazyBilinearWrap{I, N, A} <: LazyOperators.AbstractLazyMapOver{A}
+    AbstractLazyBilinearWrap{I, A} <: LazyOperators.AbstractLazyMapOver{A}
 
 Abstract base type for lazy bilinear wrappers.
 - `I` indicates whether this is for Trial (`:U`) or Test (`:V`) FESpace,
-- `N` is the number of DoFs of the complementary FESpace (i.e. Trial if `I` is set to `:V`),
 - `A` is the wrapped arguments type.
 """
-abstract type AbstractLazyBilinearWrap{I, N, A <: Tuple} <:
+abstract type AbstractLazyBilinearWrap{I, A <: Tuple} <:
               LazyOperators.AbstractLazyMapOver{A} end
 Bcube.LazyOperators.get_args(a::AbstractLazyBilinearWrap) = a.args
 
-struct LazyBilinearWrap{I, N, A} <: AbstractLazyBilinearWrap{I, N, A}
+struct LazyBilinearWrap{I, A} <: AbstractLazyBilinearWrap{I, A}
     args::A
 end
 
-function LazyBilinearWrap(::Val{I}, ::Val{N}, λ...) where {I, N}
-    LazyBilinearWrap{I, N, typeof(λ)}(λ)
+function LazyBilinearWrap(::Val{I}, λ...) where {I}
+    LazyBilinearWrap{I, typeof(λ)}(λ)
 end
 
 """
-    LazyBilinearWrapU(::Val{N}, λu) where {N}
+    LazyBilinearWrapU(λu)
 
 Helper constructor for lazy Trial functions (`:U`) wrapper in bilinear forms.
 """
 LazyBilinearWrapU(args...; kwargs...) = LazyBilinearWrap(Val(:U), args...; kwargs...)
 
 """
-    LazyBilinearWrapV(::Val{N}, λv) where {N}
+    LazyBilinearWrapV(λv)
 
 Helper constructor for lazy Test functions (`:V`) wrapper in bilinear forms.
 """
@@ -1188,11 +1166,11 @@ LazyBilinearWrapV(args...; kwargs...) = LazyBilinearWrap(Val(:V), args...; kwarg
 Materialize a `LazyBilinearWrap` on a `CellInfo` by recursively materialize the inner argument.
 """
 function LazyOperators.materialize(
-    a::AbstractLazyBilinearWrap{I, N},
+    a::AbstractLazyBilinearWrap{I},
     cInfo::CellInfo,
-) where {I, N}
+) where {I}
     args = materialize_args(get_args(a), cInfo)
-    LazyBilinearWrap(Val(I), Val(N), args...)
+    LazyBilinearWrap(Val(I), args...)
 end
 
 function LazyOperators.materialize(a::AbstractLazyBilinearWrap, x...)
@@ -1307,9 +1285,7 @@ function blockmap_bilinear_shape_functions(
 )
     λU = get_cell_shape_functions(U, shape(celltype(cellinfo_u)))
     λV = get_cell_shape_functions(V, shape(celltype(cellinfo_v)))
-    Nu = get_ndofs(U, shape(celltype(cellinfo_u)))
-    Nv = get_ndofs(V, shape(celltype(cellinfo_v)))
-    LazyBilinearWrapU(Val(Nv), λU), LazyBilinearWrapV(Val(Nu), λV)
+    LazyBilinearWrapU(λU), LazyBilinearWrapV(λV)
 end
 
 """

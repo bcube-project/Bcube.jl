@@ -41,7 +41,6 @@ export NullOperator
 export lazy_compose
 
 export LazyMapOver
-export MapOver
 export DofMap
 export BlockMap
 

@@ -147,11 +147,6 @@ for f in (:otimes, :dcontract)
     @eval ($f)(a::AbstractLazy, b) = ($f)(a, LazyWrap(b))
     @eval ($f)(a, b::AbstractLazy) = ($f)(LazyWrap(a), b)
 
-    # deal with `MapOver`
-    @eval ($f)(a::MapOver, b::MapOver) = LazyOperators.map_over($f, a, b)
-    @eval ($f)(a::MapOver, b) = LazyOperators.map_over(Base.Fix2($f, b), a)
-    @eval ($f)(a, b::MapOver) = LazyOperators.map_over(Base.Fix1($f, a), b)
-
     # deal with `DofMap` and `BlockMap`
     eval(LazyOperators.dofmap_binary_operator_rules(f))
 end

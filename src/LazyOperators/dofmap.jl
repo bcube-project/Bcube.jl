@@ -18,7 +18,7 @@ for each line or column.
 The operators on a `DofMap` return a `Broadcasted{DofMapStyle}` instead of computing a new
 `DofMap`: the whole integrand is fused and evaluated in a single loop by `dof_copy`. This
 loop has a dynamic index, so the compilation time does not grow with the number of dofs
-(unlike an unrolled evaluation such as `map_over_leaves`).
+(unlike an unrolled evaluation of all the dofs).
 """
 struct DofMap{D, T, L}
     data::NTuple{L, T}
