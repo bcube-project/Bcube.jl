@@ -120,5 +120,17 @@
             MapOver(MapOver(2, 4), MapOver(6, 8)),
             NullOperator(),
         )
+
+        # The generator of `_map_over_leaves` must find its helpers when `LazyOperators` is
+        # loaded from source: the pkgimage of Bcube hides a wrong definition order
+        # ("method too new"). It runs in a new process: loading `LazyOperators` again here
+        # would overwrite the methods it defines on functions of `Base`.
+        path = joinpath(pkgdir(Bcube), "src", "LazyOperators", "LazyOperators.jl")
+        code = """
+        include($(repr(path)))
+        r = LazyOperators.map_over_leaves(*, LazyOperators.MapOver(1, 2), 2)
+        r === LazyOperators.MapOver(2, 4) || exit(1)
+        """
+        @test success(`$(Base.julia_cmd()) --startup-file=no -e $code`)
     end
 end

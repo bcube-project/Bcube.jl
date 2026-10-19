@@ -198,18 +198,10 @@ than by a recursive call to `map_over_leaves` on the inner leaves: julia 1.10 fa
 this recursion (return type `Any`, allocations at each call).
 """
 function map_over_leaves(f::F, args::Vararg{Any, N}) where {F, N}
-    _map_over_leaves(_any_map_over(args...), f, args...)
-end
-
-@generated function _any_map_over(args::Vararg{Any, N}) where {N}
-    any(T -> T <: AbstractMapOver, args) ? :(Val(true)) : :(Val(false))
+    _map_over_leaves(any_of_type(args, AbstractMapOver), f, args...)
 end
 
 _map_over_leaves(::Val{false}, f::F, args::Vararg{Any, N}) where {F, N} = f(args...)
-
-@generated function _map_over_leaves(::Val{true}, f::F, args::Vararg{Any, N}) where {F, N}
-    gen_map_over_leaves(args, [:(args[$j]) for j in 1:N])
-end
 
 """
     gen_map_over_leaves(types, exprs)
@@ -233,6 +225,12 @@ function gen_map_over_leaves(types, exprs)
         gen_map_over_leaves(_types, _exprs)
     end
     return :(_rebuild_map_over(($(calls...),)))
+end
+
+# `gen_map_over_leaves` must be defined before this generated function: the generator
+# runs in the world age of the definition of the generated function.
+@generated function _map_over_leaves(::Val{true}, f::F, args::Vararg{Any, N}) where {F, N}
+    gen_map_over_leaves(args, [:(args[$j]) for j in 1:N])
 end
 
 _rebuild_map_over(a::Tuple) = MapOver(a)
