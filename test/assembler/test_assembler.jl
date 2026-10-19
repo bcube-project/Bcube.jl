@@ -769,6 +769,23 @@
         @test linear_allocations(3) == linear_allocations(6)
     end
 
+    @testset "Linear forms on one side of interior faces" begin
+        mesh = rectangle_mesh(4, 3)
+        V = TestFESpace(TrialFESpace(FunctionSpace(:Lagrange, 2), mesh, :discontinuous))
+        dΓ = Measure(InteriorFaceDomain(mesh), 4)
+        nΓ = get_face_normals(dΓ)
+        g = PhysicalFunction(x -> 1 + x[1] + x[2]^2)
+        # the Lagrange shape functions sum to 1 (and their gradients to 0)
+        I_g = sum(Bcube.compute(∫(side⁻(g))dΓ))
+        @test sum(assemble_linear(v -> ∫(side⁻(v) * side⁻(g))dΓ, V)) ≈ I_g
+        @test sum(assemble_linear(v -> ∫(side⁺(v) * side⁺(g))dΓ, V)) ≈ I_g
+        @test isapprox(
+            sum(assemble_linear(v -> ∫(side⁻(∇(v)) ⋅ side⁻(nΓ))dΓ, V)),
+            0.0;
+            atol = 1e-12,
+        )
+    end
+
     @testset "Tangential gradient on faces" begin
         # curve in 2D: the faces are nodes
         mesh = circle_mesh(8)

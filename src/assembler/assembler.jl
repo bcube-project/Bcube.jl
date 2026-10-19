@@ -847,6 +847,16 @@ function __update_b!(
     nothing
 end
 
+# No contribution on this side of the face (for instance `∫(side⁻(v) * g)dΓ` on interior faces)
+function __update_b!(
+    b::AbstractVector,
+    idofs::AbstractVector,
+    intvals::Tuple{NullOperator},
+    backend::AbstractBcubeBackend,
+)
+    nothing
+end
+
 """
     __update_b!(b, dofs::AbstractVector{<:Integer}, vals::NTuple, backend::BcubeBackendCPUSerial)
 
