@@ -222,7 +222,7 @@ end
     else
         x0 = SVector{N}(collect(LinRange(xmin, xmax, N)))
     end
-    w0 = @. one(x0) / N / (xmax-xmin)
+    w0 = @. one(x0) / N * (xmax-xmin)
     return :($w0, $x0)
 end
 
@@ -280,7 +280,7 @@ end
 function quadrature_rule(t::Triangle, ::Val{1}, ::QuadratureUniform)
     x = get_coords(t)
     n = length(x)
-    w = SVector{n}(one(eltype(first(x))) / n for i in 1:n) / measure(t)
+    w = SVector{n}(one(eltype(first(x))) / n for i in 1:n) * measure(t)
     return w, SVector{n}(x...)
 end
 
