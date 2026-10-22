@@ -12,7 +12,10 @@ When a cell domain `Ω` is provided, a cell measure `dΩ` is first built on that
 the method below applies. The quadrature degree of `dΩ` is the degree of the
 `FunctionSpace` of `u`; for a `:Lagrange` space the quadrature type follows the space
 (`:Legendre`, `:Lobatto` or `:Uniform`), and for any other space a uniform quadrature is
-used.
+used. Beware that uniform quadratures are currently only defined on hypercubes (`Line`,
+`Square`, `Cube`, any degree) and on `Triangle` (degree 1): any other combination — e.g.
+a `Triangle` of degree ≥ 2 or a `Tetra` — is not supported yet and raises an error when
+the measures are used.
 
 When a cell measure `dΩ` is provided, the returned measures are:
 - `dΩ` itself, on which the min/max of the solution are evaluated inside the cells;
@@ -117,7 +120,7 @@ A tuple `(lim_u, u_lim)` where:
   (e.g. `∫(u_lim ⋅ v)dΩ`); to obtain the dofs of the limited solution, project it for
   instance with `projection_l2!`.
 
-# Example
+# Examples
 ```julia
 mesh = rectangle_mesh(20, 4)
 degree = 2
@@ -131,7 +134,7 @@ u_mean = cell_mean(u, dΩ)
 lim_u, u_lim = linear_scaling_limiter(u, u_mean, Ω; bounds = (0.0, 1.0))
 
 u_limited = FEFunction(fes)
-projection_l2!(u_limited, u_lim, mesh)
+projection_l2!(u_limited, u_lim, dΩ)
 ```
 """
 function linear_scaling_limiter(
@@ -496,15 +499,17 @@ function _compute_scalar_limiter(v̅ᵢ, mᵢ, Mᵢ, m̅, M̅, coefmax, checkval
     _0 = zero(eltype(v̅ᵢ))
 
     if checkvalues
-        if !((m̅ ≤ v̅ᵢ ≤ M̅) && (mᵢ ≤ v̅ᵢ ≤ Mᵢ))
-            @show m̅ ≤ v̅ᵢ ≤ M̅
-            @show (M̅ - v̅ᵢ) ≥ _0
-            @show (Mᵢ - v̅ᵢ) ≥ _0
-            @show (v̅ᵢ - m̅) ≥ _0
-            @show (v̅ᵢ - mᵢ) ≥ _0
-            @show m̅, M̅
-            @show mᵢ, v̅ᵢ, Mᵢ
-            error("Limiter values are out of range")
+        if !(m̅ ≤ v̅ᵢ ≤ M̅)
+            error(
+                "Limiter: the cell mean value v̅ᵢ = $v̅ᵢ is outside the admissible range " *
+                "[m̅, M̅] = [$m̅, $M̅] of the neighboring cell mean values",
+            )
+        end
+        if !(mᵢ ≤ v̅ᵢ ≤ Mᵢ)
+            error(
+                "Limiter: the cell mean value v̅ᵢ = $v̅ᵢ is outside the [mᵢ, Mᵢ] = " *
+                "[$mᵢ, $Mᵢ] range of the solution in the cell",
+            )
         end
     end
 

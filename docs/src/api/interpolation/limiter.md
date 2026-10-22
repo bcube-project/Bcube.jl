@@ -16,16 +16,20 @@ The typical workflow is:
 
 ```julia
 u_mean = cell_mean(u, dΩ)
-lim_u, u_lim = linear_scaling_limiter(u, u_mean, Ω, (dΩ, dΓ))
+lim_u, u_lim = linear_scaling_limiter(u, u_mean, dΩ)
 u_limited = FEFunction(get_fespace(u))
-projection_l2!(u_limited, u_lim, mesh)
+projection_l2!(u_limited, u_lim, dΩ)
 ```
+
+When the cell means are computed repeatedly — e.g. at each time step of an explicit
+scheme — the underlying mass matrix can be assembled and factorized once with
+`build_cell_mean_cache`, and the means then obtained with `cell_mean(u, cache)`.
 
 !!! warning
     Nothing is automatic in the choice of the measures: the min/max of `u` are evaluated
     on the `targetMeasures` provided by the user, which should include both the cell
     measure and the interior face measure. In previous versions of the API the face
-    measures were implicitly taken into account; omitting them now silently weakens the
+    measures were implicitly taken into account; omitting them now may silently weaken the
     limiter.
 
 ## linear\_scaling\_limiter
@@ -36,4 +40,8 @@ linear_scaling_limiter
 
 ```@docs
 default_target_measures
+```
+
+```@docs
+build_cell_mean_cache
 ```

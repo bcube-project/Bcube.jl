@@ -76,6 +76,26 @@ get_fespace(cache::CellMeanCache) = cache.feSpace
 get_measure(cache::CellMeanCache) = cache.measure
 get_mass_matrix(cache::CellMeanCache) = cache.massMatrix
 
+"""
+    build_cell_mean_cache(u::AbstractLazy, dΩ::Measure)
+    build_cell_mean_cache(u::MultiFieldFEFunction, dΩ::Measure)
+
+Build the cache required to compute the cell mean values of `u` on the cells covered by
+the `Measure` `dΩ`: the piecewise-constant discontinuous `FESpace` in which the mean
+values live, together with its factorized mass matrix.
+
+This is useful when the mean values are computed repeatedly — e.g. at each time step of
+an explicit scheme — as the mass matrix is then assembled and factorized only once:
+
+```julia
+cache = build_cell_mean_cache(u, dΩ)
+u_mean = cell_mean(u, cache) # cheap: reuses the cache
+```
+
+For a `MultiFieldFEFunction`, a tuple of caches (one per field) is returned, to be passed
+to the corresponding `cell_mean` method. Note that `cell_mean(u, dΩ)` simply builds the
+cache and calls `cell_mean(u, cache)`.
+"""
 function build_cell_mean_cache(u::AbstractLazy, dΩ::Measure)
     mesh = get_mesh(get_domain(dΩ))
     fs = FunctionSpace(:Lagrange, 0)
