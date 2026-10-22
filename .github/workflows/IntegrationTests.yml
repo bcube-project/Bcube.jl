@@ -69,6 +69,24 @@ jobs:
 
           echo "branch=$TUTORIALS_BRANCH" >> $GITHUB_OUTPUT
 
+      - name: Determine BcubeVTK and BcubeGmsh branches
+        id: deps_branches
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          # Use the branch of the same name as the PR branch when it exists, otherwise
+          # leave the output empty so that the registered version is used.
+          BRANCH_NAME="${{ github.head_ref }}"
+          for repo in BcubeVTK BcubeGmsh; do
+            if curl -sf -H "Authorization: Bearer ${{ github.token }}" \
+              "https://api.github.com/repos/bcube-project/$repo.jl/branches/$BRANCH_NAME" > /dev/null 2>&1; then
+              echo "Using matching $repo branch: $BRANCH_NAME"
+              echo "${repo,,}=$BRANCH_NAME" >> $GITHUB_OUTPUT
+            else
+              echo "No matching $repo branch found, using the registered version"
+            fi
+          done
+
       - name: Clone Downstream
         uses: actions/checkout@v7
         with:
@@ -80,6 +98,8 @@ jobs:
       - name: Load this and run the downstream tests
         env:
           BCUBE_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          BCUBEVTK_BRANCH: ${{ steps.deps_branches.outputs.bcubevtk }}
+          BCUBEGMSH_BRANCH: ${{ steps.deps_branches.outputs.bcubegmsh }}
         shell: julia --color=yes --project=downstream {0}
         run: |
           using Pkg
