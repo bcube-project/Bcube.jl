@@ -35,7 +35,7 @@
 
         qr_uni = QuadratureRule(Line(), Quadrature(QuadratureUniform(), 2))
         @test length(qr_uni) == 3
-        @test sum(Bcube.get_weights(qr_uni)) ≈ 1.0
+        @test sum(Bcube.get_weights(qr_uni)) ≈ 2.0
 
         qr_int = QuadratureRule(Line(), 3)
         @test length(qr_int) == 2
@@ -60,6 +60,16 @@
             qr = QuadratureRule(Triangle(), Quadrature(d))
             @test sum(Bcube.get_weights(qr)) ≈ 0.5
         end
+    end
+
+    @testset "QuadratureRule - Triangle uniform" begin
+        # nodal sampling at the reference vertices: like all `QuadratureUniform` rules,
+        # the weights sum to 1 and not to the measure of the reference element
+        qr = QuadratureRule(Triangle(), Quadrature(QuadratureUniform(), 1))
+        @test length(qr) == 3
+        @test sum(Bcube.get_weights(qr)) ≈ 0.5
+        @test Bcube.get_weights(qr) ≈ SA[1 / 6, 1 / 6, 1 / 6]
+        @test Bcube.get_nodes(qr) == SA[SA[0.0, 0.0], SA[1.0, 0.0], SA[0.0, 1.0]]
     end
 
     @testset "QuadratureRule - Tetra" begin

@@ -222,7 +222,7 @@ end
     else
         x0 = SVector{N}(collect(LinRange(xmin, xmax, N)))
     end
-    w0 = @. one(x0) / N
+    w0 = @. one(x0) / N * (xmax-xmin)
     return :($w0, $x0)
 end
 
@@ -276,7 +276,14 @@ function quadrature_rule(line::Line, degree::Val{D}, quad::AbstractQuadratureTyp
     return _quadrature_rule(Val(n), quad)
 end
 
-# Triangle quadratures
+# Triangle uniform quadratures
+function quadrature_rule(t::Triangle, ::Val{1}, ::QuadratureUniform)
+    x = get_coords(t)
+    n = length(x)
+    w = SVector{n}(one(eltype(first(x))) / n for i in 1:n) * measure(t)
+    return w, SVector{n}(x...)
+end
+
 function quadrature_rule(::Triangle, ::Val{1}, ::QuadratureLegendre)
     raw_unzip(get_quadrature_points(Val{:GLTRI1}))
 end

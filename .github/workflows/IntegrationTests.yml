@@ -15,6 +15,9 @@ on:
         type: string
         default: ''
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: ${{ matrix.package.repo }}/${{ matrix.package.group }}/${{ matrix.julia-version }}
@@ -39,6 +42,11 @@ jobs:
       - name: Determine BcubeTutorials branch
         id: tutorials_branch
         shell: bash
+        # Untrusted values (branch name from a fork) go through env, never `${{ }}` in `run`
+        env:
+          INPUT_BRANCH: ${{ github.event.inputs.tutorials_branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
           # Priority order for determining the branch:
           # 1. workflow_dispatch input (if provided)
@@ -48,12 +56,11 @@ jobs:
           TUTORIALS_BRANCH=""
 
           # Check for workflow_dispatch input
-          if [ -n "${{ github.event.inputs.tutorials_branch }}" ]; then
-            TUTORIALS_BRANCH="${{ github.event.inputs.tutorials_branch }}"
+          if [ -n "$INPUT_BRANCH" ]; then
+            TUTORIALS_BRANCH="$INPUT_BRANCH"
             echo "Using branch from workflow_dispatch input: $TUTORIALS_BRANCH"
           # Try matching branch name for PRs
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH_NAME="${{ github.head_ref }}"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
             # Check if matching branch exists in BcubeTutorials
             if curl -sf "https://api.github.com/repos/bcube-project/BcubeTutorials.jl/branches/$BRANCH_NAME" > /dev/null 2>&1; then
               TUTORIALS_BRANCH="$BRANCH_NAME"
@@ -69,6 +76,27 @@ jobs:
 
           echo "branch=$TUTORIALS_BRANCH" >> $GITHUB_OUTPUT
 
+      - name: Determine BcubeVTK and BcubeGmsh branches
+        id: deps_branches
+        if: github.event_name == 'pull_request'
+        shell: bash
+        # Untrusted values (branch name from a fork) go through env, never `${{ }}` in `run`
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Use the branch of the same name as the PR branch when it exists, otherwise
+          # leave the output empty so that the registered version is used.
+          for repo in BcubeVTK BcubeGmsh; do
+            if curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/bcube-project/$repo.jl/branches/$BRANCH_NAME" > /dev/null 2>&1; then
+              echo "Using matching $repo branch: $BRANCH_NAME"
+              echo "${repo,,}=$BRANCH_NAME" >> $GITHUB_OUTPUT
+            else
+              echo "No matching $repo branch found, using the registered version"
+            fi
+          done
+
       - name: Clone Downstream
         uses: actions/checkout@v7
         with:
@@ -80,6 +108,8 @@ jobs:
       - name: Load this and run the downstream tests
         env:
           BCUBE_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          BCUBEVTK_BRANCH: ${{ steps.deps_branches.outputs.bcubevtk }}
+          BCUBEGMSH_BRANCH: ${{ steps.deps_branches.outputs.bcubegmsh }}
         shell: julia --color=yes --project=downstream {0}
         run: |
           using Pkg
