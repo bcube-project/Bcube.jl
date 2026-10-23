@@ -35,6 +35,7 @@ makedocs(;
             "api/interpolation/shape.md",
             "api/interpolation/function_space.md",
             "api/interpolation/fespace.md",
+            "api/interpolation/projection.md",
             "api/mapping/mapping.md",
             "api/integration/integration.md",
             # "api/operator/operator.md",

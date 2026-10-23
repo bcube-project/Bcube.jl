@@ -7,12 +7,21 @@ the scheme so that a discrete maximum principle (DMP) is satisfied. Bcube provid
 around the cell mean so that the solution stays within the range of the neighboring cell
 means.
 
+In each cell, the limited field is obtained by scaling the fluctuation around the cell
+mean with a scalar coefficient `lim_u ∈ [0, 1]`:
+
+    u_lim = u_mean + lim_u * (u - u_mean)
+
+The cell mean is thus preserved by construction, and `lim_u = 0` corresponds to a
+first-order (piecewise constant) solution.
+
 The typical workflow is:
 
-1. compute the cell mean of the field with `cell_mean`,
-2. compute the limiter coefficients and the limited field with `linear_scaling_limiter`,
-3. if the dofs are needed, project the limited field with `projection_l2!` (the limited
-   field returned by `linear_scaling_limiter` is a lazy expression, not an `FEFunction`).
+1. compute the cell mean of the field with [`cell_mean`](@ref),
+2. compute the limiter coefficients and the limited field with [`linear_scaling_limiter`](@ref),
+3. if the dofs are needed, project the limited field with [`projection_l2!`](@ref) (the
+   limited field returned by `linear_scaling_limiter` is a lazy expression, not an
+   `FEFunction`).
 
 ```julia
 u_mean = cell_mean(u, dΩ)
@@ -23,14 +32,17 @@ projection_l2!(u_limited, u_lim, dΩ)
 
 When the cell means are computed repeatedly — e.g. at each time step of an explicit
 scheme — the underlying mass matrix can be assembled and factorized once with
-`build_cell_mean_cache`, and the means then obtained with `cell_mean(u, cache)`.
+[`build_cell_mean_cache`](@ref), and the means then obtained with `cell_mean(u, cache)`.
 
-!!! warning
-    Nothing is automatic in the choice of the measures: the min/max of `u` are evaluated
-    on the `targetMeasures` provided by the user, which should include both the cell
-    measure and the interior face measure. In previous versions of the API the face
-    measures were implicitly taken into account; omitting them now may silently weaken the
-    limiter.
+## cell\_mean
+
+```@docs
+cell_mean
+```
+
+```@docs
+build_cell_mean_cache
+```
 
 ## linear\_scaling\_limiter
 
@@ -40,8 +52,4 @@ linear_scaling_limiter
 
 ```@docs
 default_target_measures
-```
-
-```@docs
-build_cell_mean_cache
 ```
