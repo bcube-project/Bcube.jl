@@ -356,8 +356,9 @@ function compute_periodicity(mesh, labels1, labels2, A, tol = 1e-9)
         bnd_f2f[iface] = i
     end
 
-    # node to node relation
-    bnd_n2n = zeros(eltype(bndfaces2), length(f2c))
+    # node to node relation (indexed by node: there are more nodes than faces in high-order
+    # meshes)
+    bnd_n2n = zeros(eltype(bndfaces2), nnodes(mesh))
     for (_f2c, _f2n1, _f2n2) in zip(bnd_f2c, bnd_f2n1, bnd_f2n2)
         # distance between face center and adjacent cell center
         Δx = distance(center(get_nodes(mesh, c2n[_f2c[1]])), center(get_nodes(mesh, _f2n1)))

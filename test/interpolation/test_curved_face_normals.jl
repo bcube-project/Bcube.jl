@@ -56,11 +56,12 @@ end
 @testset "same face point from both sides, any numbering of the cells" begin
     # two tetrahedra sharing a face, the nodes of the second one in any order (orientations of
     # the shared face reversed, or rotated across an inverted cell)
-    perms(v) = if length(v) ≤ 1
-        [v]
-    else
-        [[v[i]; p] for i in eachindex(v) for p in perms(v[1:end .!= i])]
-    end
+    perms(v) =
+        if length(v) ≤ 1
+            [v]
+        else
+            [[v[i]; p] for i in eachindex(v) for p in perms(v[1:end .!= i])]
+        end
     xs = [
         SA[0.0, 0.0, 0.0],
         SA[1.0, 0.0, 0.0],
@@ -89,6 +90,35 @@ end
     end
     @test nperms == 24
     @test err < 1e-14
+end
+
+@testset "periodic curved faces" begin
+    # Quad9 mesh (more nodes than faces) with curved faces, periodic in x
+    warp(x) = SA[x[1] + 0.06 * sin(2π * x[2]), x[2] + 0.08 * sin(2π * x[1])]
+    mesh = transform(rectangle_mesh(4, 4; order = 2), warp)
+    @test nnodes(mesh) > nfaces(mesh)
+    perio = PeriodicBCType(Translation(SA[1.0, 0.0]), "xmin", "xmax")
+    Γ = BoundaryFaceDomain(mesh, perio)
+    nΓ = get_face_normals(Γ)
+    phys(cInfo, ξ) = mapping(Bcube.celltype(cInfo), Bcube.nodes(cInfo), ξ)
+    err_x, err_n, nf = 0.0, 0.0, 0
+    Bcube.foreach_element(Γ) do fInfo, _, _
+        cn, cp = Bcube.get_cellinfo_n(fInfo), Bcube.get_cellinfo_p(fInfo)
+        for ζ in (-0.7, 0.2, 1.0)
+            fp = FacePoint(SA[ζ], fInfo, ReferenceDomain())
+            # the opposite cell is translated onto the face
+            xn = phys(cn, get_coords(side_n(fp)))
+            xp = phys(cp, get_coords(side_p(fp)))
+            err_x = max(err_x, norm(xn - xp))
+            n⁻ = materialize(materialize(side_n(nΓ), fInfo), fp)
+            n⁺ = materialize(materialize(side_p(nΓ), fInfo), fp)
+            err_n = max(err_n, norm(n⁻ + n⁺))
+        end
+        nf += 1
+    end
+    @test nf == 3
+    @test err_x < 1e-12
+    @test err_n < 1e-12
 end
 
 @testset "coplanar rotation on curved hypersurfaces" begin
