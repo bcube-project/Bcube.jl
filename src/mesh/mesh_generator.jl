@@ -159,8 +159,8 @@ function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"
         i = 1 # init counter
         for ielt in 1:nelts
             # two new nodes : middle one and then right boundary
-            nodes[i + 1] = xmin + i * Δx
-            nodes[i + 2] = xmin + (i + 1) * Δx
+            nodes[i + 1] = Node(xmin + i * Δx)
+            nodes[i + 2] = Node(xmin + (i + 1) * Δx)
 
             # cell -> node
             cell2node[3 * ielt - 2] = i
@@ -175,7 +175,7 @@ function line_mesh(n; xmin = 0.0, xmax = 1.0, order = 1, names = ("xmin", "xmax"
         cell2nnodes = 3 * ones(Int, nelts)
 
         # Boundaries
-        bc_names, bc_nodes = one_line_bnd(1, n, names)
+        bc_names, bc_nodes = one_line_bnd(1, 2 * n - 1, names) # last node: right boundary
 
         # Mesh
         return Mesh(
