@@ -195,9 +195,7 @@ function side_p_face_coords(facePoint::FacePoint{ReferenceDomain})
     fshape = face_shapes(shape(celltype(cellinfo_p)), get_cell_side_p(faceInfo))
     permut = _face_permutation_p(faceInfo)
     # as in `side_p` (`mapping_face(shape, side, permut)`): the vertex `j` of the face seen from
-    # the negative side is sent to the vertex `permut[j]` seen from the positive side. This is
-    # exact when `permut` is an involution, which is the case between two cells of positive
-    # Jacobian (they run the face in opposite orientations).
+    # the negative side is the vertex `permut[j]` seen from the positive side
     fnodes = map(j -> Node(get_coords(fshape, j)), permut)
     ζ = get_coords(facePoint)
     return eltype(ζ).(mapping(fshape, fnodes, ζ))
@@ -207,8 +205,10 @@ side_p_face_coords(facePoint::FacePoint) = get_coords(facePoint)
 """
     _face_permutation_p(faceInfo::FaceInfo)
 
-Position, among the vertices of the face seen from the cell of the negative side, of each vertex
-of the face seen from the cell of the positive side.
+Position, among the vertices of the face seen from the cell of the positive side, of each vertex
+of the face seen from the cell of the negative side: the `j`-th vertex of the face for the
+negative side is its `permut[j]`-th vertex for the positive side (as expected by
+`mapping_face(shape, side, permut)`).
 """
 function _face_permutation_p(faceInfo)
     cellinfo_n = get_cellinfo_n(faceInfo)
@@ -229,10 +229,12 @@ function _face_permutation_p(faceInfo)
     c2n_p = get_nodes_index(cellinfo_p)
     f2n_p = c2n_p[faces2nodes(cshape_p, cside_p)]  # assumption:  shape nodes can be directly indexed in entity nodes
 
-    # types-stable version of `indexin(f2n_p, f2n_n)`
+    # types-stable version of `indexin(f2n_n, f2n_p)`
     # which return an array of `Int` instead of `Union{Int,Nothing}``
-    return map(f2n_p) do j
-        for (i, k) in enumerate(f2n_n)
+    # (the two orders coincide when the permutation is an involution, which is the case
+    # between two cells of positive Jacobian, but not across an inverted cell)
+    return map(f2n_n) do j
+        for (i, k) in enumerate(f2n_p)
             k === j && return i
         end
         return -1 # this must never happen

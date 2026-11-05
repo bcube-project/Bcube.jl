@@ -53,6 +53,44 @@
     @test err < 1e-12
 end
 
+@testset "same face point from both sides, any numbering of the cells" begin
+    # two tetrahedra sharing a face, the nodes of the second one in any order (orientations of
+    # the shared face reversed, or rotated across an inverted cell)
+    perms(v) = if length(v) ≤ 1
+        [v]
+    else
+        [[v[i]; p] for i in eachindex(v) for p in perms(v[1:end .!= i])]
+    end
+    xs = [
+        SA[0.0, 0.0, 0.0],
+        SA[1.0, 0.0, 0.0],
+        SA[0.0, 1.0, 0.0],
+        SA[0.0, 0.0, 1.0],
+        SA[0.3, 0.3, -1.0],
+    ]
+    phys(cInfo, ξ) = mapping(Bcube.celltype(cInfo), Bcube.nodes(cInfo), ξ)
+    err, nperms = 0.0, 0
+    for c2 in perms([1, 2, 3, 5])
+        mesh = Bcube.Mesh(
+            Node.(xs),
+            [Tetra4_t(), Tetra4_t()],
+            Connectivity([4, 4], [1, 2, 3, 4, c2...]),
+        )
+        Bcube.foreach_element(InteriorFaceDomain(mesh)) do fInfo, _, _
+            cn, cp = Bcube.get_cellinfo_n(fInfo), Bcube.get_cellinfo_p(fInfo)
+            for ζ in (SA[0.2, 0.3], SA[0.6, 0.1])
+                fp = FacePoint(ζ, fInfo, ReferenceDomain())
+                xn = phys(cn, get_coords(side_n(fp)))
+                xp = phys(cp, get_coords(side_p(fp)))
+                err = max(err, norm(xn - xp))
+            end
+        end
+        nperms += 1
+    end
+    @test nperms == 24
+    @test err < 1e-14
+end
+
 @testset "coplanar rotation on curved hypersurfaces" begin
     # Quad9 surface in 3D: on each side, the rotation maps the normal of the cell of this side on
     # the normal of the opposite cell, both evaluated at the same face point (`side⁺` evaluates
