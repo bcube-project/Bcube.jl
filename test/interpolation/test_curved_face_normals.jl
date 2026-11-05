@@ -52,3 +52,37 @@
     end
     @test err < 1e-12
 end
+
+@testset "coplanar rotation on curved hypersurfaces" begin
+    # Quad9 surface in 3D: on each side, the rotation maps the normal of the cell of this side on
+    # the normal of the opposite cell, both evaluated at the same face point (`side⁺` evaluates
+    # the rotation on `opposite_side` of the face point, which must be the same point)
+    m = rectangle_mesh(4, 4; order = 2)
+    surf(x) =
+        SA[x[1], x[2], 0.3 * sin(5 * x[1]) * cos(4 * x[2]) + 0.2 * sin(6 * x[2]) + x[1] ^ 4]
+    mesh = Bcube.Mesh(
+        [Bcube.Node(surf(get_coords(n))) for n in get_nodes(m)],
+        collect(Bcube.cells(m)),
+        Bcube.connectivities_indices(m, :c2n),
+    )
+    Γ = InteriorFaceDomain(mesh)
+    R, ν = Bcube.CoplanarRotation(), Bcube.CellNormal()
+    err_point, err_n, err_p = 0.0, 0.0, 0.0
+    Bcube.foreach_element(Γ) do fInfo, _, _
+        for ζ in (-0.7, 0.2, 1.0)
+            fp = FacePoint(SA[ζ], fInfo, ReferenceDomain())
+            x⁺ = get_coords(side_p(fp))
+            err_point =
+                max(err_point, norm(get_coords(side_n(Bcube.opposite_side(fp))) - x⁺))
+            ν⁻ = materialize(materialize(side_n(ν), fInfo), fp)
+            ν⁺ = materialize(materialize(side_p(ν), fInfo), fp)
+            R⁻ = materialize(materialize(side_n(R), fInfo), fp)
+            R⁺ = materialize(materialize(side_p(R), fInfo), fp)
+            err_n = max(err_n, norm(R⁻ - Bcube._coplanar_rotation(ν⁻, ν⁺)))
+            err_p = max(err_p, norm(R⁺ - Bcube._coplanar_rotation(ν⁺, ν⁻)))
+        end
+    end
+    @test err_point < 1e-12
+    @test err_n < 1e-12
+    @test err_p < 1e-12
+end
