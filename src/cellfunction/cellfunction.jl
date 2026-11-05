@@ -399,7 +399,8 @@ function LazyOperators.materialize(
     fInfo = get_faceinfo(fPoint)
     assert_has_opposite_side(fInfo)
 
-    ξface = get_coords(fPoint)
+    # the reference coordinates of `fPoint` follow the parametrization of the negative side
+    ξface = side_p_face_coords(fPoint)
 
     cInfo = get_cellinfo_p(fInfo)
     kside = get_cell_side_p(fInfo)
