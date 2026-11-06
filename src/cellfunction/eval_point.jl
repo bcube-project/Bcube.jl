@@ -175,9 +175,8 @@ Return the `CellPoint` corresponding to the `FacePoint` on positive side
 function side_p(facePoint::FacePoint{ReferenceDomain})
     faceInfo = get_faceinfo(facePoint)
     cellinfo_p = get_cellinfo_p(faceInfo)
-    permut = _face_permutation_p(faceInfo)
-    f = mapping_face(shape(celltype(cellinfo_p)), get_cell_side_p(faceInfo), permut)
-    return CellPoint(f(get_coords(facePoint)), cellinfo_p, ReferenceDomain())
+    f = mapping_face(shape(celltype(cellinfo_p)), get_cell_side_p(faceInfo))
+    return CellPoint(f(side_p_face_coords(facePoint)), cellinfo_p, ReferenceDomain())
 end
 
 """
@@ -194,8 +193,8 @@ function side_p_face_coords(facePoint::FacePoint{ReferenceDomain})
     cellinfo_p = get_cellinfo_p(faceInfo)
     fshape = face_shapes(shape(celltype(cellinfo_p)), get_cell_side_p(faceInfo))
     permut = _face_permutation_p(faceInfo)
-    # as in `side_p` (`mapping_face(shape, side, permut)`): the vertex `j` of the face seen from
-    # the negative side is the vertex `permut[j]` seen from the positive side
+    # the vertex `j` of the face seen from the negative side is the vertex `permut[j]` seen from
+    # the positive side (same convention as `mapping_face(shape, side, permut)`)
     fnodes = map(j -> Node(get_coords(fshape, j)), permut)
     ζ = get_coords(facePoint)
     return eltype(ζ).(mapping(fshape, fnodes, ζ))
