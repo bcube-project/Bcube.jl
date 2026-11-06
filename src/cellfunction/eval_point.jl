@@ -148,11 +148,12 @@ function FacePoint(x, faceInfo::FaceInfo, ds::DomainStyle)
 end
 
 """
-Return the opposite side of the `FacePoint`
+Return the opposite side of the `FacePoint`: the same point, its reference coordinates following
+the parametrization of the face by the cell of the new negative side (see `side_p_face_coords`).
 """
 function opposite_side(fPoint::FacePoint)
     return FacePoint(
-        get_coords(fPoint),
+        side_p_face_coords(fPoint),
         opposite_side(get_faceinfo(fPoint)),
         DomainStyle(fPoint),
     )
@@ -173,6 +174,42 @@ Return the `CellPoint` corresponding to the `FacePoint` on positive side
 """
 function side_p(facePoint::FacePoint{ReferenceDomain})
     faceInfo = get_faceinfo(facePoint)
+    cellinfo_p = get_cellinfo_p(faceInfo)
+    f = mapping_face(shape(celltype(cellinfo_p)), get_cell_side_p(faceInfo))
+    return CellPoint(f(side_p_face_coords(facePoint)), cellinfo_p, ReferenceDomain())
+end
+
+"""
+    side_p_face_coords(facePoint::FacePoint{ReferenceDomain})
+
+Coordinates of `facePoint` in the reference element of the face as parametrized by the cell of
+the positive side (`mapping_face(shape_p, side_p)`). The reference coordinates of a `FacePoint`
+follow the parametrization of the face by the cell of the negative side: they differ when the two
+cells see the vertices of the face in different orders (for instance a line face run in opposite
+directions).
+"""
+function side_p_face_coords(facePoint::FacePoint{ReferenceDomain})
+    faceInfo = get_faceinfo(facePoint)
+    cellinfo_p = get_cellinfo_p(faceInfo)
+    fshape = face_shapes(shape(celltype(cellinfo_p)), get_cell_side_p(faceInfo))
+    permut = _face_permutation_p(faceInfo)
+    # the vertex `j` of the face seen from the negative side is the vertex `permut[j]` seen from
+    # the positive side (same convention as `mapping_face(shape, side, permut)`)
+    fnodes = map(j -> Node(get_coords(fshape, j)), permut)
+    ζ = get_coords(facePoint)
+    return eltype(ζ).(mapping(fshape, fnodes, ζ))
+end
+side_p_face_coords(facePoint::FacePoint) = get_coords(facePoint)
+
+"""
+    _face_permutation_p(faceInfo::FaceInfo)
+
+Position, among the vertices of the face seen from the cell of the positive side, of each vertex
+of the face seen from the cell of the negative side: the `j`-th vertex of the face for the
+negative side is its `permut[j]`-th vertex for the positive side (as expected by
+`mapping_face(shape, side, permut)`).
+"""
+function _face_permutation_p(faceInfo)
     cellinfo_n = get_cellinfo_n(faceInfo)
     cellinfo_p = get_cellinfo_p(faceInfo)
 
@@ -191,18 +228,16 @@ function side_p(facePoint::FacePoint{ReferenceDomain})
     c2n_p = get_nodes_index(cellinfo_p)
     f2n_p = c2n_p[faces2nodes(cshape_p, cside_p)]  # assumption:  shape nodes can be directly indexed in entity nodes
 
-    # types-stable version of `indexin(f2n_p, f2n_n)`
+    # types-stable version of `indexin(f2n_n, f2n_p)`
     # which return an array of `Int` instead of `Union{Int,Nothing}``
-    permut = map(f2n_p) do j
-        for (i, k) in enumerate(f2n_n)
+    # (the two orders coincide when the permutation is an involution, which is the case
+    # between two cells of positive Jacobian, but not across an inverted cell)
+    return map(f2n_n) do j
+        for (i, k) in enumerate(f2n_p)
             k === j && return i
         end
         return -1 # this must never happen
     end
-
-    f = mapping_face(cshape_p, cside_p, permut)
-
-    return CellPoint(f(get_coords(facePoint)), cellinfo_p, ReferenceDomain())
 end
 
 function side_n(facePoint::FacePoint{PhysicalDomain})

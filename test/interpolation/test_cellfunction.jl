@@ -208,7 +208,7 @@ end
         ν = get_cell_normals(CellDomain(mesh))
 
         fInfo = FaceInfo(mesh, 2) # 2 is the good one, cf `Bcube.get_nodes_index(fInfo)`
-        fPoint = Bcube.FacePoint([0.0, 0.0], fInfo, ReferenceDomain())
+        fPoint = Bcube.FacePoint([0.0], fInfo, ReferenceDomain()) # faces are lines
         cInfo_n = Bcube.get_cellinfo_n(fInfo)
         cnodes_n = Bcube.nodes(cInfo_n)
         ctype_n = Bcube.celltype(cInfo_n)
@@ -262,7 +262,7 @@ end
         transform!(mesh, x -> rot * x)
 
         fInfo = FaceInfo(mesh, 2) # 2 is the good one, cf `Bcube.get_nodes_index(fInfo)`
-        fPoint = Bcube.FacePoint([0.0, 0.0], fInfo, ReferenceDomain())
+        fPoint = Bcube.FacePoint([0.0], fInfo, ReferenceDomain()) # faces are lines
         cInfo_n = Bcube.get_cellinfo_n(fInfo)
         cnodes_n = Bcube.nodes(cInfo_n)
         ctype_n = Bcube.celltype(cInfo_n)
