@@ -77,9 +77,86 @@
     end
 
     @testset "lazy_compose materialize_op" begin
-        import Bcube.LazyOperators: LazyOperator, materialize, lazy_compose
+        import Bcube.LazyOperators: LazyOperator, materialize, lazy_compose, MapOver
 
         op = LazyOperator(lazy_compose, (x -> x + 1), 5)
         @test materialize(op) == 6
+
+        # `MapOver` arguments : the function is applied on each leaf
+        # (`>` is not defined on `MapOver`)
+        f(x, y) = ifelse(x > 1, x * y, -1)
+        op = lazy_compose(f, (MapOver(1, 2, 3), 10))
+        @test materialize(op) === MapOver(-1, 20, 30)
+    end
+
+    @testset "map_over_leaves" begin
+        import Bcube.LazyOperators: map_over_leaves, MapOver, NullOperator
+
+        f(x, y) = x * y + 1
+        @test map_over_leaves(f, 2, 3) === 7
+        @test map_over_leaves(f, MapOver(1, 2, 3), 2) === MapOver(3, 5, 7)
+        @test map_over_leaves(f, MapOver(1, 2), MapOver(3, 4)) === MapOver(4, 9)
+
+        # nested `MapOver`s
+        a = MapOver(MapOver(1, 2), MapOver(3, 4))
+        @test map_over_leaves(f, a, 2) === MapOver(MapOver(3, 5), MapOver(7, 9))
+        # the nested `MapOver`s must not prevent the inference (it did with julia 1.10)
+        f3(x, y, z) = x * y + z
+        @test @inferred(map_over_leaves(f3, a, 2, 1)) ===
+              MapOver(MapOver(3, 5), MapOver(7, 9))
+
+        # leaves that are all `NullOperator` are collapsed
+        g(x, y) = x * y
+        @test map_over_leaves(g, MapOver(1, 2), NullOperator()) === NullOperator()
+        b = MapOver(MapOver(1, 2), NullOperator())
+        @test map_over_leaves(g, b, 3) === MapOver(MapOver(3, 6), NullOperator())
+
+        # a function returning a `Tuple` gives a `Tuple` of `MapOver`s
+        h(x) = (x, 2 * x, x * NullOperator())
+        @test map_over_leaves(h, MapOver(1, 2)) ===
+              (MapOver(1, 2), MapOver(2, 4), NullOperator())
+        @test map_over_leaves(h, a) === (
+            MapOver(MapOver(1, 2), MapOver(3, 4)),
+            MapOver(MapOver(2, 4), MapOver(6, 8)),
+            NullOperator(),
+        )
+        # ... and is inferred, even when the components of the `Tuple` have different types
+        h2(x) = (x, 2.0 * x, x * NullOperator())
+        @test @inferred(map_over_leaves(h2, a)) === (
+            MapOver(MapOver(1, 2), MapOver(3, 4)),
+            MapOver(MapOver(2.0, 4.0), MapOver(6.0, 8.0)),
+            NullOperator(),
+        )
+
+        # the other subtypes of `AbstractMapOver` are evaluated operator by operator
+        struct OtherMapOver{A <: Tuple} <: Bcube.LazyOperators.AbstractMapOver{A}
+            args::A
+        end
+        Bcube.LazyOperators.get_basetype(::Type{<:OtherMapOver}) = OtherMapOver
+        o = OtherMapOver((3, 4))
+        @test map_over_leaves(f, o, 2) === OtherMapOver((7, 9))
+        @test map_over_leaves(f, o, MapOver(1, 2)) === OtherMapOver((4, 9))
+
+        # above `MAX_UNROLLED_LEAVES` leaves, `f` is evaluated operator by operator
+        which_path(x, _) = x isa MapOver ? :operator_by_operator : :leaves
+        @test map_over_leaves(which_path, MapOver(1, 2), 2) === MapOver(:leaves, :leaves)
+        n = isqrt(Bcube.LazyOperators.MAX_UNROLLED_LEAVES) + 1
+        big = MapOver(ntuple(i -> MapOver(ntuple(j -> i + j, n)), n))
+        @test map_over_leaves(which_path, big, 2) === :operator_by_operator
+        @test map_over_leaves(f, big, 2) == f(big, 2)
+
+        # The generator of `_map_over_leaves` must find its helpers when `LazyOperators` is
+        # loaded from source: the pkgimage of Bcube hides a wrong definition order
+        # ("method too new", or an undefined binding for julia >= 1.12). It runs in a new
+        # process: loading `LazyOperators` again here would overwrite the methods it defines
+        # on functions of `Base`. The new process has no project: `LazyOperators` only
+        # depends on standard libraries.
+        path = joinpath(pkgdir(Bcube), "src", "LazyOperators", "LazyOperators.jl")
+        code = """
+        include($(repr(path)))
+        r = LazyOperators.map_over_leaves(*, LazyOperators.MapOver(1, 2), 2)
+        r === LazyOperators.MapOver(2, 4) || exit(1)
+        """
+        @test success(`$(Base.julia_cmd()) --startup-file=no -e $code`)
     end
 end

@@ -380,6 +380,64 @@
         @test eh1 < tol
     end
 
+    @testset "Bilinear face composition" begin
+        # A composition `f ∘ (...)` mixing both sides of the faces must give
+        # the same matrix as the equivalent lazy expression
+        mesh = rectangle_mesh(3, 4)
+        U = TrialFESpace(FunctionSpace(:Lagrange, 1), mesh, :discontinuous; size = 2)
+        V = TestFESpace(U)
+        μ = PhysicalFunction(x -> 1.0 + x[1]^2)
+        dΓ = Measure(InteriorFaceDomain(mesh), 3)
+        dΓb = Measure(BoundaryFaceDomain(mesh), 3)
+        nΓ = get_face_normals(dΓ)
+        nΓb = get_face_normals(dΓb)
+
+        avg(u) = 0.5 * (side⁺(u) + side⁻(u))
+        τ(μ, ∇u) = μ * (∇u + transpose(∇u) - tr(∇u) * I)
+        jump_vec(u, n) = side⁺(u) ⊗ side⁺(n) + side⁻(u) ⊗ side⁻(n)
+
+        function a_lazy(u, v)
+            ∫(
+                -avg(τ(μ, ∇(u))) ⊡ jump_vec(v, nΓ) +
+                2 * avg(μ) * jump_vec(v, nΓ) ⊡ jump_vec(u, nΓ),
+            )dΓ
+        end
+        function fa(u⁻, u⁺, ∇u⁻, ∇u⁺, v⁻, v⁺, μ⁻, μ⁺, n⁻)
+            ju = (u⁻ - u⁺) ⊗ n⁻
+            jv = (v⁻ - v⁺) ⊗ n⁻
+            return -0.5 * (τ(μ⁻, ∇u⁻) + τ(μ⁺, ∇u⁺)) ⊡ jv + (μ⁻ + μ⁺) * (jv ⊡ ju)
+        end
+        function a_compo(u, v)
+            args = (
+                side⁻(u),
+                side⁺(u),
+                side⁻(∇(u)),
+                side⁺(∇(u)),
+                side⁻(v),
+                side⁺(v),
+                side⁻(μ),
+                side⁺(μ),
+                side⁻(nΓ),
+            )
+            ∫(fa ∘ args)dΓ
+        end
+        A_lazy = assemble_bilinear(a_lazy, U, V)
+        A_compo = assemble_bilinear(a_compo, U, V)
+        @test norm(A_lazy) > 0
+        @test isapprox(A_compo, A_lazy; rtol = 1e-14)
+
+        # Boundary faces
+        function ab_lazy(u, v)
+            ∫(-(τ(side⁻(μ), side⁻(∇(u))) * side⁻(nΓb)) ⋅ side⁻(v) + side⁻(u) ⋅ side⁻(v))dΓb
+        end
+        fab(u, ∇u, v, μ, n) = -(τ(μ, ∇u) * n) ⋅ v + u ⋅ v
+        ab_compo(u, v) = ∫(fab ∘ map(side⁻, (u, ∇(u), v, μ, nΓb)))dΓb
+        B_lazy = assemble_bilinear(ab_lazy, U, V)
+        B_compo = assemble_bilinear(ab_compo, U, V)
+        @test norm(B_lazy) > 0
+        @test isapprox(B_compo, B_lazy; rtol = 1e-14)
+    end
+
     @testset "Constrained Poisson" begin
         n = 2
         Lx = 2.0
